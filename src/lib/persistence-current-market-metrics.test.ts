@@ -73,7 +73,7 @@ describe('BUG-179 canonical current-market metric projection', () => {
     });
   });
 
-  it('publishes one executable revision atomically and clears every metric on arb to no-arb', async () => {
+  it('publishes one executable revision atomically and clears every metric on genuine no-arb', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-metrics-'));
     const dbPath = path.join(tempDir, 'edgefinder.db');
     process.env.H2H_SQLITE_PATH = dbPath;
@@ -143,8 +143,8 @@ describe('BUG-179 canonical current-market metric projection', () => {
       strategy: 'No arb',
       arbType: null,
       outcomeCount: 1,
-      matchedCount: 1,
-      matchStatus: 'matched',
+      matchedCount: 0,
+      matchStatus: 'confirmed_zero',
       kalshiCount: 1,
       pmCount: 1,
       scannedAt: '2026-08-20T13:05:00.000Z',
@@ -193,6 +193,77 @@ describe('BUG-179 canonical current-market metric projection', () => {
       canonical_current_revision: secondRevision + 1,
     });
     expect(Number(guardAlerts.rows[0]?.count ?? 0)).toBeGreaterThan(0);
+  });
+
+  it('preserves prior canonical metrics when a matched scan produces no positive candidate', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-matched-no-positive-'));
+    const dbPath = path.join(tempDir, 'edgefinder.db');
+    process.env.H2H_SQLITE_PATH = dbPath;
+    process.env.H2H_SAVED_MARKETS_FILE = path.join(tempDir, 'saved-markets.json');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+
+    const market = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/bug-182-no-positive',
+      polymarketUrl: 'https://polymarket.com/event/bug-182-no-positive',
+      eventTitle: 'BUG-182 no-positive fixture',
+      expiryDate: '2026-11-28T00:00:00.000Z',
+    });
+    const firstRevision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
+    const roiPct = 2;
+    const daysToExpiry = 100;
+    const apyPct = (Math.pow(1 + roiPct / 100, 365 / daysToExpiry) - 1) * 100;
+    await persistence.updateSavedMarketScanResult(market.id, {
+      bestRoiPct: roiPct,
+      bestProfit: 1,
+      strategy: 'Buy YES Kalshi + NO PM',
+      arbType: 'direct',
+      outcomeCount: 1,
+      matchedCount: 1,
+      matchStatus: 'matched',
+      kalshiCount: 1,
+      pmCount: 1,
+      scannedAt: '2026-08-20T13:00:00.000Z',
+      publicationGeneration: firstRevision,
+      allArbs: [{
+        artist: 'Yes', roiPct, expectedProfit: 1, strategy: 'Buy YES Kalshi + NO PM',
+        arbType: 'direct', totalStake: 99, executionStatus: 'executable', apyPct,
+        daysToExpiry, expiryAt: '2026-11-28T00:00:00.000Z',
+      }],
+    });
+
+    const secondRevision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
+    expect(await persistence.updateSavedMarketScanResult(market.id, {
+      bestRoiPct: 0,
+      bestProfit: 0,
+      strategy: 'No arb',
+      arbType: null,
+      outcomeCount: 1,
+      matchedCount: 1,
+      matchStatus: 'matched',
+      kalshiCount: 1,
+      pmCount: 1,
+      scannedAt: '2026-08-20T13:05:00.000Z',
+      publicationGeneration: secondRevision,
+      allArbs: [],
+    })).toBe(true);
+
+    const saved = await persistence.getSavedMarketById(market.id);
+    expect(saved).toMatchObject({
+      canonicalApyPct: apyPct,
+      canonicalApyRevision: firstRevision,
+      canonicalCurrentRoiPct: roiPct,
+      canonicalCurrentProfit: 1,
+      canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
+      canonicalCurrentDaysToExpiry: daysToExpiry,
+      canonicalCurrentExpiryAt: '2026-11-28T00:00:00.000Z',
+      canonicalCurrentRevision: firstRevision,
+      lastScanResult: {
+        matchStatus: 'unavailable',
+        matchError: expect.stringContaining('no_positive_candidate_persists_prior'),
+        publicationGeneration: secondRevision,
+      },
+    });
   });
 
   it('preserves a prior executable revision when a matched publisher supplies only non-executable evidence', async () => {

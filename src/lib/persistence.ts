@@ -2243,13 +2243,32 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
   await ensureMarketsMigrated();
   const c = getClient();
   const current = await c.execute({
-    sql: 'SELECT last_scan_result, scan_publication_generation FROM saved_markets WHERE id = ?', args: [id],
+    sql: `SELECT last_scan_result, scan_publication_generation,
+            canonical_current_roi_pct, canonical_current_profit, canonical_current_strategy,
+            canonical_current_days_to_expiry, canonical_current_expiry_at, canonical_current_revision,
+            canonical_apy_pct, canonical_apy_unavailable_reason, canonical_apy_outcome,
+            canonical_apy_observed_at, canonical_apy_source, canonical_apy_revision
+          FROM saved_markets WHERE id = ?`, args: [id],
   });
   if (!current.rows[0]) return false;
   const previousRaw = current.rows[0].last_scan_result == null ? null : String(current.rows[0].last_scan_result);
   const previous = previousRaw
       ? JSON.parse(previousRaw) as LastScanResult
       : null;
+  const previousCanonical = {
+    roiPct: current.rows[0].canonical_current_roi_pct == null ? null : Number(current.rows[0].canonical_current_roi_pct),
+    profit: current.rows[0].canonical_current_profit == null ? null : Number(current.rows[0].canonical_current_profit),
+    strategy: current.rows[0].canonical_current_strategy == null ? null : String(current.rows[0].canonical_current_strategy),
+    daysToExpiry: current.rows[0].canonical_current_days_to_expiry == null ? null : Number(current.rows[0].canonical_current_days_to_expiry),
+    expiryAt: current.rows[0].canonical_current_expiry_at == null ? null : String(current.rows[0].canonical_current_expiry_at),
+    revision: current.rows[0].canonical_current_revision == null ? null : Number(current.rows[0].canonical_current_revision),
+    apyPct: current.rows[0].canonical_apy_pct == null ? null : Number(current.rows[0].canonical_apy_pct),
+    apyUnavailableReason: current.rows[0].canonical_apy_unavailable_reason == null ? null : String(current.rows[0].canonical_apy_unavailable_reason),
+    apyOutcome: current.rows[0].canonical_apy_outcome == null ? null : String(current.rows[0].canonical_apy_outcome),
+    apyObservedAt: current.rows[0].canonical_apy_observed_at == null ? null : String(current.rows[0].canonical_apy_observed_at),
+    apySource: current.rows[0].canonical_apy_source == null ? null : String(current.rows[0].canonical_apy_source),
+    apyRevision: current.rows[0].canonical_apy_revision == null ? null : Number(current.rows[0].canonical_apy_revision),
+  };
   const generation = Number(current.rows[0].scan_publication_generation);
   if (result.publicationGeneration != null && result.publicationGeneration !== generation) return false;
   if (isStaleMatchPublication(previous, result)) return false;
@@ -2273,8 +2292,23 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
     }, previous, 'saved_market_scan');
     if (!prepared) return false;
   }
-  const successfulFullScan = prepared.matchStatus === 'matched' || prepared.matchStatus === 'confirmed_zero';
-  const canonicalApy = successfulFullScan ? canonicalSavedMarketApy(prepared) : null;
+  let successfulFullScan = prepared.matchStatus === 'matched' || prepared.matchStatus === 'confirmed_zero';
+  let canonicalApy = successfulFullScan ? canonicalSavedMarketApy(prepared) : null;
+  // BUG-182: a matched scan that finds matched pairs but no positive candidate
+  // must not erase a prior valid canonical ROI/profit/APY. Persist the attempt
+  // as unavailable and keep the last-known canonical values with their
+  // original revision/age.
+  const newCanonicalRoiValid = canonicalApy?.roiPct != null && Number.isFinite(canonicalApy.roiPct) && canonicalApy.roiPct > 0;
+  const previousCanonicalRoiValid = previousCanonical.roiPct != null && Number.isFinite(previousCanonical.roiPct) && previousCanonical.roiPct > 0;
+  if (successfulFullScan && prepared.matchStatus === 'matched' && !newCanonicalRoiValid && previousCanonicalRoiValid) {
+    prepared = {
+      ...prepared,
+      matchStatus: 'unavailable',
+      matchError: `no_positive_candidate_persists_prior: The latest scan found no positive candidate opportunity, so the prior completed canonical values remain current (revision ${previousCanonical.revision}).`,
+    };
+    successfulFullScan = false;
+    canonicalApy = null;
+  }
   const matchedNow = prepared.matchedCount > 0 ? new Date().toISOString() : null;
   const dependencies = prepared.matchDependencies ?? [];
   const dependencyGuard = dependencies.length > 0

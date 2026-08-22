@@ -524,7 +524,7 @@ export async function executeFullScan(request: NextRequest) {
           arbType: bestNetArb ? (bestNetArb.arbitrage as any).arbType ?? null : null,
           outcomeCount: withArbitrage.length,
           matchedCount,
-          matchStatus: matchedCount > 0 ? 'matched' as const : 'confirmed_zero' as const,
+          matchStatus: netArbs.length > 0 ? 'matched' as const : 'confirmed_zero' as const,
           matchedPairs,
           kalshiCount,
           pmCount,
