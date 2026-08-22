@@ -2294,13 +2294,13 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
   }
   let successfulFullScan = prepared.matchStatus === 'matched' || prepared.matchStatus === 'confirmed_zero';
   let canonicalApy = successfulFullScan ? canonicalSavedMarketApy(prepared) : null;
-  // BUG-182: a matched scan that finds matched pairs but no positive candidate
-  // must not erase a prior valid canonical ROI/profit/APY. Persist the attempt
-  // as unavailable and keep the last-known canonical values with their
-  // original revision/age.
+  // BUG-182: any scan that completes (matched or confirmed_zero) but fails to
+  // produce a positive candidate must not erase a prior valid canonical
+  // ROI/profit/APY. Persist the attempt as unavailable and keep the last-known
+  // canonical values with their original revision/age.
   const newCanonicalRoiValid = canonicalApy?.roiPct != null && Number.isFinite(canonicalApy.roiPct) && canonicalApy.roiPct > 0;
   const previousCanonicalRoiValid = previousCanonical.roiPct != null && Number.isFinite(previousCanonical.roiPct) && previousCanonical.roiPct > 0;
-  if (successfulFullScan && prepared.matchStatus === 'matched' && !newCanonicalRoiValid && previousCanonicalRoiValid) {
+  if (successfulFullScan && !newCanonicalRoiValid && previousCanonicalRoiValid) {
     prepared = {
       ...prepared,
       matchStatus: 'unavailable',

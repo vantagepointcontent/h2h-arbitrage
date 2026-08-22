@@ -73,7 +73,7 @@ describe('BUG-179 canonical current-market metric projection', () => {
     });
   });
 
-  it('publishes one executable revision atomically and clears every metric on genuine no-arb', async () => {
+  it('publishes one executable revision atomically and preserves canonical values on a zero-candidate completion', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-metrics-'));
     const dbPath = path.join(tempDir, 'edgefinder.db');
     process.env.H2H_SQLITE_PATH = dbPath;
@@ -153,15 +153,19 @@ describe('BUG-179 canonical current-market metric projection', () => {
     })).toBe(true);
 
     expect(await persistence.getSavedMarketById(market.id)).toMatchObject({
-      canonicalApyPct: null,
-      canonicalApyUnavailableReason: 'no_canonical_arbitrage',
-      canonicalApyRevision: secondRevision,
-      canonicalCurrentRoiPct: null,
-      canonicalCurrentProfit: null,
-      canonicalCurrentStrategy: 'No arb',
-      canonicalCurrentDaysToExpiry: null,
-      canonicalCurrentExpiryAt: null,
-      canonicalCurrentRevision: secondRevision,
+      canonicalApyPct: apyPct,
+      canonicalApyRevision: firstRevision,
+      canonicalCurrentRoiPct: roiPct,
+      canonicalCurrentProfit: 1,
+      canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
+      canonicalCurrentDaysToExpiry: daysToExpiry,
+      canonicalCurrentExpiryAt: '2026-11-28T00:00:00.000Z',
+      canonicalCurrentRevision: firstRevision,
+      lastScanResult: {
+        matchStatus: 'unavailable',
+        matchError: expect.stringContaining('no_positive_candidate_persists_prior'),
+        publicationGeneration: secondRevision,
+      },
     });
     expect(await persistence.updateSavedMarketScanResult(market.id, {
       bestRoiPct: roiPct, bestProfit: 1, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',
@@ -193,6 +197,49 @@ describe('BUG-179 canonical current-market metric projection', () => {
       canonical_current_revision: secondRevision + 1,
     });
     expect(Number(guardAlerts.rows[0]?.count ?? 0)).toBeGreaterThan(0);
+  });
+
+  it('clears canonical metrics when the first completed scan is a genuine zero-candidate scan', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-first-zero-'));
+    const dbPath = path.join(tempDir, 'edgefinder.db');
+    process.env.H2H_SQLITE_PATH = dbPath;
+    process.env.H2H_SAVED_MARKETS_FILE = path.join(tempDir, 'saved-markets.json');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+
+    const market = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/bug-182-first-zero',
+      polymarketUrl: 'https://polymarket.com/event/bug-182-first-zero',
+      eventTitle: 'BUG-182 first-zero fixture',
+      expiryDate: '2026-11-28T00:00:00.000Z',
+    });
+    const revision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
+    await persistence.updateSavedMarketScanResult(market.id, {
+      bestRoiPct: 0,
+      bestProfit: 0,
+      strategy: 'No arb',
+      arbType: null,
+      outcomeCount: 1,
+      matchedCount: 0,
+      matchStatus: 'confirmed_zero',
+      kalshiCount: 1,
+      pmCount: 1,
+      scannedAt: '2026-08-20T13:00:00.000Z',
+      publicationGeneration: revision,
+      allArbs: [],
+    });
+
+    expect(await persistence.getSavedMarketById(market.id)).toMatchObject({
+      canonicalApyPct: null,
+      canonicalApyUnavailableReason: 'no_canonical_arbitrage',
+      canonicalApyRevision: revision,
+      canonicalCurrentRoiPct: null,
+      canonicalCurrentProfit: null,
+      canonicalCurrentStrategy: 'No arb',
+      canonicalCurrentDaysToExpiry: null,
+      canonicalCurrentExpiryAt: null,
+      canonicalCurrentRevision: revision,
+    });
   });
 
   it('preserves prior canonical metrics when a matched scan produces no positive candidate', async () => {
