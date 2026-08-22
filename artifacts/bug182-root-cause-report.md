@@ -4,7 +4,7 @@ Observed and implemented: 2026-08-22 UTC
 
 ## Production identity and controlled reproduction
 
-The active production artifact throughout the reproduction was commit `417ba19942c9355de3c9b875f6385255fdd3c247`, build ID `j4yKqSPvtqKAfh86v1343`, release run `1787326619485-223860`.
+The original failing reproduction used commit `417ba19942c9355de3c9b875f6385255fdd3c247`, build ID `j4yKqSPvtqKAfh86v1343`, release run `1787326619485-223860`. The reviewed prevention was subsequently released as commit `c3eccd4e00c781b6e4078ad912875bec77af76ab`, build ID `-1-4bWEPzLpLQsy0MOHpN`, release run `1787401126544-395905`. Both `scripts/release-manager.mjs status` and live `/api/health` identified that exact post-fix artifact during final verification.
 
 Three consecutive controlled `h2h-arbitrage` restarts were observed:
 
@@ -16,7 +16,17 @@ Three consecutive controlled `h2h-arbitrage` restarts were observed:
 
 Across all three ready states, the canonical Logs summary was unchanged: Total Arbs 0, Avg ROI 1.3013746867767322%, Best ROI 25.26460000000001%, Total Profit null. The latest quality snapshot was unchanged at scan 854274. SQLite integrity remained `ok` and foreign-key violations remained zero. After restart 3, persisted Saved Markets had 84 ROI values, 3 profit values, and 0 APY values. The primary and backup JSON mirrors both parsed as 476 rows and had the identical SHA-256 `1453a2ec47f5cf7d596e7374e7bcf1a7a2f57f7f90e6bcd9575754ea8dc64e52`.
 
-This falsifies the original assumption that app startup deletes canonical financial values. The database population and summaries remain stable across restart. The startup-visible Current ROI loss is a consumer authorization failure, while the continuing Markets/Logs degradation has separate producer and provenance causes.
+This falsified the original assumption that app startup deleted canonical financial values. The database population and summaries remained stable across restart. The startup-visible Current ROI loss was a consumer authorization failure, while the continuing Markets/Logs degradation had separate producer and provenance causes.
+
+Final post-fix verification captured every `saved_markets` row by stable ID and both venue URLs, together with canonical ROI, profit, strategy, APY, current/APY revisions, expiry/TTE, source, outcome, and observed-at. The complete snapshots and comparisons are in `backups/bug182-review-20260822T124113Z/`.
+
+| Restart | Before | HTTP unavailable/startup snapshot | Ready snapshot | First natural completed scan | Protected financial rows exact through readiness and first scan |
+|---|---|---|---|---|---|
+| 1 | 2026-08-22T12:41:18.593Z | 2026-08-22T12:41:23.750Z | 2026-08-22T12:41:43.767Z | 856348 at 2026-08-22T12:42:11.242Z, `completed`, `No arb`, `confirmed_no_arbitrage` | 78/78 exact; 0 null regressions |
+| 2 | 2026-08-22T12:42:21.603Z | 2026-08-22T12:42:26.909Z | 2026-08-22T12:42:42.344Z | 856357 at 2026-08-22T12:42:24.061Z, `completed`, `No arb`, `confirmed_no_arbitrage` | 78/78 exact; 0 null regressions |
+| 3 | 2026-08-22T12:42:52.236Z | 2026-08-22T12:42:59.405Z | 2026-08-22T12:43:07.405Z | 856358 at 2026-08-22T12:43:32.510Z, `completed`, `No arb`, `confirmed_no_arbitrage` | 78/78 exact; 0 null regressions |
+
+The poller PID remained 402086 throughout all three controlled app restarts, establishing that these were natural scheduled producer completions rather than manually injected scans. All 78 rows carrying a canonical ROI/profit/APY value were byte-for-byte identical across every captured field at startup, readiness, and after the first natural completion. There were zero missing market identities and zero non-null-to-null canonical regressions. Some genuinely no-canonical-arbitrage rows advanced only their no-arbitrage revision/observed-at as concurrent natural scans completed; `restart-comparison.json` lists each such change explicitly instead of hiding it behind aggregate counts. No protected financial row changed.
 
 ## First divergent layers
 
@@ -73,6 +83,33 @@ The corrected scanner now fails closed before publication for five distinct stat
 - `git diff --check` passed.
 - Post-rework data integrity: SQLite `integrity_check=ok`, zero foreign-key violations; both JSON mirrors parse as 476 rows and are byte-identical with SHA-256 `ec677d6f8cf62ca441e256577b233cfbfbc503ac58f1dece1c8bd6d072a575e4`.
 
-## Production release gate
+## Post-fix production verification
 
-The active release remains commit `417ba199...`; this working-tree task did not create or promote a commit. Therefore post-fix sustained production polling, two distinct 500-row browser bottom reaches, and three post-fix production restarts must be completed by the reviewed release lane. The pre-fix three-restart evidence above is complete and establishes that canonical rows were not deleted on startup; the visible recurrence was the protected POST plus ongoing sparse/non-executable publications.
+The post-fix `c3eccd4` release is active. Its original release gates passed, but the stronger sustained-lifecycle audit below found one remaining startup/list-reconciliation provenance mutation, so final acceptance remains open pending review and promotion of the additional guard.
+
+- Release identity: commit `c3eccd4e00c781b6e4078ad912875bec77af76ab`, build `-1-4bWEPzLpLQsy0MOHpN`, run `1787401126544-395905`.
+- Release gates from OPS-861: 2,244 Vitest tests passed; lint baseline passed; Next.js production build passed 53/53 static pages plus standalone workers; focused preservation suites passed 92/92; `git diff --check` passed.
+- Final evidence rework gate: the four reviewer-targeted suites passed 75/75 with file parallelism disabled (the suites mutate process-global persistence paths), the lint baseline passed with no new errors, all evidence scripts passed `node --check`, and `git diff --check` passed.
+- Exact restart evidence: `backups/bug182-review-20260822T124113Z/restart-manifest.json`, all twelve per-stage snapshots, and `restart-comparison.json`. Each snapshot includes the complete 634-row SQLite canonical population, stable identities, exact financial values/revisions/ages, JSON mirror hash and row count, SQLite quick check, foreign-key count, poller lifecycle, app health, and completed scans after its baseline.
+- Integrity: every final snapshot reports SQLite `quick_check=ok` and zero foreign-key violations. OPS-861 additionally verified the primary/backup Saved Markets mirrors byte-identical with SHA-256 `089603dc8d17533c389454373d8fd0c37ca072166410f44988550e33382fbc3c` before promotion.
+- Live Markets projection at 2026-08-22T12:45:15Z: 476 rows; 75 canonical Current ROI values retained and 401 truthful no-canonical-arbitrage rows. APY reasons were exactly `no_canonical_arbitrage` (401) and `current_candidate_non_executable` (75). Failed/incomplete attempts remained separate as `executable_candidate_unavailable`, `clob_book_empty`, or `Recovered interrupted scan after application restart`; none erased a protected canonical value.
+- Live Logs pagination used the actual route contract, `before=<scanned_at|id>`: page 1 returned IDs 856367 through 855868 and page 2 returned 855867 through 855368, 500 rows each, zero overlap, with identical summaries. The summary reconciled as Total Arbs 0, Avg ROI 1.3093760740918932%, Best ROI 25.26460000000001%, Total Profit null, and direct/cross/internal counts all zero. This is the documented indicative-ROI/executable-profit scope, not arithmetic disagreement.
+- Persisted Current ROI batching returned 500/500 exact-market results with precise `latest_completed_scan_has_no_arbitrage`; historical unavailable fields on those pages resolved to `confirmed_no_arbitrage`. API pages and Current ROI responses contained zero generic `failed` occurrences.
+- Logs CSV export returned 1,000 rows and 67 columns; `HEAD /api/logs/export` reported the same canonical 79,061-row scope as `/api/logs`; SHA-256 was `360047a81f831bf3b16e7d8af785232c563d5210b0ba9df7f297fa67355cf258`. The accounting/trades CSV returned its valid 41-column header and zero rows with SHA-256 `fc98a3e7f06826a6d1fd5d0d08a723579dd65fcecf206cd0a3b1c30ec144ae3d`. Neither export contained generic `failed`.
+- Logs Current ROI rendering performs zero venue calls: the GET route imports only the persisted SQLite resolver in `src/lib/current-log-roi.server.ts`; five live 100-ID batches completed from that path. Existing route/component regression tests fence the GET contract and stale-state behavior.
+
+Machine-readable live reconciliation is stored at `artifacts/bug182-production-reconciliation.json` and can be regenerated with `scripts/bug182-production-reconciliation.mjs`.
+
+### Remaining bounded caveat
+
+The original `profit: 100% affected (all_zero_population)` alert is gone. The current data-quality banner remains degraded because 99/100 recent indicative rows truthfully lack executable profit and 93/94 APY-eligible rows truthfully lack APY, all with precise `current_candidate_non_executable` reasons. One legacy row still carries an available zero profit under the old unverifiable envelope. That single bounded legacy datum is recorded rather than silently rewritten; it does not cause protected values to disappear and no new producer path fabricates that zero.
+
+### Sustained-lifecycle rework finding
+
+The twelve-snapshot restart artifact proves the initially captured startup/readiness/first-scan windows preserved all 78 protected financial records. Continued ordinary use and additional restarts then exposed a later mutation that the original comparison window did not reach. `backups/bug182-review-rework/exact-restart-comparison.json` records all 634 stable market identities and every canonical value/revision/age. Its third cycle found 63 rows with retained non-executable Current ROI where ROI, strategy, TTE, expiry, APY reason, and observed-at stayed unchanged but both canonical revision fields advanced by one. No ROI became null, but relabeling an old value with a failed attempt's revision violates the same-revision/age contract and can make downstream reconciliation treat stale evidence as current.
+
+The first mutating layer is `reconcileSavedMarketMatchSummaries()` in `src/lib/persistence.ts`. During startup or Saved Markets list reconciliation it rebuilt the metric projection from a persisted `matchStatus=unavailable` attempt. Such an attempt intentionally retains the prior candidate values and observation age while carrying its own newer `publicationGeneration`; reconciliation therefore copied the failed generation onto the older canonical values and could clear a previously valid APY.
+
+The additional candidate guard skips metric reconstruction for `unavailable` and `refreshing` attempts. The fail-closed invariant query still clears internally inconsistent APY rows, but failed/in-progress evidence cannot promote, clear, or relabel last-known canonical metrics. The real SQLite regression in `src/lib/persistence-current-market-metrics.test.ts` first reproduced the mutation (`reconcileSavedMarketMatchSummaries()` changed one row and cleared stale APY), then passed with zero reconciled rows and exact ROI/profit/APY/revision/observed-at preservation.
+
+Final production acceptance now requires review, release promotion of this additional reconciliation guard, and repetition of the exact sustained restart/list-refresh audit with zero lost and zero changed prior-valid canonical records.

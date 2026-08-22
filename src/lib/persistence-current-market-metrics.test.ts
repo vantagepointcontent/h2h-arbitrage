@@ -311,6 +311,20 @@ describe('BUG-179 canonical current-market metric projection', () => {
         publicationGeneration: secondRevision,
       },
     });
+
+    expect(await persistence.reconcileSavedMarketMatchSummaries()).toBe(0);
+    expect(await persistence.getSavedMarketById(market.id)).toMatchObject({
+      canonicalApyPct: apyPct,
+      canonicalApyRevision: firstRevision,
+      canonicalApyObservedAt: '2026-08-20T13:00:00.000Z',
+      canonicalCurrentRoiPct: roiPct,
+      canonicalCurrentProfit: 1,
+      canonicalCurrentRevision: firstRevision,
+      lastScanResult: {
+        matchStatus: 'unavailable',
+        publicationGeneration: secondRevision,
+      },
+    });
   });
 
   it('preserves a prior executable revision when a matched publisher supplies only non-executable evidence', async () => {

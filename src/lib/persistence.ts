@@ -2472,6 +2472,14 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
         result = sanitizeSavedArbResult(parsed) ?? parsed;
       } catch { /* APY without a readable current source is cleared below */ }
     }
+    // BUG-182: unavailable/refreshing payloads describe attempts, not completed
+    // canonical observations. Their publication generation can be newer than
+    // the retained last-known values; replaying it during startup/list
+    // reconciliation would relabel the old ROI/profit/APY with the failed
+    // attempt's revision (and could clear valid APY). Preserve the complete
+    // prior projection; the fail-closed invariant statement below still clears
+    // internally inconsistent APY rows without promoting failed evidence.
+    if (result?.matchStatus === 'unavailable' || result?.matchStatus === 'refreshing') continue;
     const canonical = result ? canonicalSavedMarketApy(result) : {
       value: null, unavailableReason: 'current_scan_revision_unavailable', outcome: null, observedAt: null,
       roiPct: null, profit: null, strategy: 'No arb', daysToExpiry: null, expiryAt: null,
