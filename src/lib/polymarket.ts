@@ -19,6 +19,7 @@ export interface PMMarket {
   volumeClob?: number;
   active: boolean;
   closed: boolean;
+  closedTime?: string; // actual venue resolution/closure timestamp
   endDate?: string; // ISO 8601, market close date
   neg_risk?: boolean; // true = independent binary outcomes (YES/NO don't sum to 1)
   negRisk?: boolean; // Gamma API field name

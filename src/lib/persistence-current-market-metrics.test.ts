@@ -492,6 +492,71 @@ describe('BUG-179 canonical current-market metric projection', () => {
     expect(persisted?.canonicalApyPct).toBeCloseTo(calculateApyPctFromDays(roiPct, daysToExpiry)!, 12);
   });
 
+  it('recovers a missing linked-market expiry with durable provenance and recomputes retained APY atomically', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-expiry-recovery-'));
+    process.env.H2H_SQLITE_PATH = path.join(tempDir, 'edgefinder.db');
+    process.env.H2H_SAVED_MARKETS_FILE = path.join(tempDir, 'saved-markets.json');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const observedAt = '2026-08-22T11:09:07.335Z';
+    const expiryAt = '2027-01-01T04:59:00Z';
+    const roiPct = 3.196;
+    const market = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/kxarrest/arrests/kxarrest-27jan',
+      polymarketUrl: 'https://polymarket.com/event/who-will-be-arrested-before-2027',
+      eventTitle: 'Who will be arrested before 2027?',
+      expiryDate: null,
+    });
+    const revision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
+    await persistence.updateSavedMarketScanResult(market.id, {
+      bestRoiPct: roiPct, bestProfit: 1, strategy: 'Buy YES PM + NO Kalshi', arbType: 'direct',
+      outcomeCount: 1, matchedCount: 1, matchStatus: 'matched', kalshiCount: 1, pmCount: 1,
+      scannedAt: observedAt, publicationGeneration: revision,
+      allArbs: [{ artist: 'Anthony Fauci', roiPct, expectedProfit: 1, strategy: 'Buy YES PM + NO Kalshi',
+        arbType: 'direct', executionStatus: 'executable', expiryAt: null }],
+    });
+
+    expect(await persistence.recoverSavedMarketExpiry(market.id, {
+      expiryAt,
+      source: 'kalshi_market_close_time',
+      sourceId: 'KXARREST-27JAN',
+      observedAt: '2026-08-24T22:17:00.000Z',
+    })).toBe(true);
+
+    const daysToExpiry = (Date.parse(expiryAt) - Date.parse(observedAt)) / 86_400_000;
+    const persisted = await persistence.getSavedMarketById(market.id);
+    expect(persisted).toMatchObject({
+      expiryDate: expiryAt,
+      expirySource: 'kalshi_market_close_time',
+      expirySourceId: 'KXARREST-27JAN',
+      expiryObservedAt: '2026-08-24T22:17:00.000Z',
+      canonicalApyUnavailableReason: null,
+      canonicalCurrentDaysToExpiry: daysToExpiry,
+      canonicalCurrentExpiryAt: expiryAt,
+      canonicalCurrentRevision: revision,
+      canonicalApyRevision: revision,
+    });
+    expect(persisted?.canonicalApyPct).toBeCloseTo(calculateApyPctFromDays(roiPct, daysToExpiry)!, 12);
+  });
+
+  it('does not overwrite a valid linked-market expiry with null', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-expiry-null-overwrite-'));
+    process.env.H2H_SQLITE_PATH = path.join(tempDir, 'edgefinder.db');
+    process.env.H2H_SAVED_MARKETS_FILE = path.join(tempDir, 'saved-markets.json');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const expiryAt = '2027-01-01T04:59:00Z';
+    const market = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/kxevent/event/kxevent-27jan',
+      polymarketUrl: 'https://polymarket.com/event/event-before-2027',
+      eventTitle: 'Valid linked market',
+      expiryDate: expiryAt,
+    });
+
+    expect(await persistence.updateSavedMarket(market.id, { expiryDate: null })).toBe(false);
+    expect(await persistence.getSavedMarketById(market.id)).toMatchObject({ expiryDate: expiryAt });
+  });
+
   it('keeps APY expiry provenance coherent when an existing market is upserted', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-expiry-upsert-'));
     process.env.H2H_SQLITE_PATH = path.join(tempDir, 'edgefinder.db');
@@ -522,6 +587,14 @@ describe('BUG-179 canonical current-market metric projection', () => {
       polymarketUrl: market.polymarketUrl,
       eventTitle: market.eventTitle,
       expiryDate: updatedExpiry,
+    });
+    // PredictionHunt/import payloads may omit expiry after a canonical linked
+    // source was recovered. Sparse null must not erase that authoritative row.
+    await persistence.upsertSavedMarket({
+      kalshiUrl: market.kalshiUrl,
+      polymarketUrl: market.polymarketUrl,
+      eventTitle: market.eventTitle,
+      expiryDate: null,
     });
 
     const daysToExpiry = (Date.parse(updatedExpiry) - Date.parse(observedAt)) / 86_400_000;

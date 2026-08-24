@@ -32,6 +32,7 @@ import { resolveMarketDomain } from '@/lib/market-classification';
 import { selectMatchedClobConditionIds } from '@/lib/scan-clob-selection';
 import { withSqliteBusyRetry } from '@/lib/sqlite-write-retry';
 import { persistPlatformPriceSnapshots, snapshotInputsFromOutcomes } from '@/lib/current-price-snapshots';
+import { resolveCanonicalMarketExpiry } from '@/lib/canonical-market-expiry';
 import {
   acquireSavedMarketScanLock,
   releaseSavedMarketScanLock,
@@ -230,7 +231,16 @@ export async function executeFullScan(request: NextRequest) {
       );
     }
 
-    const expiryDate = pmEvent.endDate;
+    const expiryResolution = resolveCanonicalMarketExpiry({
+      polymarketEndDate: pmEvent.endDate,
+      polymarketEventSlug: pmSlug,
+      polymarketClosed: pmEvent.closed,
+      polymarketMarkets: pmEvent.markets,
+      kalshiMarkets,
+    });
+    // A previously persisted source remains usable when a transient venue
+    // response cannot prove a replacement. Never clear it from a sparse scan.
+    const expiryDate = expiryResolution?.expiryAt ?? savedMarket?.expiryDate ?? null;
 
     // groupItemTitle is often an outcome label ("Yes", a candidate name, etc.).
     // Only accept it when it is one of EdgeFinder's canonical domains.
@@ -273,7 +283,7 @@ export async function executeFullScan(request: NextRequest) {
     const preliminaryOutcomes = skipAutoMatch
       ? []
       : applyManualMatches(
-          matchOutcomes(kalshiMarkets, pmMarketsRaw, pmEvent.title, capital, pmEvent.endDate),
+          matchOutcomes(kalshiMarkets, pmMarketsRaw, pmEvent.title, capital, expiryDate ?? undefined),
           manualMatches,
           kalshiMarkets,
           pmMarketsRaw,
@@ -410,9 +420,9 @@ export async function executeFullScan(request: NextRequest) {
         }),
       ];
     } else {
-      const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent.title, capital, pmEvent.endDate);
+      const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent.title, capital, expiryDate ?? undefined);
       // Step 2: apply manual matches to merge auto-unmatched pairs
-      outcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, capital, pmEvent.endDate);
+      outcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, capital, expiryDate ?? undefined);
     }
 
     // Step 2b: split decoupled pairs — user has explicitly unlinked these
@@ -427,7 +437,7 @@ export async function executeFullScan(request: NextRequest) {
     const withArbitrage = attachOutcomeContingentApy(
       calculateAllArbitrages(splitOutcomes, pmEvent.title, capital),
       scanObservedAt,
-      pmEvent.endDate,
+      expiryDate,
     );
 
     // BUG-05b2: Smart expiry — compute priceResolved once, reuse for DB save + response.
@@ -615,7 +625,16 @@ export async function executeFullScan(request: NextRequest) {
           };
           }),
         };
-        const published = await withSqliteBusyRetry(() => updateSavedMarketScanResult(market.id, scanResult, pmEvent.endDate));
+        const published = await withSqliteBusyRetry(() => updateSavedMarketScanResult(
+          market.id,
+          scanResult,
+          expiryResolution?.expiryAt,
+          expiryResolution ? {
+            source: expiryResolution.source,
+            sourceId: expiryResolution.sourceId,
+            observedAt: scanObservedAt,
+          } : undefined,
+        ));
         if (!published) throw new Error('Saved-market publication was superseded before persistence');
         fullScanPersisted = true;
         try {
@@ -660,7 +679,7 @@ export async function executeFullScan(request: NextRequest) {
           positiveArbCount: positiveArbs.length,
           totalStake: scanResult.allArbs?.reduce((s, a) => s + (a.totalStake ?? 0), 0) ?? 0,
           scannedAt: scanResult.scannedAt,
-          expiryAt: pmEvent.endDate ?? null,
+          expiryAt: expiryDate,
           outcomeApy: bestNetArb?.arbitrage?.outcomeApy,
           calculationEnvelope: scanResult.calculationEnvelope,
           // ARB-01a: persist the best arb's type classification
@@ -744,7 +763,9 @@ export async function executeFullScan(request: NextRequest) {
       kalshiEventTicker: kalshiTicker,
       pmEventSlug: pmSlug,
       pmEventId: pmEvent.id,
-      expiryDate: pmEvent.endDate,
+      expiryDate,
+      expirySource: expiryResolution?.source ?? savedMarket?.expirySource ?? null,
+      expirySourceId: expiryResolution?.sourceId ?? savedMarket?.expirySourceId ?? null,
       kalshiCount,
       pmCount,
       matchedCount,

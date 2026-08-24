@@ -477,6 +477,14 @@ const openapi = {
       SavedMarket: {
         type: 'object', additionalProperties: true,
         properties: {
+          expiryDate: { type: ['string', 'null'], format: 'date-time' },
+          expirySource: {
+            type: ['string', 'null'],
+            enum: ['polymarket_event_end_date', 'polymarket_market_end_date', 'polymarket_event_closed_time', 'kalshi_market_close_time', 'kalshi_expected_expiration_time', 'kalshi_latest_expiration_time', 'manual_update', 'legacy_import', null],
+            description: 'Authoritative source used for expiryDate; never inferred from UI text.',
+          },
+          expirySourceId: { type: ['string', 'null'], description: 'Venue event slug/ticker or manual market id supporting expiryDate.' },
+          expiryObservedAt: { type: ['string', 'null'], format: 'date-time' },
           canonicalApyPct: { type: ['number', 'null'], description: 'Canonical compact APY percentage from the newest persisted successful full scan.' },
           canonicalApyUnavailableReason: { type: ['string', 'null'] },
           canonicalApyOutcome: { type: ['string', 'null'] },

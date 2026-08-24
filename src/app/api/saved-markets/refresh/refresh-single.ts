@@ -15,6 +15,7 @@ import { SavedMarket } from '@/lib/persistence';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import type { OutcomeContingentApy } from '@/lib/settlement-apy';
 import { quoteOneShareFromTopAsk } from '@/lib/executable-book';
+import { resolveCanonicalMarketExpiry } from '@/lib/canonical-market-expiry';
 
 const KALSHI_TIMEOUT_MS = 3000;
 const PM_TIMEOUT_MS = 3000;
@@ -153,6 +154,15 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
     };
   }
 
+  const expiryResolution = resolveCanonicalMarketExpiry({
+    polymarketEndDate: pmEvent.endDate,
+    polymarketEventSlug: pmSlug,
+    polymarketClosed: pmEvent.closed,
+    polymarketMarkets: pmEvent.markets,
+    kalshiMarkets,
+  });
+  const expiryDate = expiryResolution?.expiryAt ?? market.expiryDate ?? null;
+
   const pmMarketsRaw = chooseBestPmStructure(pmEvent.markets || [], kalshiMarkets, pmEvent.title);
   const conditionIds = pmMarketsRaw.map(m => m.conditionId).filter(Boolean) as string[];
   // Fetch CLOB for ALL condition IDs — fetchClobMarkets has its own concurrency limiter (10 concurrent)
@@ -219,8 +229,8 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
     }),
   );
 
-  const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent.title, 1000, pmEvent.endDate);
-  const outcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, 1000, pmEvent.endDate);
+  const baseOutcomes = matchOutcomes(kalshiMarkets, pmMarkets, pmEvent.title, 1000, expiryDate ?? undefined);
+  const outcomes = applyManualMatches(baseOutcomes, manualMatches, kalshiMarkets, pmMarkets, 1000, expiryDate ?? undefined);
   const decoupledPairs = await getDecoupledPairs();
   const splitOutcomes = applyDecoupledPairs(outcomes, decoupledPairs);
 
@@ -228,7 +238,7 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
   const withArbitrage = attachOutcomeContingentApy(
     calculateAllArbitrages(splitOutcomes, market.category || pmEvent.title),
     scannedAt,
-    pmEvent.endDate,
+    expiryDate,
   );
 
   const kalshiCount = withArbitrage.filter(o => o.kalshi).length;
@@ -257,7 +267,7 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
     pmCount,
     scannedAt,
     totalStake: bestNetArb ? (bestNetArb.arbitrage!.kalshiStake ?? 0) + (bestNetArb.arbitrage!.pmStake ?? 0) : 0,
-    expiryDate: pmEvent.endDate,
+    expiryDate,
     allArbs: netArbs.map(o => {
       const selectedPmConditionId = o.arbitrage?.pmConditionId ?? o.polymarket?.conditionId;
       const selectedPmLeg = withArbitrage.find(candidate => candidate.polymarket?.conditionId === selectedPmConditionId)?.polymarket ?? o.polymarket;

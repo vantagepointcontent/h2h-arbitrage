@@ -24,6 +24,7 @@ import {
   serializeHistoricalFinancialProvenance,
 } from './historical-scan-financials';
 import { recoverHistoricalScanFinancials } from './historical-scan-financial-recovery';
+import type { CanonicalMarketExpirySource } from './canonical-market-expiry';
 
 const DATA_FILE = process.env.H2H_SAVED_MARKETS_FILE || path.join(process.cwd(), 'data', 'saved-markets.json');
 
@@ -363,6 +364,9 @@ async function initDb(): Promise<void> {
     // SELECT *, APY joins, or refresh publication state.
     `ALTER TABLE saved_markets ADD COLUMN category TEXT`,
     `ALTER TABLE saved_markets ADD COLUMN expiry_date TEXT`,
+    `ALTER TABLE saved_markets ADD COLUMN expiry_source TEXT`,
+    `ALTER TABLE saved_markets ADD COLUMN expiry_source_id TEXT`,
+    `ALTER TABLE saved_markets ADD COLUMN expiry_observed_at TEXT`,
     `ALTER TABLE saved_markets ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE saved_markets ADD COLUMN last_scan_result TEXT`,
     `ALTER TABLE saved_markets ADD COLUMN archived INTEGER NOT NULL DEFAULT 0`,
@@ -1798,6 +1802,9 @@ export interface SavedMarket {
   category?: string; // e.g. "Politics", "Temperature", "Finances", "Mentions", "Sports"
   createdAt: string;
   expiryDate?: string | null; // ISO timestamp
+  expirySource?: CanonicalMarketExpirySource | 'manual_update' | 'legacy_import' | null;
+  expirySourceId?: string | null;
+  expiryObservedAt?: string | null;
   favorite?: boolean;         // user-starred for quick access
   lastScanResult?: LastScanResult | null;
   /** WS-107: real-time result from the ws-watcher (HOT pairs only). UI reads
@@ -1878,6 +1885,10 @@ function rowToMarket(r: any): SavedMarket {
     category: r.category != null ? String(r.category) : undefined,
     createdAt: String(r.created_at),
     expiryDate: r.expiry_date != null ? String(r.expiry_date) : null,
+    expirySource: r.expiry_source != null
+      ? String(r.expiry_source) as SavedMarket['expirySource'] : null,
+    expirySourceId: r.expiry_source_id != null ? String(r.expiry_source_id) : null,
+    expiryObservedAt: r.expiry_observed_at != null ? String(r.expiry_observed_at) : null,
     favorite: Boolean(Number(r.favorite ?? 0)),
     lastScanResult,
     liveResult,
@@ -1978,9 +1989,10 @@ async function upsertMarketRow(m: SavedMarket): Promise<void> {
   const c = getClient();
   await c.execute({
     sql: `INSERT INTO saved_markets
-            (id, kalshi_url, polymarket_url, platform_links, event_title, category, created_at, expiry_date, favorite, last_scan_result,
+            (id, kalshi_url, polymarket_url, platform_links, event_title, category, created_at,
+             expiry_date, expiry_source, expiry_source_id, expiry_observed_at, favorite, last_scan_result,
              archived, archived_at, archive_reason, last_matched_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             kalshi_url = excluded.kalshi_url,
             polymarket_url = excluded.polymarket_url,
@@ -1988,6 +2000,9 @@ async function upsertMarketRow(m: SavedMarket): Promise<void> {
             event_title = excluded.event_title,
             category = excluded.category,
             expiry_date = excluded.expiry_date,
+            expiry_source = excluded.expiry_source,
+            expiry_source_id = excluded.expiry_source_id,
+            expiry_observed_at = excluded.expiry_observed_at,
             favorite = excluded.favorite,
             last_scan_result = excluded.last_scan_result,
             archived = excluded.archived,
@@ -1998,7 +2013,11 @@ async function upsertMarketRow(m: SavedMarket): Promise<void> {
       m.id, m.kalshiUrl, m.polymarketUrl,
       JSON.stringify(m.platformLinks ?? legacyPlatformLinks(m.kalshiUrl, m.polymarketUrl)),
       m.eventTitle, m.category ?? null,
-      m.createdAt, m.expiryDate ?? null, m.favorite ? 1 : 0,
+      m.createdAt, m.expiryDate ?? null,
+      m.expirySource ?? (m.expiryDate ? 'legacy_import' : null),
+      m.expirySourceId ?? null,
+      m.expiryObservedAt ?? (m.expiryDate ? m.createdAt : null),
+      m.favorite ? 1 : 0,
       m.lastScanResult ? JSON.stringify(m.lastScanResult) : null,
       m.archived ? 1 : 0, m.archivedAt ?? null, m.archiveReason ?? null, m.lastMatchedAt ?? null,
     ],
@@ -2272,13 +2291,19 @@ export async function reserveSavedMarketPublication(
   });
 }
 
-export async function updateSavedMarketScanResult(id: string, result: LastScanResult, expiryDate?: string | null): Promise<boolean> {
+export async function updateSavedMarketScanResult(
+  id: string,
+  result: LastScanResult,
+  expiryDate?: string | null,
+  expiryProvenance?: SavedMarketExpiryProvenance,
+): Promise<boolean> {
   // Targeted UPDATE — no read-modify-write of the whole list. This was the
   // main race: concurrent scans clobbering each other's lastScanResult.
   await ensureMarketsMigrated();
   const c = getClient();
   const current = await c.execute({
     sql: `SELECT last_scan_result, scan_publication_generation,
+            expiry_date, expiry_source, expiry_source_id, expiry_observed_at,
             canonical_current_roi_pct, canonical_current_profit, canonical_current_strategy,
             canonical_current_days_to_expiry, canonical_current_expiry_at, canonical_current_revision,
             canonical_apy_pct, canonical_apy_unavailable_reason, canonical_apy_outcome,
@@ -2356,9 +2381,20 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
             OR coupling.revision <> json_extract(dependency.value, '$.couplingRevision')
        )`
     : '';
+  const shouldUpdateExpiry = expiryDate != null;
+  const effectiveExpiryProvenance = shouldUpdateExpiry
+    ? expiryProvenance ?? {
+        source: 'legacy_import' as const,
+        sourceId: id,
+        observedAt: result.scannedAt,
+      }
+    : null;
   const updated = await c.execute({
       sql: `UPDATE saved_markets SET last_scan_result = ?,
               expiry_date = CASE WHEN ? THEN ? ELSE expiry_date END,
+              expiry_source = CASE WHEN ? THEN ? ELSE expiry_source END,
+              expiry_source_id = CASE WHEN ? THEN ? ELSE expiry_source_id END,
+              expiry_observed_at = CASE WHEN ? THEN ? ELSE expiry_observed_at END,
               last_matched_at = COALESCE(?, last_matched_at),
               canonical_apy_pct = CASE WHEN ? THEN ? ELSE canonical_apy_pct END,
               canonical_apy_unavailable_reason = CASE WHEN ? THEN ? ELSE canonical_apy_unavailable_reason END,
@@ -2375,9 +2411,15 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
             WHERE id = ?
               AND scan_publication_generation = ?
               AND last_scan_result IS ?
+              AND expiry_date IS ? AND expiry_source IS ?
+              AND expiry_source_id IS ? AND expiry_observed_at IS ?
               ${dependencyGuard}`,
       args: [
-        JSON.stringify(prepared), expiryDate !== undefined ? 1 : 0, expiryDate ?? null, matchedNow,
+        JSON.stringify(prepared), shouldUpdateExpiry ? 1 : 0, expiryDate ?? null,
+        shouldUpdateExpiry ? 1 : 0, effectiveExpiryProvenance?.source ?? null,
+        shouldUpdateExpiry ? 1 : 0, effectiveExpiryProvenance?.sourceId ?? null,
+        shouldUpdateExpiry ? 1 : 0, effectiveExpiryProvenance?.observedAt ?? null,
+        matchedNow,
         successfulFullScan ? 1 : 0, canonicalApy?.value ?? null,
         successfulFullScan ? 1 : 0, canonicalApy?.unavailableReason ?? null,
         successfulFullScan ? 1 : 0, canonicalApy?.outcome ?? null,
@@ -2391,6 +2433,10 @@ export async function updateSavedMarketScanResult(id: string, result: LastScanRe
         successfulFullScan ? 1 : 0, canonicalApy?.expiryAt ?? null,
         successfulFullScan ? 1 : 0, result.publicationGeneration ?? null,
         id, generation, previousRaw,
+        current.rows[0].expiry_date == null ? null : String(current.rows[0].expiry_date),
+        current.rows[0].expiry_source == null ? null : String(current.rows[0].expiry_source),
+        current.rows[0].expiry_source_id == null ? null : String(current.rows[0].expiry_source_id),
+        current.rows[0].expiry_observed_at == null ? null : String(current.rows[0].expiry_observed_at),
         ...(dependencies.length > 0 ? [JSON.stringify(dependencies)] : []),
       ],
   });
@@ -2733,9 +2779,16 @@ export async function getSavedMarketById(id: string): Promise<SavedMarket | null
   return rows.length > 0 ? rowToMarket(rows[0]) : null;
 }
 
+export interface SavedMarketExpiryProvenance {
+  source: CanonicalMarketExpirySource | 'manual_update' | 'legacy_import';
+  sourceId: string | null;
+  observedAt: string;
+}
+
 export async function updateSavedMarket(
   id: string,
   updates: Partial<Pick<SavedMarket, 'eventTitle' | 'expiryDate' | 'category' | 'kalshiUrl' | 'polymarketUrl' | 'platformLinks'>>,
+  expiryProvenance?: SavedMarketExpiryProvenance,
 ): Promise<boolean> {
   await ensureMarketsMigrated();
   const c = getClient();
@@ -2758,7 +2811,8 @@ export async function updateSavedMarket(
     }
 
     const source = await c.execute({
-      sql: `SELECT expiry_date, last_scan_result, scan_publication_generation,
+      sql: `SELECT expiry_date, expiry_source, expiry_source_id, expiry_observed_at,
+              last_scan_result, scan_publication_generation,
               canonical_apy_pct, canonical_apy_unavailable_reason, canonical_apy_outcome,
               canonical_apy_observed_at, canonical_apy_source, canonical_apy_revision,
               canonical_current_roi_pct, canonical_current_profit, canonical_current_strategy,
@@ -2768,21 +2822,36 @@ export async function updateSavedMarket(
     });
     const row = source.rows[0];
     if (!row) return false;
-    const expiryDate = updates.expiryDate || null;
+    if (updates.expiryDate === null && row.expiry_date != null) return false;
+    const expiryDate = updates.expiryDate ?? null;
     const roiPct = row.canonical_current_roi_pct == null ? Number.NaN : Number(row.canonical_current_roi_pct);
     const observedAt = row.canonical_apy_observed_at == null ? '' : String(row.canonical_apy_observed_at);
     const apy = calculateScanApy(roiPct, observedAt, expiryDate);
     sets.push(
       'expiry_date = ?',
+      'expiry_source = ?',
+      'expiry_source_id = ?',
+      'expiry_observed_at = ?',
       'canonical_apy_pct = ?',
       'canonical_apy_unavailable_reason = ?',
       'canonical_current_days_to_expiry = ?',
       'canonical_current_expiry_at = ?',
     );
-    args.push(expiryDate, apy.apyPct, apy.unavailableReason, apy.daysToExpiry, expiryDate, id);
+    const provenance = expiryDate == null ? null : expiryProvenance ?? {
+      source: 'manual_update' as const,
+      sourceId: id,
+      observedAt: new Date().toISOString(),
+    };
+    args.push(
+      expiryDate, provenance?.source ?? null, provenance?.sourceId ?? null, provenance?.observedAt ?? null,
+      apy.apyPct, apy.unavailableReason, apy.daysToExpiry, expiryDate, id,
+    );
 
     const fenced: Array<string | number | null> = [
       row.expiry_date == null ? null : String(row.expiry_date),
+      row.expiry_source == null ? null : String(row.expiry_source),
+      row.expiry_source_id == null ? null : String(row.expiry_source_id),
+      row.expiry_observed_at == null ? null : String(row.expiry_observed_at),
       row.last_scan_result == null ? null : String(row.last_scan_result),
       Number(row.scan_publication_generation),
       row.canonical_apy_pct == null ? null : Number(row.canonical_apy_pct),
@@ -2802,7 +2871,8 @@ export async function updateSavedMarket(
     res = await c.execute({
       sql: `UPDATE saved_markets SET ${sets.join(', ')}
             WHERE id = ?
-              AND expiry_date IS ? AND last_scan_result IS ? AND scan_publication_generation IS ?
+              AND expiry_date IS ? AND expiry_source IS ? AND expiry_source_id IS ? AND expiry_observed_at IS ?
+              AND last_scan_result IS ? AND scan_publication_generation IS ?
               AND canonical_apy_pct IS ? AND canonical_apy_unavailable_reason IS ? AND canonical_apy_outcome IS ?
               AND canonical_apy_observed_at IS ? AND canonical_apy_source IS ? AND canonical_apy_revision IS ?
               AND canonical_current_roi_pct IS ? AND canonical_current_profit IS ? AND canonical_current_strategy IS ?
@@ -2815,6 +2885,27 @@ export async function updateSavedMarket(
   const changed = Number(res?.rowsAffected ?? 0) > 0;
   if (changed) await mirrorMarketsToJson();
   return changed;
+}
+
+/** Apply one authoritative linked-market expiry and recompute retained APY/TTE
+ * under the same complete source/projection CAS used by ordinary expiry edits. */
+export async function recoverSavedMarketExpiry(
+  id: string,
+  recovery: {
+    expiryAt: string;
+    source: CanonicalMarketExpirySource;
+    sourceId: string;
+    observedAt: string;
+  },
+): Promise<boolean> {
+  if (!Number.isFinite(Date.parse(recovery.expiryAt))
+    || !Number.isFinite(Date.parse(recovery.observedAt))
+    || !recovery.sourceId.trim()) return false;
+  return updateSavedMarket(id, { expiryDate: recovery.expiryAt }, {
+    source: recovery.source,
+    sourceId: recovery.sourceId,
+    observedAt: recovery.observedAt,
+  });
 }
 
 export async function deleteSavedMarket(id: string): Promise<boolean> {
