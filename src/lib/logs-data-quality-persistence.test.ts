@@ -34,7 +34,7 @@ function scan(overrides: Record<string, unknown> = {}) {
 }
 
 describe('Logs data-quality persistence guardrail', () => {
-  it('does not publish a non-executable zero profit as an available financial value', async () => {
+  it('classifies a completed non-executable zero-arb scan as not applicable without degrading quality', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-quality-non-executable-'));
     const dbPath = path.join(tempDir, 'logs.db');
     process.env.H2H_SQLITE_PATH = dbPath;
@@ -58,21 +58,20 @@ describe('Logs data-quality persistence guardrail', () => {
     const { resolveHistoricalScanFinancials } = await import('./historical-scan-financials');
     expect(resolveHistoricalScanFinancials(history.rows[0]).fields.profitUsd).toMatchObject({
       status: 'unavailable',
-      reasonCode: 'current_candidate_non_executable',
+      reasonCode: 'confirmed_no_arbitrage',
     });
     const db = createClient({ url: `file:${dbPath}` });
     const snapshot = JSON.parse(String((await db.execute({
       sql: 'SELECT snapshot_json FROM logs_data_quality_batches WHERE scan_id = ?', args: [saved.id],
     })).rows[0].snapshot_json));
     expect(snapshot.fields.profit).toMatchObject({
-      denominator: 1,
+      denominator: 0,
       available: 0,
-      unavailable: 1,
-      reasons: { current_candidate_non_executable: 1 },
+      unavailable: 0,
+      reasons: {},
     });
-    expect(snapshot.breaches).not.toContainEqual(expect.objectContaining({
-      field: 'profit', trigger: 'all_zero_population',
-    }));
+    expect(snapshot.state).toBe('healthy');
+    expect(snapshot.breaches).toEqual([]);
     db.close();
   });
 
@@ -130,6 +129,50 @@ describe('Logs data-quality persistence guardrail', () => {
     expect(after).toBe(before);
     expect(after).toBe(12);
     expect(telemetryRows).toBe(12);
+    db.close();
+  });
+
+  it('reconciles a stale latest quality snapshot against the bounded canonical cohort on restart', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-quality-stale-latest-'));
+    const dbPath = path.join(tempDir, 'logs.db');
+    process.env.H2H_SQLITE_PATH = dbPath;
+    let persistence = await import('./persistence');
+    const saved = await persistence.saveScanResult('zero-arb', scan({
+      positiveArbCount: 0,
+      bestProfit: 0,
+      totalStake: 0,
+      raw: { allArbs: [{
+        roiPct: 2.5,
+        expectedProfit: 0,
+        totalStake: 0,
+        strategy: 'Buy YES Kalshi + NO PM',
+        executionStatus: 'non_executable',
+      }] },
+    }));
+    const db = createClient({ url: `file:${dbPath}` });
+    const stale = {
+      batchId: `scan:${saved.id}`,
+      state: 'degraded',
+      fields: Object.fromEntries(['roi', 'profit', 'apy', 'state', 'currentRoi'].map((field) => [field, {
+        denominator: 100, available: 1, unavailable: 99, unavailablePct: 99,
+        exactlyZero: 0, nonZero: 1, reasons: { current_candidate_non_executable: 99 },
+      }])),
+      breaches: [{ field: 'profit', trigger: 'single_batch_over_50pct', unavailablePct: 99 }],
+      reconciliation: { requested: true, maxAttempts: 2 },
+      recoveryVerified: false,
+    };
+    await db.execute({
+      sql: 'UPDATE logs_data_quality_batches SET state = ?, snapshot_json = ? WHERE scan_id = ?',
+      args: ['degraded', JSON.stringify(stale), saved.id],
+    });
+
+    vi.resetModules();
+    persistence = await import('./persistence');
+    await persistence.queryScanHistory({ limit: 1 });
+    const health = await persistence.getLogsDataQualityHealth();
+
+    expect(health.latest).toMatchObject({ batchId: `scan:${saved.id}`, state: 'healthy', breaches: [] });
+    expect(health.latest?.fields.profit).toMatchObject({ denominator: 0, unavailable: 0, unavailablePct: 0 });
     db.close();
   });
 });

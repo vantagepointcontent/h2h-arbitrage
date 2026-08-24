@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { calculateApyPctFromDays } from './scan-apy';
 
 // Run against an isolated temp DB (persistence.ts resolves data/edgefinder.db
 // from process.cwd()).
@@ -119,15 +120,20 @@ describe('WS-107 liveResult persistence', () => {
       kalshiUrl: 'https://kalshi.com/markets/canonical-apy', polymarketUrl: 'https://polymarket.com/event/canonical-apy',
       eventTitle: 'Canonical APY', category: '', expiryDate: null,
     });
+    const scannedAt = '2026-08-24T00:00:00.000Z';
+    const expiryAt = '2027-01-01T00:00:00.000Z';
+    const daysToExpiry = (Date.parse(expiryAt) - Date.parse(scannedAt)) / 86_400_000;
+    const canonicalApyPct = calculateApyPctFromDays(12, daysToExpiry)!;
     const scanGeneration = await persistence.reserveSavedMarketPublication(m.id, 'scan');
     await persistence.updateSavedMarketScanResult(m.id, makeScan({
       publicationGeneration: scanGeneration,
       matchStatus: 'matched',
+      scannedAt,
       allArbs: [{
         artist: 'MD-01', roiPct: 12, expectedProfit: 12, strategy: 'Buy YES Kalshi + NO PM',
         arbType: 'direct', totalStake: 100, executionStatus: 'executable', apyPct: 29.959508018509656,
-        daysToExpiry: 365 * Math.log(1.12) / Math.log(1 + 29.959508018509656 / 100),
-        expiryAt: '2027-01-01T00:00:00.000Z',
+        daysToExpiry: 999,
+        expiryAt,
       }],
     }));
     const liveGeneration = await persistence.reserveSavedMarketPublication(m.id, 'live');
@@ -139,7 +145,7 @@ describe('WS-107 liveResult persistence', () => {
     }));
 
     const got = (await persistence.getSavedMarkets()).find((x) => x.id === m.id)!;
-    expect(got.canonicalApyPct).toBe(29.959508018509656);
+    expect(got.canonicalApyPct).toBe(canonicalApyPct);
     expect(got.canonicalApyOutcome).toBe('MD-01');
     expect(got.canonicalApySource).toBe('full_scan');
     expect(got.canonicalApyRevision).toBe(scanGeneration);

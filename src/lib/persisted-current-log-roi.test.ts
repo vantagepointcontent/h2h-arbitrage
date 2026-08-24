@@ -122,8 +122,16 @@ describe('getLatestCompletedScanRoiForLogIds', () => {
       999_999,
       first.id,
     ])).resolves.toEqual([
-      { id: first.id, status: 'available', roiPct: 3.7, strategy: 'Buy YES Kalshi + NO PM', scannedAt: '2026-08-13T20:03:30.000Z', scanId: latestIndicative.id },
-      { id: duplicate.id, status: 'available', roiPct: 3.7, strategy: 'Buy YES Kalshi + NO PM', scannedAt: '2026-08-13T20:03:30.000Z', scanId: latestIndicative.id },
+      {
+        id: first.id, status: 'no_arbitrage', scannedAt: '2026-08-13T20:03:30.000Z', scanId: latestIndicative.id,
+        reasonCode: 'latest_completed_scan_has_no_arbitrage',
+        reason: 'The newest successfully completed scan for the exact linked market pair recorded no arbitrage.',
+      },
+      {
+        id: duplicate.id, status: 'no_arbitrage', scannedAt: '2026-08-13T20:03:30.000Z', scanId: latestIndicative.id,
+        reasonCode: 'latest_completed_scan_has_no_arbitrage',
+        reason: 'The newest successfully completed scan for the exact linked market pair recorded no arbitrage.',
+      },
       { id: similar.id, status: 'available', roiPct: 8.8, strategy: 'Buy YES Kalshi + NO PM', scannedAt: '2026-08-13T20:06:00.000Z', scanId: similar.id },
       {
         id: onlyFailed.id,
@@ -149,18 +157,14 @@ describe('getLatestCompletedScanRoiForLogIds', () => {
         reason: 'The historical row does not contain both exact linked event URLs.',
       },
       {
-        id: missingRoi.id,
-        status: 'unavailable',
-        reasonCode: 'historical_roi_not_persisted',
-        reason: 'No authoritative scan-time ROI value was persisted for this result.',
+        id: missingRoi.id, status: 'no_arbitrage', scannedAt: '2026-08-13T20:08:30.000Z', scanId: missingRoi.id,
+        reasonCode: 'latest_completed_scan_has_no_arbitrage',
+        reason: 'The newest successfully completed scan for the exact linked market pair recorded no arbitrage.',
       },
       {
-        id: genuineZero.id,
-        status: 'available',
-        roiPct: 0,
-        strategy: 'Buy YES Kalshi + NO PM',
-        scannedAt: '2026-08-13T20:09:00.000Z',
-        scanId: genuineZero.id,
+        id: genuineZero.id, status: 'no_arbitrage', scannedAt: '2026-08-13T20:09:00.000Z', scanId: genuineZero.id,
+        reasonCode: 'latest_completed_scan_has_no_arbitrage',
+        reason: 'The newest successfully completed scan for the exact linked market pair recorded no arbitrage.',
       },
       {
         id: 999_999,

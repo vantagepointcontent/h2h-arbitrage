@@ -271,6 +271,31 @@ describe('LogsPanel', () => {
     expect(screen.queryByLabelText('ROI Declined? FALSE')).toBeNull();
   });
 
+  it('renders completed zero-arb economics as N/A instead of degraded Unavailable or false zeroes', async () => {
+    const noArb = {
+      ...comparisonLog(),
+      positive_arb_count: 0,
+      best_roi_pct: 2.5,
+      best_profit: 0,
+      total_stake: 0,
+      apy_pct: 45,
+    };
+    vi.stubGlobal('fetch', logsFetch([noArb]));
+
+    render(createElement(LogsPanel));
+    await screen.findByText('No arbitrage');
+
+    const headers = Array.from(document.querySelectorAll('thead th')).map((header) =>
+      header.textContent?.replace(/[▲▼↕↑↓]/g, '').trim());
+    const cells = Array.from(document.querySelectorAll('tbody tr:first-child td'));
+    for (const label of ['ROI %', 'Profit', 'APY', 'Stake']) {
+      expect(cells[headers.indexOf(label)]?.textContent).toBe('N/A');
+    }
+    expect(screen.getByLabelText('ROI Declined? N/A')).toBeTruthy();
+    expect(screen.queryByText('0.00%', { selector: 'td' })).toBeNull();
+    expect(screen.queryByText('$0.00', { selector: 'td' })).toBeNull();
+  });
+
   it('shows exact field reasons and sorts raw-snapshot historical values by the displayed economics', async () => {
     const lowDisplayed = {
       ...comparisonLog(),

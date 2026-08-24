@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import fs from 'node:fs';
+import { calculateApyPctFromDays } from '@/lib/scan-apy';
 
 const state = vi.hoisted(() => {
   const tempDir = `/tmp/bug182-scan-persistence-${process.pid}`;
@@ -105,8 +106,10 @@ let marketId = '';
 let canonicalRevision = 0;
 const canonicalRoiPct = 2;
 const canonicalProfit = 1;
-const canonicalDaysToExpiry = 100;
-const canonicalApyPct = (Math.pow(1 + canonicalRoiPct / 100, 365 / canonicalDaysToExpiry) - 1) * 100;
+const canonicalScannedAt = '2026-08-20T13:00:00.000Z';
+const canonicalExpiryAt = '2026-11-28T00:00:00.000Z';
+const canonicalDaysToExpiry = (Date.parse(canonicalExpiryAt) - Date.parse(canonicalScannedAt)) / 86_400_000;
+const canonicalApyPct = calculateApyPctFromDays(canonicalRoiPct, canonicalDaysToExpiry)!;
 
 beforeAll(async () => {
   fs.rmSync(state.tempDir, { recursive: true, force: true });
@@ -129,13 +132,13 @@ beforeAll(async () => {
     matchStatus: 'matched',
     kalshiCount: 1,
     pmCount: 1,
-    scannedAt: '2026-08-20T13:00:00.000Z',
+    scannedAt: canonicalScannedAt,
     publicationGeneration: canonicalRevision,
     allArbs: [{
       artist: 'Yes', roiPct: canonicalRoiPct, expectedProfit: canonicalProfit,
       strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct', totalStake: 99,
       executionStatus: 'executable', apyPct: canonicalApyPct,
-      daysToExpiry: canonicalDaysToExpiry, expiryAt: '2026-11-28T00:00:00.000Z',
+      daysToExpiry: canonicalDaysToExpiry, expiryAt: canonicalExpiryAt,
     }],
   });
 });

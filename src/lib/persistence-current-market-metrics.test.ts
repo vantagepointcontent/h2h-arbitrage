@@ -3,6 +3,7 @@ import { createClient } from '@libsql/client';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { calculateApyPctFromDays } from './scan-apy';
 
 let tempDir = '';
 
@@ -14,7 +15,7 @@ afterEach(() => {
 });
 
 describe('BUG-179 canonical current-market metric projection', () => {
-  it('recovers field-level legacy ROI while leaving contradictory zero profit and APY unavailable', async () => {
+  it('derives and persists APY from canonical ROI and expiry when optional profit is unavailable', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-legacy-roi-only-'));
     process.env.H2H_SQLITE_PATH = path.join(tempDir, 'edgefinder.db');
     process.env.H2H_SAVED_MARKETS_FILE = path.join(tempDir, 'saved-markets.json');
@@ -32,14 +33,20 @@ describe('BUG-179 canonical current-market metric projection', () => {
       allArbs: [{ artist: 'Yes', roiPct: 2, expectedProfit: 0, strategy: 'Buy YES Kalshi + NO PM',
         arbType: 'direct', totalStake: 99, daysToExpiry: 100, expiryAt: '2026-11-28T00:00:00.000Z' }],
     });
+    const daysToExpiry = (
+      Date.parse('2026-11-28T00:00:00.000Z') - Date.parse('2026-08-20T13:00:00.000Z')
+    ) / 86_400_000;
 
-    expect(await persistence.getSavedMarketById(market.id)).toMatchObject({
+    const persisted = await persistence.getSavedMarketById(market.id);
+    expect(persisted).toMatchObject({
       canonicalCurrentRoiPct: 2,
       canonicalCurrentProfit: null,
       canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
-      canonicalApyPct: null,
-      canonicalApyUnavailableReason: 'current_profit_unavailable',
+      canonicalApyUnavailableReason: null,
+      canonicalCurrentDaysToExpiry: daysToExpiry,
+      canonicalCurrentExpiryAt: '2026-11-28T00:00:00.000Z',
     });
+    expect(persisted?.canonicalApyPct).toBeCloseTo((Math.pow(1.02, 365 / daysToExpiry) - 1) * 100, 12);
   });
 
   it('recovers a pre-executionStatus persisted candidate instead of relabeling it No arb', async () => {
@@ -54,8 +61,10 @@ describe('BUG-179 canonical current-market metric projection', () => {
     });
     const revision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
     const roiPct = 2;
-    const daysToExpiry = 100;
-    const apyPct = (Math.pow(1 + roiPct / 100, 365 / daysToExpiry) - 1) * 100;
+    const daysToExpiry = (
+      Date.parse('2026-11-28T00:00:00.000Z') - Date.parse('2026-08-20T13:00:00.000Z')
+    ) / 86_400_000;
+    const apyPct = calculateApyPctFromDays(roiPct, daysToExpiry)!;
 
     await persistence.updateSavedMarketScanResult(market.id, {
       bestRoiPct: roiPct, bestProfit: 1, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',
@@ -89,8 +98,10 @@ describe('BUG-179 canonical current-market metric projection', () => {
     });
     const firstRevision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
     const roiPct = 2;
-    const daysToExpiry = 100;
-    const apyPct = (Math.pow(1 + roiPct / 100, 365 / daysToExpiry) - 1) * 100;
+    const daysToExpiry = (
+      Date.parse('2026-11-28T00:00:00.000Z') - Date.parse('2026-08-20T13:00:00.000Z')
+    ) / 86_400_000;
+    const apyPct = calculateApyPctFromDays(roiPct, daysToExpiry)!;
     expect(await persistence.updateSavedMarketScanResult(market.id, {
       bestRoiPct: roiPct,
       bestProfit: 1,
@@ -258,8 +269,10 @@ describe('BUG-179 canonical current-market metric projection', () => {
     });
     const firstRevision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
     const roiPct = 2;
-    const daysToExpiry = 100;
-    const apyPct = (Math.pow(1 + roiPct / 100, 365 / daysToExpiry) - 1) * 100;
+    const daysToExpiry = (
+      Date.parse('2026-11-28T00:00:00.000Z') - Date.parse('2026-08-20T13:00:00.000Z')
+    ) / 86_400_000;
+    const apyPct = calculateApyPctFromDays(roiPct, daysToExpiry)!;
     await persistence.updateSavedMarketScanResult(market.id, {
       bestRoiPct: roiPct,
       bestProfit: 1,
@@ -340,8 +353,10 @@ describe('BUG-179 canonical current-market metric projection', () => {
       expiryDate: '2026-11-28T00:00:00.000Z',
     });
     const roiPct = 2;
-    const daysToExpiry = 100;
-    const apyPct = (Math.pow(1 + roiPct / 100, 365 / daysToExpiry) - 1) * 100;
+    const daysToExpiry = (
+      Date.parse('2026-11-28T00:00:00.000Z') - Date.parse('2026-08-20T13:00:00.000Z')
+    ) / 86_400_000;
+    const apyPct = calculateApyPctFromDays(roiPct, daysToExpiry)!;
     const firstRevision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
     expect(await persistence.updateSavedMarketScanResult(market.id, {
       bestRoiPct: roiPct, bestProfit: 1, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',

@@ -117,7 +117,7 @@ describe('recoverHistoricalScanFinancials', () => {
     client.close();
   });
 
-  it('recovers and enumerates the selected-candidate cohort even when executable count is zero', async () => {
+  it('enumerates retained zero-arb candidates without promoting their indicative economics', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'historical-financial-selected-candidate-'));
     const client = createClient({ url: `file:${path.join(tempDir, 'recovery.db')}` });
     await client.execute(`CREATE TABLE scan_results (
@@ -139,9 +139,9 @@ describe('recoverHistoricalScanFinancials', () => {
     ], 'write');
 
     const report = await recoverHistoricalScanFinancials(client, { apply: true });
-    expect(report.counts).toMatchObject({ inspected: 2, recovered: 1, unrecoverable: 1, applied: 2 });
-    expect(report.unrecoverableReasons).toEqual({ historical_financials_not_persisted: 1 });
-    expect((await client.execute('SELECT best_roi_pct FROM scan_results WHERE id = 1')).rows[0].best_roi_pct).toBe(2);
+    expect(report.counts).toMatchObject({ inspected: 2, recovered: 0, unrecoverable: 2, applied: 2 });
+    expect(report.unrecoverableReasons).toEqual({ historical_financials_not_persisted: 2 });
+    expect((await client.execute('SELECT best_roi_pct FROM scan_results WHERE id = 1')).rows[0].best_roi_pct).toBe(0);
     client.close();
   });
 });

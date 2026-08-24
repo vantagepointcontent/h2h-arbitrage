@@ -4,6 +4,7 @@
 import type { OutcomeContingentApy } from '@/lib/settlement-apy';
 import { selectCanonicalSavedMarketMetrics } from '@/lib/canonical-saved-market-metrics';
 import type { ArbType } from '@/lib/arb-types';
+import { calculateApyPctFromDays } from '@/lib/scan-apy';
 
 // ─── Generic localStorage helpers ───
 
@@ -543,10 +544,10 @@ export function getCanonicalCurrentMarketMetrics(market: SavedMarket): Canonical
   const revision = Number.isSafeInteger(market.canonicalCurrentRevision) ? market.canonicalCurrentRevision! : null;
   const apyRevision = Number.isSafeInteger(market.canonicalApyRevision) ? market.canonicalApyRevision! : null;
   const expectedApy = roiPct != null && daysToExpiry != null
-    ? (Math.pow(1 + roiPct / 100, 365 / daysToExpiry) - 1) * 100 : null;
+    ? calculateApyPctFromDays(roiPct, daysToExpiry) : null;
   const apyMatches = rawApy != null && expectedApy != null && Number.isFinite(expectedApy)
     && Math.abs(rawApy - expectedApy) <= Math.max(1e-9, Math.abs(expectedApy) * 1e-9);
-  const valid = rawApy != null && roiPct != null && roiPct > 0 && profit != null && profit > 0
+  const valid = rawApy != null && roiPct != null && roiPct > 0
     && strategy !== 'No arb' && !strategy.startsWith('Unavailable')
     && daysToExpiry != null && expiryAt != null && revision != null && revision === apyRevision
     && market.canonicalApySource === 'full_scan' && apyMatches;

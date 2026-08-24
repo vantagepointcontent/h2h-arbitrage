@@ -55,7 +55,10 @@ function finite(value: number | null): value is number {
 function eligible(row: LogsQualityRow, field: LogsRequiredField): boolean {
   if (row.scanStatus !== 'completed') return false;
   if (field === 'state') return true;
-  if (!row.hasSelectedCandidate) return false;
+  // Arb-only data is applicable only to canonically valid Positive Arb rows.
+  // Indicative candidates retained by a zero-arb scan are diagnostic payload,
+  // not missing financial values.
+  if (!row.hasSelectedCandidate || !row.arbValid || row.positiveArbCount <= 0) return false;
   if (field === 'apy') return row.apyEligible;
   if (field === 'currentRoi') return row.exactMarketIdentity;
   return true;

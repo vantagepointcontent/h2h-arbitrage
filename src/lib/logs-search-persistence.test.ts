@@ -250,7 +250,7 @@ describe('Logs FTS persistence', () => {
       best_roi_pct: 2,
       total_stake: 0,
     });
-    expect(history.summary).toMatchObject({ totalArbs: 0, avgRoi: 2, bestRoi: 2, totalProfit: null });
+    expect(history.summary).toMatchObject({ totalArbs: 0, avgRoi: null, bestRoi: null, totalProfit: null });
     expect((await persistence.queryScanHistory({ arbType: 'direct' })).rows).toHaveLength(0);
     const exported: Array<Record<string, unknown>> = [];
     for await (const batch of persistence.queryScanHistoryStream({ chunkSize: 1 })) exported.push(...batch);
@@ -258,7 +258,7 @@ describe('Logs FTS persistence', () => {
     expect(exported.find((item) => item.id === nonExecutable.id)).toMatchObject({ arb_type: null, arb_valid: 1 });
   });
 
-  it('persists missing selected-candidate economics as unavailable while preserving a genuine zero', async () => {
+  it('persists selected zero-arb economics as not applicable rather than missing or false zero', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-missing-financial-provenance-'));
     process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');
     vi.resetModules();
@@ -281,21 +281,21 @@ describe('Logs FTS persistence', () => {
     const missing = history.rows.find((row) => row.market_id === 'missing-selected');
     const genuine = history.rows.find((row) => row.market_id === 'genuine-zero-selected');
     expect(resolveHistoricalScanFinancials(missing ?? {} as never).fields.roiPct).toMatchObject({
-      status: 'unavailable', value: null, reasonCode: 'historical_roi_not_persisted',
+      status: 'unavailable', value: null, reasonCode: 'confirmed_no_arbitrage',
     });
     expect(resolveHistoricalScanFinancials(genuine ?? {} as never).fields.roiPct).toMatchObject({
-      status: 'available', value: 0,
+      status: 'unavailable', value: null, reasonCode: 'confirmed_no_arbitrage',
     });
-    expect(history.summary).toMatchObject({ avgRoi: 0, bestRoi: 0, totalProfit: null });
+    expect(history.summary).toMatchObject({ avgRoi: null, bestRoi: null, totalProfit: null });
     const exported: Array<Record<string, unknown>> = [];
     for await (const batch of persistence.queryScanHistoryStream({ chunkSize: 1 })) exported.push(...batch);
     const exportedMissing = exported.find((row) => row.market_id === 'missing-selected');
     expect(resolveHistoricalScanFinancials(exportedMissing ?? {} as never).fields.roiPct).toMatchObject({
-      status: 'unavailable', value: null, reasonCode: 'historical_roi_not_persisted',
+      status: 'unavailable', value: null, reasonCode: 'confirmed_no_arbitrage',
     });
   });
 
-  it('reconciles legacy raw ROI evidence across API rows, summaries, filters, and exports', async () => {
+  it('does not promote legacy raw ROI evidence when the canonical row recorded zero arbs', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-legacy-raw-parity-'));
     const databasePath = path.join(tempDir, 'logs.db');
     process.env.H2H_SQLITE_PATH = databasePath;
@@ -320,15 +320,15 @@ describe('Logs FTS persistence', () => {
 
     const history = await persistence.queryScanHistory({ limit: 10 });
     expect(resolveHistoricalScanFinancials(history.rows[0]).fields.roiPct).toMatchObject({
-      status: 'available', value: 7, source: 'raw_result_snapshot',
+      status: 'unavailable', value: null, reasonCode: 'confirmed_no_arbitrage',
     });
-    expect(history.summary).toMatchObject({ avgRoi: 7, bestRoi: 7, totalProfit: null });
-    await expect(persistence.queryScanHistory({ minRoi: 6, limit: 10 })).resolves.toMatchObject({ total: 1 });
+    expect(history.summary).toMatchObject({ avgRoi: null, bestRoi: null, totalProfit: null });
+    await expect(persistence.queryScanHistory({ minRoi: 6, limit: 10 })).resolves.toMatchObject({ total: 0 });
 
     const exported: Array<Record<string, unknown>> = [];
     for await (const batch of persistence.queryScanHistoryStream({ chunkSize: 1 })) exported.push(...batch);
     expect(resolveHistoricalScanFinancials(exported[0]).fields.roiPct).toMatchObject({
-      status: 'available', value: 7, source: 'raw_result_snapshot',
+      status: 'unavailable', value: null, reasonCode: 'confirmed_no_arbitrage',
     });
   });
 
@@ -467,5 +467,44 @@ describe('Logs FTS persistence', () => {
     const result = await persistence.queryScanHistory({ search });
     expect(result.rows.map((row) => row.market_id)).toEqual(['matching']);
     expect(result.total).toBe(1);
+  });
+
+  it('serves bounded Logs and complete Markets reads concurrently without cross-path suppression', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-markets-concurrent-'));
+    process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const market = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/concurrent',
+      polymarketUrl: 'https://polymarket.com/event/concurrent',
+      eventTitle: 'Concurrent Logs and Markets', category: 'test', expiryDate: null,
+    });
+    for (let index = 0; index < 12; index += 1) {
+      await persistence.saveScanResult(market.id, {
+        bestRoiPct: index % 2 === 0 ? 2.5 : 0,
+        bestProfit: index % 2 === 0 ? 5 : 0,
+        strategy: index % 2 === 0 ? 'Buy YES Kalshi + NO PM' : 'No arb',
+        arbType: index % 2 === 0 ? 'direct' : undefined,
+        outcomeCount: 1, matchedCount: 1, kalshiCount: 1, pmCount: 1,
+        positiveArbCount: index % 2 === 0 ? 1 : 0,
+        totalStake: index % 2 === 0 ? 200 : 0,
+        scannedAt: new Date(Date.parse('2026-08-12T12:00:00.000Z') + index * 1000).toISOString(),
+      });
+    }
+
+    const results = await Promise.all(Array.from({ length: 10 }, async () => {
+      const [logs, markets] = await Promise.all([
+        persistence.queryScanHistory({ limit: 5 }),
+        persistence.getSavedMarkets(),
+      ]);
+      return { logs, markets };
+    }));
+
+    for (const { logs, markets } of results) {
+      expect(logs.rows).toHaveLength(5);
+      expect(logs.total).toBe(12);
+      expect(logs.summary).toMatchObject({ totalArbs: 6, avgRoi: 2.5, bestRoi: 2.5, totalProfit: 30 });
+      expect(markets.some((candidate) => candidate.id === market.id)).toBe(true);
+    }
   });
 });

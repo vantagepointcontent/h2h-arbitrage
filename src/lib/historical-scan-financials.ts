@@ -171,7 +171,11 @@ export function resolveHistoricalScanFinancials(row: PersistedFinancialRow): His
   const raw = selectRawSnapshot(row);
   const scalarRevision = `scan_results:${scanId ?? 'unknown'}`;
   const rawRevision = `${scalarRevision}:raw_result`;
-  const confirmedNoArbitrage = row.strategy === 'No arb' && !positiveArb;
+  // Canonical persisted arb count owns applicability. A completed scan may
+  // retain its best indicative candidate for diagnostics while truthfully
+  // recording zero executable Positive Arbs; those arb-only economics are N/A.
+  const confirmedNoArbitrage = positiveArbCount === 0
+    || (row.strategy === 'No arb' && !positiveArb);
   const selectedCandidate = typeof row.strategy === 'string' && row.strategy.length > 0 && row.strategy !== 'No arb';
   const provenance = parseFieldProvenance(row);
 
@@ -182,15 +186,6 @@ export function resolveHistoricalScanFinancials(row: PersistedFinancialRow): His
         status: 'unavailable', value: null, source: 'unavailable', sourceRevision: scalarRevision,
         reasonCode: 'confirmed_no_arbitrage',
         reason: 'The completed scan found no candidate opportunity; this financial metric is not applicable.',
-      } satisfies HistoricalFinancialField];
-    }
-    if (name !== 'roiPct' && raw?.executionStatus === 'non_executable') {
-      const blocker = typeof raw.executionBlocker === 'string' && raw.executionBlocker.trim()
-        ? ` ${raw.executionBlocker.trim()}` : '';
-      return [name, {
-        status: 'unavailable', value: null, source: 'unavailable', sourceRevision: rawRevision,
-        reasonCode: 'current_candidate_non_executable',
-        reason: `The selected scan candidate was indicative but not executable; no tradeable ${name === 'profitUsd' ? 'profit' : name === 'apyPct' ? 'APY' : 'stake'} was established.${blocker}`,
       } satisfies HistoricalFinancialField];
     }
     const persistedField = provenance?.[name];
@@ -217,6 +212,18 @@ export function resolveHistoricalScanFinancials(row: PersistedFinancialRow): His
     if (rawUsable) {
       return [name, {
         status: 'available', value: rawValue, source: 'raw_result_snapshot', sourceRevision: rawRevision,
+      } satisfies HistoricalFinancialField];
+    }
+
+    // A raw non-executable annotation can explain genuinely absent applicable
+    // evidence, but it must never overwrite an immutable persisted snapshot.
+    if (name !== 'roiPct' && raw?.executionStatus === 'non_executable') {
+      const blocker = typeof raw.executionBlocker === 'string' && raw.executionBlocker.trim()
+        ? ` ${raw.executionBlocker.trim()}` : '';
+      return [name, {
+        status: 'unavailable', value: null, source: 'unavailable', sourceRevision: rawRevision,
+        reasonCode: 'current_candidate_non_executable',
+        reason: `The selected scan candidate was indicative but not executable; no tradeable ${name === 'profitUsd' ? 'profit' : name === 'apyPct' ? 'APY' : 'stake'} was established.${blocker}`,
       } satisfies HistoricalFinancialField];
     }
 

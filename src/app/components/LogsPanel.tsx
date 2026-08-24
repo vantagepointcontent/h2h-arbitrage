@@ -1182,19 +1182,25 @@ function LogRow({
     ? ARB_TYPES[arbProjection.arbType]
     : null;
   const apy = historical.fields.apyPct.status === 'available' ? historical.fields.apyPct.value : null;
+  const historicalNotApplicable = Object.values(historical.fields).every((field) =>
+    field.status === 'unavailable' && field.reasonCode === 'confirmed_no_arbitrage');
   const currentRoiValue = currentRoi.status === 'available'
     && typeof currentRoi.roiPct === 'number'
     && Number.isFinite(currentRoi.roiPct)
     ? currentRoi.roiPct
     : null;
   const roiDecline = compareRoiDecline(scanTimeRoi, currentRoiValue);
-  const roiDeclineText = roiDecline.declined == null ? 'Unavailable' : roiDecline.declined ? 'TRUE' : 'FALSE';
+  const roiDeclineNotApplicable = historicalNotApplicable || currentRoi.status === 'no_arbitrage';
+  const roiDeclineText = roiDeclineNotApplicable ? 'N/A'
+    : roiDecline.declined == null ? 'Unavailable' : roiDecline.declined ? 'TRUE' : 'FALSE';
   const roiDeclineUnavailableReason = roiDecline.unavailableInputs.length === 0
     ? null
     : roiDecline.unavailableInputs.map((input) => input === 'Current ROI'
       ? `Current ROI is unavailable: ${currentRoi.reason ?? currentRoiStatusLabel(currentRoi.status)}`
       : 'scan-time ROI is unavailable').join('; ');
-  const roiDeclineTitle = roiDeclineUnavailableReason
+  const roiDeclineTitle = roiDeclineNotApplicable
+    ? 'ROI Declined? N/A — the completed scan found no canonical Positive Arb.'
+    : roiDeclineUnavailableReason
     ? `ROI Declined? unavailable — ${roiDeclineUnavailableReason}.`
     : `ROI Declined? ${roiDeclineText} — compared using full-precision persisted ROI values.`;
   const roiDeclineDescriptionId = `roi-declined-reason-${log.id}`;
@@ -1316,7 +1322,7 @@ function LogRow({
           <ScanStatusIndicator log={log} />
         </td>
         <td className={`px-3 py-2 text-right text-xs font-mono font-semibold ${roiColor}`} title={historical.fields.roiPct.status === 'unavailable' ? historical.fields.roiPct.reason : 'ROI captured at scan time'}>
-          {scanTimeRoi == null ? 'Unavailable' : fmtPct(scanTimeRoi)}
+          {scanTimeRoi == null ? historicalNotApplicable ? 'N/A' : 'Unavailable' : fmtPct(scanTimeRoi)}
         </td>
         <td className="px-3 py-2 text-right text-[11px] font-mono text-[#8A9BA8] whitespace-nowrap" title={currentRoi.scannedAt ? `Latest persisted scan: ${currentRoi.scannedAt}${currentRoi.strategy ? ` — ${currentRoi.strategy}` : ''}` : currentRoi.reason ?? currentRoiStatusLabel(currentRoi.status)}>
           {currentRoiValue != null
@@ -1337,16 +1343,16 @@ function LogRow({
           </span>
           <span id={roiDeclineDescriptionId} className="sr-only">{roiDeclineTitle}</span>
         </td>
-        <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]" title={historical.fields.profitUsd.status === 'unavailable' ? historical.fields.profitUsd.reason : 'Profit captured at scan time'}>{scanProfit == null ? 'Unavailable' : fmtUsd(scanProfit)}</td>
+        <td className="px-3 py-2 text-right text-xs font-mono text-[#facc15]" title={historical.fields.profitUsd.status === 'unavailable' ? historical.fields.profitUsd.reason : 'Profit captured at scan time'}>{scanProfit == null ? historicalNotApplicable ? 'N/A' : 'Unavailable' : fmtUsd(scanProfit)}</td>
         <td
           className={`px-3 py-2 text-right text-xs font-mono ${apy != null ? "text-[#5DBE81]" : "text-[#8A9BA8]"}`}
           title={historical.fields.apyPct.status === 'unavailable' ? historical.fields.apyPct.reason : 'APY captured at scan time'}
-        >{apy != null ? fmtPct(apy) : "Unavailable"}</td>
+        >{apy != null ? fmtPct(apy) : historicalNotApplicable ? 'N/A' : 'Unavailable'}</td>
         <td className={`px-3 py-2 text-right text-xs font-mono ${minutesToExpiry != null && minutesToExpiry <= 0 ? 'text-[#ef4444]' : 'text-[#8A9BA8]'}`}>{tte}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#FFFFFF]">{log.matched_count}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]">{log.kalshi_count} / {log.pm_count}</td>
         <td className={`px-3 py-2 text-right text-xs font-mono ${arbBadge}`}>{arbProjection.positiveArbCount}</td>
-        <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]" title={historical.fields.stakeUsd.status === 'unavailable' ? historical.fields.stakeUsd.reason : 'Stake captured at scan time'}>{scanStake == null ? 'Unavailable' : fmtUsd(scanStake)}</td>
+        <td className="px-3 py-2 text-right text-xs font-mono text-[#8A9BA8]" title={historical.fields.stakeUsd.status === 'unavailable' ? historical.fields.stakeUsd.reason : 'Stake captured at scan time'}>{scanStake == null ? historicalNotApplicable ? 'N/A' : 'Unavailable' : fmtUsd(scanStake)}</td>
         <td className="px-3 py-2 text-center">
           <button
             onClick={handleNavigate}

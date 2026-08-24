@@ -126,7 +126,68 @@ describe('resolveHistoricalScanFinancials', () => {
     expect(Object.values(resolved.fields).every((field) => field.status === 'unavailable')).toBe(true);
   });
 
-  it('preserves an actual persisted zero calculation for a selected candidate', () => {
+  it('treats every canonical zero-arb scan as not applicable even when it retained an indicative candidate', () => {
+    const resolved = resolveHistoricalScanFinancials({
+      id: 220,
+      positive_arb_count: 0,
+      strategy: 'Buy YES Kalshi + NO PM',
+      best_roi_pct: 2.5,
+      best_profit: 0,
+      apy_pct: 45,
+      total_stake: 0,
+      raw_result: JSON.stringify({ allArbs: [{
+        strategy: 'Buy YES Kalshi + NO PM',
+        roiPct: 2.5,
+        expectedProfit: 0,
+        apyPct: 45,
+        totalStake: 0,
+        executionStatus: 'non_executable',
+      }] }),
+    });
+
+    expect(Object.values(resolved.fields)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ status: 'unavailable', reasonCode: 'confirmed_no_arbitrage' }),
+    ]));
+    expect(Object.values(resolved.fields).every((field) =>
+      field.status === 'unavailable' && field.reasonCode === 'confirmed_no_arbitrage')).toBe(true);
+  });
+
+  it('preserves explicitly persisted immutable economics for an applicable arb despite raw execution annotations', () => {
+    const resolved = resolveHistoricalScanFinancials({
+      id: 221,
+      positive_arb_count: 1,
+      strategy: 'Buy YES Kalshi + NO PM',
+      best_roi_pct: 2.5,
+      best_profit: 5,
+      apy_pct: 45,
+      total_stake: 200,
+      historical_financials_revision: 3,
+      historical_financials_provenance: JSON.stringify({
+        revision: 3,
+        fields: {
+          roiPct: { status: 'available' }, profitUsd: { status: 'available' },
+          apyPct: { status: 'available' }, stakeUsd: { status: 'available' },
+        },
+      }),
+      raw_result: JSON.stringify({ allArbs: [{
+        strategy: 'Buy YES Kalshi + NO PM',
+        roiPct: 2.5,
+        expectedProfit: 5,
+        apyPct: 45,
+        totalStake: 200,
+        executionStatus: 'non_executable',
+      }] }),
+    });
+
+    expect(resolved.fields).toMatchObject({
+      roiPct: { status: 'available', value: 2.5 },
+      profitUsd: { status: 'available', value: 5 },
+      apyPct: { status: 'available', value: 45 },
+      stakeUsd: { status: 'available', value: 200 },
+    });
+  });
+
+  it('does not render a persisted selected-candidate zero as an applicable arb metric', () => {
     const resolved = resolveHistoricalScanFinancials({
       id: 23,
       positive_arb_count: 0,
@@ -145,11 +206,15 @@ describe('resolveHistoricalScanFinancials', () => {
       }),
     });
 
-    expect(resolved.fields.roiPct).toMatchObject({ status: 'available', value: 0 });
-    expect(resolved.fields.profitUsd).toMatchObject({ status: 'available', value: 0 });
+    expect(resolved.fields.roiPct).toMatchObject({
+      status: 'unavailable', value: null, reasonCode: 'confirmed_no_arbitrage',
+    });
+    expect(resolved.fields.profitUsd).toMatchObject({
+      status: 'unavailable', value: null, reasonCode: 'confirmed_no_arbitrage',
+    });
   });
 
-  it('uses durable field provenance to distinguish compatibility zeros from genuine zero calculations', () => {
+  it('keeps every canonical zero-arb row not applicable regardless of legacy zero provenance', () => {
     const compatibilityZero = resolveHistoricalScanFinancials({
       id: 24,
       positive_arb_count: 0,
@@ -170,7 +235,7 @@ describe('resolveHistoricalScanFinancials', () => {
       }),
     });
     expect(compatibilityZero.fields.roiPct).toMatchObject({
-      status: 'unavailable', value: null, reasonCode: 'historical_roi_not_persisted',
+      status: 'unavailable', value: null, reasonCode: 'confirmed_no_arbitrage',
     });
     expect(compatibilityZero.fields.profitUsd.status).toBe('unavailable');
 
@@ -191,7 +256,11 @@ describe('resolveHistoricalScanFinancials', () => {
         },
       }),
     });
-    expect(genuineZero.fields.roiPct).toMatchObject({ status: 'available', value: 0 });
-    expect(genuineZero.fields.profitUsd).toMatchObject({ status: 'available', value: 0 });
+    expect(genuineZero.fields.roiPct).toMatchObject({
+      status: 'unavailable', value: null, reasonCode: 'confirmed_no_arbitrage',
+    });
+    expect(genuineZero.fields.profitUsd).toMatchObject({
+      status: 'unavailable', value: null, reasonCode: 'confirmed_no_arbitrage',
+    });
   });
 });

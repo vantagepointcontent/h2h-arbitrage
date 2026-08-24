@@ -115,6 +115,30 @@ describe('evaluateLogsDataQuality', () => {
     expect(quality.state).toBe('healthy');
   });
 
+  it('excludes completed zero-arb rows from every arb-only metric denominator', () => {
+    const quality = evaluateLogsDataQuality({ batchId: 'zero-arb-na', rows: [row({
+      positiveArbCount: 0,
+      hasSelectedCandidate: true,
+      roiPct: null,
+      profitUsd: null,
+      apyPct: null,
+      currentRoiPct: null,
+      reasons: {
+        roi: 'confirmed_no_arbitrage',
+        profit: 'confirmed_no_arbitrage',
+        apy: 'confirmed_no_arbitrage',
+        currentRoi: 'latest_completed_scan_has_no_arbitrage',
+      },
+    })], previousBatch: null });
+
+    expect(quality.state).toBe('healthy');
+    expect(quality.breaches).toEqual([]);
+    expect(quality.fields.state.denominator).toBe(1);
+    for (const field of ['roi', 'profit', 'apy', 'currentRoi'] as const) {
+      expect(quality.fields[field]).toMatchObject({ denominator: 0, unavailable: 0, unavailablePct: 0 });
+    }
+  });
+
   it('fails immediately when every eligible historical ROI is exactly zero after a non-zero population', () => {
     const previous = evaluateLogsDataQuality({ batchId: 'non-zero-baseline', rows: [row({ roiPct: 2.5 })], previousBatch: null });
     const allZero = evaluateLogsDataQuality({
@@ -129,7 +153,7 @@ describe('evaluateLogsDataQuality', () => {
     expect(allZero.reconciliation).toEqual({ requested: true, maxAttempts: 2 });
   });
 
-  it('fails an all-zero selected-candidate population on cold start including non-executable candidates', () => {
+  it('does not treat all-zero non-executable candidates as an applicable population', () => {
     const quality = evaluateLogsDataQuality({
       batchId: 'cold-all-zero',
       rows: Array.from({ length: 20 }, (_, id) => row({
@@ -139,11 +163,9 @@ describe('evaluateLogsDataQuality', () => {
       previousBatch: null,
     });
 
-    expect(quality.fields.roi).toMatchObject({ denominator: 20, exactlyZero: 20, nonZero: 0 });
-    expect(quality.state).toBe('degraded');
-    expect(quality.breaches).toContainEqual(expect.objectContaining({
-      field: 'roi', trigger: 'all_zero_population',
-    }));
+    expect(quality.fields.roi).toMatchObject({ denominator: 0, exactlyZero: 0, nonZero: 0 });
+    expect(quality.state).toBe('healthy');
+    expect(quality.breaches).toEqual([]);
   });
 
   it('degrades when more than five percent of a recent cohort becomes zero without requiring population shrinkage', () => {

@@ -2,7 +2,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { createClient } from '@libsql/client';
 import type { MarketLink } from './platforms/types';
-import { calculateScanApy } from './scan-apy';
+import { calculateApyPctFromDays, calculateScanApy } from './scan-apy';
 import { auditArbClassification, projectCanonicalArbClassification } from './arb-types';
 import { selectCanonicalSavedMarketMetrics, type CanonicalSavedMarketMetrics } from './canonical-saved-market-metrics';
 import { withSqliteBusyRetry } from './sqlite-write-retry';
@@ -161,6 +161,38 @@ async function backfillRecentLogsDataQuality(c: ReturnType<typeof createClient>)
       args: [Number(row.id), String(row.scanned_at), snapshot.state, JSON.stringify(snapshot), 0],
     });
     previousBatch = snapshot;
+  }
+
+  // Re-evaluate the latest persisted cohort on startup. Quality snapshots are
+  // derived telemetry, so an applicability-rule correction must not leave an
+  // obsolete degraded banner in place until another scan happens. This stays
+  // bounded to the same 100-row cohort used by live scan persistence.
+  const latest = await c.execute(`SELECT id, scanned_at FROM scan_results
+    WHERE scan_status = 'completed' ORDER BY scanned_at DESC, id DESC LIMIT 1`);
+  const latestRow = latest.rows[0];
+  const latestId = Number(latestRow?.id);
+  if (Number.isSafeInteger(latestId) && latestId > 0 && typeof latestRow?.scanned_at === 'string') {
+    const prior = await c.execute({
+      sql: `SELECT snapshot_json FROM logs_data_quality_batches
+        WHERE scan_id <> ? ORDER BY observed_at DESC, scan_id DESC LIMIT 1`,
+      args: [latestId],
+    });
+    let priorSnapshot: LogsDataQualitySnapshot | null = null;
+    try {
+      priorSnapshot = typeof prior.rows[0]?.snapshot_json === 'string'
+        ? JSON.parse(prior.rows[0].snapshot_json) as LogsDataQualitySnapshot
+        : null;
+    } catch { /* malformed historical telemetry does not satisfy continuity */ }
+    const latestSnapshot = evaluateLogsDataQuality({
+      batchId: `scan:${latestId}`,
+      previousBatch: priorSnapshot,
+      rows: await loadRecentLogsQualityRows(c),
+    });
+    await c.execute({
+      sql: `INSERT OR REPLACE INTO logs_data_quality_batches
+        (scan_id, observed_at, state, snapshot_json, reconciliation_attempts) VALUES (?, ?, ?, ?, ?)`,
+      args: [latestId, latestRow.scanned_at, latestSnapshot.state, JSON.stringify(latestSnapshot), 0],
+    });
   }
 }
 
@@ -389,13 +421,15 @@ async function initDb(): Promise<void> {
         canonical_current_revision = NEW.canonical_apy_revision
       WHERE id = NEW.id;
     END`);
+  // BUG-183: APY depends on canonical ROI and event-time TTE, not optional
+  // profit. Recreate the trigger so existing databases adopt that invariant.
+  await c.execute(`DROP TRIGGER IF EXISTS saved_market_apy_invariant_guard`);
   await c.execute(`CREATE TRIGGER IF NOT EXISTS saved_market_apy_invariant_guard
     AFTER UPDATE OF canonical_apy_pct, canonical_apy_revision, canonical_current_roi_pct,
       canonical_current_profit, canonical_current_strategy, canonical_current_days_to_expiry,
       canonical_current_expiry_at, canonical_current_revision ON saved_markets
     WHEN NEW.canonical_apy_pct IS NOT NULL AND (
       NEW.canonical_current_roi_pct IS NULL OR NEW.canonical_current_roi_pct <= 0
-      OR NEW.canonical_current_profit IS NULL OR NEW.canonical_current_profit <= 0
       OR NEW.canonical_current_strategy IS NULL OR NEW.canonical_current_strategy = 'No arb'
       OR NEW.canonical_current_strategy LIKE 'Unavailable%'
       OR NEW.canonical_current_days_to_expiry IS NULL OR NEW.canonical_current_days_to_expiry <= 0
@@ -929,7 +963,7 @@ const scanHistoryHistoricalFieldValueSql = (
   scalar: 'best_roi_pct' | 'best_profit',
   provenanceField: 'roiPct' | 'profitUsd',
   rawField: 'roiPct' | 'expectedProfit',
-) => `CASE WHEN (${scanHistoryHistoricalCandidateSql}) THEN CASE
+) => `CASE WHEN (${scanHistoryHistoricalCandidateSql}) AND (${scanHistoryCanonicalArbCountSql}) > 0 THEN CASE
   WHEN historical_financials_revision = ${HISTORICAL_SCAN_FINANCIALS_REVISION}
     AND json_valid(historical_financials_provenance)
     AND json_extract(historical_financials_provenance, '$.fields.${provenanceField}.status') = 'unavailable'
@@ -1225,8 +1259,8 @@ export async function getLatestCompletedScanRoiForLogIds(ids: number[]): Promise
         reason: 'The newest successfully completed scan is missing a valid arbitrage count.',
       };
     }
-    if (positiveArbCount === 0 && row.strategy === 'No arb') {
-      return row.arb_valid === 1 || row.apy_unavailable_reason === 'no_arbitrage'
+    if (positiveArbCount === 0) {
+      return row.arb_valid === 1
         ? {
             ...common,
             status: 'no_arbitrage' as const,
@@ -1885,11 +1919,10 @@ function sanitizeSavedMarketCurrentMetrics(market: SavedMarket): SavedMarket {
     && market.canonicalApyRevision === market.canonicalCurrentRevision;
   const expectedApy = typeof roi === 'number' && Number.isFinite(roi)
     && typeof days === 'number' && Number.isFinite(days) && days > 0
-    ? (Math.pow(1 + roi / 100, 365 / days) - 1) * 100 : null;
+    ? calculateApyPctFromDays(roi, days) : null;
   const apyMatches = expectedApy != null && Number.isFinite(expectedApy)
     && Math.abs(market.canonicalApyPct - expectedApy) <= Math.max(1e-9, Math.abs(expectedApy) * 1e-9);
   const valid = typeof roi === 'number' && Number.isFinite(roi) && roi > 0
-    && typeof profit === 'number' && Number.isFinite(profit) && profit > 0
     && typeof strategy === 'string' && strategy !== 'No arb' && !strategy.startsWith('Unavailable')
     && typeof expiry === 'string' && Number.isFinite(Date.parse(expiry))
     && market.canonicalApySource === 'full_scan' && revisionMatches && apyMatches;
@@ -2207,9 +2240,9 @@ function isStaleMatchPublication(previous: LastScanResult | null, incoming: Last
   return matchPublicationAuthority(incoming) < matchPublicationAuthority(previous);
 }
 
-/** Extract the compact scalar from the same full-scan candidate that owns the
- * persisted current ROI. Recompute only as an invariant check against the
- * candidate's same-revision persisted TTE; never use wall-clock time. */
+/** Derive the compact scalar from the same full-scan candidate that owns the
+ * persisted current ROI, using its scan timestamp and expiry rather than an
+ * optional precomputed APY/TTE field or wall-clock time. */
 export function canonicalSavedMarketApy(result: LastScanResult): CanonicalSavedMarketMetrics {
   return selectCanonicalSavedMarketMetrics(result.allArbs ?? [], result.scannedAt);
 }
@@ -2534,7 +2567,6 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
   // promotes or reconstructs a value and cannot touch immutable scan history.
   const invalidPredicate = `canonical_apy_pct IS NOT NULL AND (
     canonical_current_roi_pct IS NULL OR canonical_current_roi_pct <= 0
-    OR canonical_current_profit IS NULL OR canonical_current_profit <= 0
     OR canonical_current_strategy IS NULL OR canonical_current_strategy = 'No arb'
     OR canonical_current_strategy LIKE 'Unavailable%'
     OR canonical_current_days_to_expiry IS NULL OR canonical_current_days_to_expiry <= 0

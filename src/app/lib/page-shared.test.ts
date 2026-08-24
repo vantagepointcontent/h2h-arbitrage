@@ -139,22 +139,12 @@ describe("saved-market scheduler status", () => {
   });
 
   it.each([
-    ['unrecognized strategy', { strategy: 'Buy MAYBE somewhere' }, null],
-    ['non-executable candidate', { executionStatus: 'non_executable' }, {
-      canonicalCurrentRoiPct: 2.5, canonicalCurrentProfit: null,
-      canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
-      canonicalCurrentDaysToExpiry: 50, canonicalCurrentExpiryAt: '2026-10-02T00:00:00.000Z',
-      canonicalApyUnavailableReason: 'current_candidate_non_executable',
-    }],
-    ['zero total stake', { kalshiStake: 0, pmStake: 0 }, null],
-    ['APY mismatch', { apyPct: 99 }, {
-      canonicalCurrentRoiPct: 2.5, canonicalCurrentProfit: 1.25,
-      canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
-      canonicalCurrentDaysToExpiry: 50, canonicalCurrentExpiryAt: '2026-10-02T00:00:00.000Z',
-      canonicalApyUnavailableReason: 'current_apy_mismatch',
-    }],
-  ])('fails closed after a persisted full scan with an %s', (_label, override, retainedCurrent) => {
-    const daysToExpiry = 50;
+    ['zero total stake', { kalshiStake: 0, pmStake: 0 }, 1.25],
+    ['mismatched optional APY/TTE', { apyPct: 99, daysToExpiry: 999 }, 1.25],
+  ])('derives canonical APY after a persisted full-scan refresh with a %s', (_label, override, expectedProfit) => {
+    const scannedAt = '2026-08-13T19:59:00Z';
+    const expiryAt = '2026-10-02T00:00:00.000Z';
+    const daysToExpiry = (Date.parse(expiryAt) - Date.parse(scannedAt)) / 86_400_000;
     const roiPct = 2.5;
     const candidate = outcome(roiPct, 1.25);
     candidate.arbitrage = {
@@ -163,7 +153,7 @@ describe("saved-market scheduler status", () => {
       executionStatus: 'executable',
       apyPct: (Math.pow(1 + roiPct / 100, 365 / daysToExpiry) - 1) * 100,
       daysToExpiry,
-      expiryAt: '2026-10-02T00:00:00.000Z',
+      expiryAt,
       ...override,
     } as UnifiedOutcome['arbitrage'] & { arbType: 'direct' };
     const market: SavedMarket = {
@@ -174,19 +164,72 @@ describe("saved-market scheduler status", () => {
     const updated = applyDurableFullScanToSavedMarket(market, {
       fullScanPersisted: true, publicationGeneration: 4,
       outcomes: [candidate], kalshiCount: 1, pmCount: 1, matchedCount: 1,
-    }, '2026-08-13T19:59:00Z');
+    }, scannedAt);
 
     expect(updated).toMatchObject({
-      canonicalApyPct: null,
-      canonicalCurrentRoiPct: retainedCurrent?.canonicalCurrentRoiPct ?? null,
-      canonicalCurrentProfit: retainedCurrent?.canonicalCurrentProfit ?? null,
-      canonicalCurrentStrategy: retainedCurrent?.canonicalCurrentStrategy ?? 'No arb',
-      canonicalCurrentDaysToExpiry: retainedCurrent?.canonicalCurrentDaysToExpiry ?? null,
-      canonicalCurrentExpiryAt: retainedCurrent?.canonicalCurrentExpiryAt ?? null,
-      ...(retainedCurrent?.canonicalApyUnavailableReason
-        ? { canonicalApyUnavailableReason: retainedCurrent.canonicalApyUnavailableReason } : {}),
+      canonicalApyUnavailableReason: null,
+      canonicalCurrentRoiPct: roiPct,
+      canonicalCurrentProfit: expectedProfit,
+      canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
+      canonicalCurrentDaysToExpiry: daysToExpiry,
+      canonicalCurrentExpiryAt: expiryAt,
       canonicalApyRevision: 4,
       canonicalCurrentRevision: 4,
+    });
+    expect(updated.canonicalApyPct).toBeCloseTo((Math.pow(1 + roiPct / 100, 365 / daysToExpiry) - 1) * 100, 12);
+  });
+
+  it('keeps APY unavailable when a full-scan candidate is explicitly non-executable', () => {
+    const scannedAt = '2026-08-13T19:59:00Z';
+    const expiryAt = '2026-10-02T00:00:00.000Z';
+    const daysToExpiry = (Date.parse(expiryAt) - Date.parse(scannedAt)) / 86_400_000;
+    const candidate = outcome(2.5, 1.25);
+    candidate.arbitrage = {
+      ...candidate.arbitrage,
+      arbType: 'direct',
+      executionStatus: 'non_executable',
+      expiryAt,
+    } as UnifiedOutcome['arbitrage'] & { arbType: 'direct' };
+    const market: SavedMarket = {
+      id: 'market-1', eventTitle: 'Market 1', kalshiUrl: 'k', polymarketUrl: 'p',
+      createdAt: '2026-08-13T18:00:00Z',
+    };
+
+    expect(applyDurableFullScanToSavedMarket(market, {
+      fullScanPersisted: true, publicationGeneration: 4,
+      outcomes: [candidate], kalshiCount: 1, pmCount: 1, matchedCount: 1,
+    }, scannedAt)).toMatchObject({
+      canonicalApyPct: null,
+      canonicalApyUnavailableReason: 'current_candidate_non_executable',
+      canonicalCurrentRoiPct: 2.5,
+      canonicalCurrentProfit: null,
+      canonicalCurrentDaysToExpiry: daysToExpiry,
+      canonicalCurrentExpiryAt: expiryAt,
+    });
+  });
+
+  it('does not publish canonical APY after a persisted full scan with an unrecognized strategy', () => {
+    const candidate = outcome(2.5, 1.25);
+    candidate.arbitrage = {
+      ...candidate.arbitrage,
+      strategy: 'Buy MAYBE somewhere',
+      arbType: 'direct',
+      executionStatus: 'executable',
+      expiryAt: '2026-10-02T00:00:00.000Z',
+    } as UnifiedOutcome['arbitrage'] & { arbType: 'direct' };
+    const market: SavedMarket = {
+      id: 'market-1', eventTitle: 'Market 1', kalshiUrl: 'k', polymarketUrl: 'p',
+      createdAt: '2026-08-13T18:00:00Z',
+    };
+
+    expect(applyDurableFullScanToSavedMarket(market, {
+      fullScanPersisted: true, publicationGeneration: 4,
+      outcomes: [candidate], kalshiCount: 1, pmCount: 1, matchedCount: 1,
+    }, '2026-08-13T19:59:00Z')).toMatchObject({
+      canonicalApyPct: null,
+      canonicalApyUnavailableReason: 'no_canonical_arbitrage',
+      canonicalCurrentRoiPct: null,
+      canonicalCurrentStrategy: 'No arb',
     });
   });
 
@@ -374,6 +417,27 @@ describe('canonical market APY summary', () => {
       scalarApyPct: null,
       scenarioApyPct: { kalshi: 2.5, polymarket: 4.5 },
       sortApyPct: null,
+    });
+  });
+
+  it('keeps canonical APY available in compact rows when optional profit is unavailable', () => {
+    const apyPct = (Math.pow(1.02, 365 / 100) - 1) * 100;
+    const market = {
+      id: 'roi-expiry-only', eventTitle: 'ROI and expiry only', kalshiUrl: '', polymarketUrl: '', createdAt: '',
+      canonicalApyPct: apyPct,
+      canonicalApyObservedAt: '2026-08-20T13:00:00.000Z',
+      canonicalApySource: 'full_scan', canonicalApyRevision: 12,
+      canonicalCurrentRoiPct: 2, canonicalCurrentProfit: null,
+      canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
+      canonicalCurrentDaysToExpiry: 100,
+      canonicalCurrentExpiryAt: '2026-11-28T13:00:00.000Z',
+      canonicalCurrentRevision: 12,
+    } as SavedMarket;
+
+    expect(getMarketApySummary(market)).toMatchObject({
+      scalarApyPct: apyPct,
+      sortApyPct: apyPct,
+      unavailableReason: null,
     });
   });
 
