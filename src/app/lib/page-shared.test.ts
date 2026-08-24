@@ -179,7 +179,7 @@ describe("saved-market scheduler status", () => {
     expect(updated.canonicalApyPct).toBeCloseTo((Math.pow(1 + roiPct / 100, 365 / daysToExpiry) - 1) * 100, 12);
   });
 
-  it('keeps APY unavailable when a full-scan candidate is explicitly non-executable', () => {
+  it('keeps profit unavailable but annualizes ROI when a full-scan candidate is explicitly non-executable', () => {
     const scannedAt = '2026-08-13T19:59:00Z';
     const expiryAt = '2026-10-02T00:00:00.000Z';
     const daysToExpiry = (Date.parse(expiryAt) - Date.parse(scannedAt)) / 86_400_000;
@@ -195,17 +195,18 @@ describe("saved-market scheduler status", () => {
       createdAt: '2026-08-13T18:00:00Z',
     };
 
-    expect(applyDurableFullScanToSavedMarket(market, {
+    const updated = applyDurableFullScanToSavedMarket(market, {
       fullScanPersisted: true, publicationGeneration: 4,
       outcomes: [candidate], kalshiCount: 1, pmCount: 1, matchedCount: 1,
-    }, scannedAt)).toMatchObject({
-      canonicalApyPct: null,
-      canonicalApyUnavailableReason: 'current_candidate_non_executable',
+    }, scannedAt);
+    expect(updated).toMatchObject({
+      canonicalApyUnavailableReason: null,
       canonicalCurrentRoiPct: 2.5,
       canonicalCurrentProfit: null,
       canonicalCurrentDaysToExpiry: daysToExpiry,
       canonicalCurrentExpiryAt: expiryAt,
     });
+    expect(updated.canonicalApyPct).toBeCloseTo((Math.pow(1.025, 365 / daysToExpiry) - 1) * 100, 12);
   });
 
   it('does not publish canonical APY after a persisted full scan with an unrecognized strategy', () => {

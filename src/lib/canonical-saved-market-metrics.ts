@@ -45,15 +45,7 @@ export function selectCanonicalSavedMarketMetrics(
     const declared = candidate.arbType === 'cross' || candidate.arbType === 'direct' || candidate.arbType === 'internal'
       ? candidate.arbType : null;
     const classification = auditArbClassification(candidate.strategy, declared);
-    // executionStatus post-dates thousands of complete durable scan payloads.
-    // Missing means legacy persisted evidence. Explicit non-executable rows may
-    // retain indicative ROI, but never executable profit/APY; unavailable rows
-    // remain closed entirely.
-    const executionEligible = candidate.executionStatus == null
-      || candidate.executionStatus === 'executable'
-      || candidate.executionStatus === 'non_executable';
     return classification.valid && classification.canonicalType !== null
-      && executionEligible
       && Number.isFinite(candidate.roiPct) && candidate.roiPct > 0;
   });
   const best = eligible.reduce<CanonicalSavedMarketCandidate | null>((current, candidate) => {
@@ -70,20 +62,8 @@ export function selectCanonicalSavedMarketMetrics(
 
   const expiryAt = typeof best.expiryAt === 'string' ? best.expiryAt : null;
   const apy = calculateScanApy(best.roiPct, scannedAt ?? '', expiryAt);
-  if (best.executionStatus === 'non_executable') {
-    return {
-      value: null,
-      unavailableReason: 'current_candidate_non_executable',
-      outcome: best.artist,
-      observedAt,
-      roiPct: best.roiPct,
-      profit: null,
-      strategy: best.strategy,
-      daysToExpiry: apy.daysToExpiry,
-      expiryAt,
-    };
-  }
-  const profit = typeof best.expectedProfit === 'number' && Number.isFinite(best.expectedProfit)
+  const profit = (best.executionStatus == null || best.executionStatus === 'executable')
+    && typeof best.expectedProfit === 'number' && Number.isFinite(best.expectedProfit)
     && best.expectedProfit > 0 ? best.expectedProfit : null;
   return {
     value: apy.apyPct,

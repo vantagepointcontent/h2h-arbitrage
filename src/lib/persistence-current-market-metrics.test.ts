@@ -392,6 +392,62 @@ describe('BUG-179 canonical current-market metric projection', () => {
     });
   });
 
+  it('backfills APY from the persisted ROI observation while preserving unavailable match status', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-apy-backfill-'));
+    const dbPath = path.join(tempDir, 'edgefinder.db');
+    process.env.H2H_SQLITE_PATH = dbPath;
+    process.env.H2H_SAVED_MARKETS_FILE = path.join(tempDir, 'saved-markets.json');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const expiryAt = '2026-11-28T00:00:00.000Z';
+    const observedAt = '2026-08-20T13:00:00.000Z';
+    const roiPct = 2;
+    const market = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/bug-186-backfill',
+      polymarketUrl: 'https://polymarket.com/event/bug-186-backfill',
+      eventTitle: 'BUG-186 backfill fixture',
+      expiryDate: expiryAt,
+    });
+    const revision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
+    await persistence.updateSavedMarketScanResult(market.id, {
+      bestRoiPct: roiPct, bestProfit: 1, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',
+      outcomeCount: 1, matchedCount: 1, matchStatus: 'matched', kalshiCount: 1, pmCount: 1,
+      scannedAt: observedAt, publicationGeneration: revision,
+      allArbs: [{ artist: 'Yes', roiPct, expectedProfit: 1, strategy: 'Buy YES Kalshi + NO PM',
+        arbType: 'direct', executionStatus: 'executable', expiryAt }],
+    });
+
+    const db = createClient({ url: `file:${dbPath}` });
+    await db.execute({
+      sql: `UPDATE saved_markets SET
+              canonical_apy_pct = NULL,
+              canonical_apy_unavailable_reason = 'current_candidate_non_executable',
+              last_scan_result = json_set(last_scan_result,
+                '$.matchStatus', 'unavailable',
+                '$.matchError', 'Current venue depth is unavailable')
+            WHERE id = ?`,
+      args: [market.id],
+    });
+    db.close();
+
+    expect(await persistence.reconcileSavedMarketMatchSummaries()).toBeGreaterThan(0);
+    const persisted = await persistence.getSavedMarketById(market.id);
+    const daysToExpiry = (Date.parse(expiryAt) - Date.parse(observedAt)) / 86_400_000;
+    expect(persisted).toMatchObject({
+      canonicalApyUnavailableReason: null,
+      canonicalApyObservedAt: observedAt,
+      canonicalApyRevision: revision,
+      canonicalCurrentRoiPct: roiPct,
+      canonicalCurrentExpiryAt: expiryAt,
+      canonicalCurrentRevision: revision,
+      lastScanResult: {
+        matchStatus: 'unavailable',
+        matchError: 'Current venue depth is unavailable',
+      },
+    });
+    expect(persisted?.canonicalApyPct).toBeCloseTo(calculateApyPctFromDays(roiPct, daysToExpiry)!, 12);
+  });
+
   it('reconciles and alerts on a persisted APY-only row without reading historical logs', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-reconcile-'));
     const dbPath = path.join(tempDir, 'edgefinder.db');

@@ -471,7 +471,12 @@ function MarketSidebarInner({
                         </span>
                       )}
                       {roi !== 0 && (
-                        <span className="text-[10px] text-[var(--text-secondary)] ml-1">
+                        <span
+                          className="text-[10px] text-[var(--text-secondary)] ml-1"
+                          title={apy == null
+                            ? `APY unavailable: ${(apySummary.unavailableReason ?? 'unknown reason').replaceAll('_', ' ')}`
+                            : undefined}
+                        >
                           {apy != null ? `(${formatPercent(apy)})` : '(APY unavailable)'}
                         </span>
                       )}

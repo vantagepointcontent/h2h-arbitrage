@@ -2488,7 +2488,7 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
   // BUG-179: bounded, same-row reconciliation. The saved full-scan payload is
   // the current source of truth; immutable scan_results history is never copied
   // back into current state. A CAS fences every repaired projection.
-  const metricRows = await c.execute(`SELECT id, last_scan_result, scan_publication_generation,
+  const metricRows = await c.execute(`SELECT id, expiry_date, last_scan_result, scan_publication_generation,
       canonical_apy_pct, canonical_apy_unavailable_reason, canonical_apy_outcome,
       canonical_apy_observed_at, canonical_apy_source, canonical_apy_revision,
       canonical_current_roi_pct, canonical_current_profit, canonical_current_strategy,
@@ -2505,19 +2505,36 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
         result = sanitizeSavedArbResult(parsed) ?? parsed;
       } catch { /* APY without a readable current source is cleared below */ }
     }
-    // BUG-182: unavailable/refreshing payloads describe attempts, not completed
-    // canonical observations. Their publication generation can be newer than
-    // the retained last-known values; replaying it during startup/list
-    // reconciliation would relabel the old ROI/profit/APY with the failed
-    // attempt's revision (and could clear valid APY). Preserve the complete
-    // prior projection; the fail-closed invariant statement below still clears
-    // internally inconsistent APY rows without promoting failed evidence.
-    if (result?.matchStatus === 'unavailable' || result?.matchStatus === 'refreshing') continue;
-    const canonical = result ? canonicalSavedMarketApy(result) : {
+    // BUG-186: unavailable/refreshing describes current execution state, not
+    // whether the already-persisted descriptive ROI can be annualized. Rebuild
+    // APY from that exact persisted ROI observation and the row's market expiry,
+    // preserving its revision rather than adopting the failed attempt's newer
+    // publication generation.
+    const retainedRoi = row.canonical_current_roi_pct == null ? null : Number(row.canonical_current_roi_pct);
+    const retainedObservation = row.canonical_apy_observed_at == null ? null : String(row.canonical_apy_observed_at);
+    const retainedRevision = row.canonical_current_revision == null ? null : Number(row.canonical_current_revision);
+    const retainedProjection = (result?.matchStatus === 'unavailable' || result?.matchStatus === 'refreshing')
+      && retainedRoi != null && Number.isFinite(retainedRoi);
+    const retainedApy = retainedProjection
+      ? calculateScanApy(retainedRoi!, retainedObservation ?? '', row.expiry_date == null ? null : String(row.expiry_date))
+      : null;
+    if ((result?.matchStatus === 'unavailable' || result?.matchStatus === 'refreshing') && !retainedProjection) continue;
+    const canonical: CanonicalSavedMarketMetrics = retainedApy ? {
+      value: retainedApy.apyPct,
+      unavailableReason: retainedApy.unavailableReason,
+      outcome: row.canonical_apy_outcome == null ? null : String(row.canonical_apy_outcome),
+      observedAt: retainedObservation,
+      roiPct: retainedRoi,
+      profit: row.canonical_current_profit == null ? null : Number(row.canonical_current_profit),
+      strategy: row.canonical_current_strategy == null ? 'No arb' : String(row.canonical_current_strategy),
+      daysToExpiry: retainedApy.daysToExpiry,
+      expiryAt: row.expiry_date == null ? null : String(row.expiry_date),
+    } : result ? canonicalSavedMarketApy(result) : {
       value: null, unavailableReason: 'current_scan_revision_unavailable', outcome: null, observedAt: null,
       roiPct: null, profit: null, strategy: 'No arb', daysToExpiry: null, expiryAt: null,
     };
-    const revision = result && Number.isSafeInteger(result.publicationGeneration) ? result.publicationGeneration! : null;
+    const revision = retainedProjection ? retainedRevision
+      : result && Number.isSafeInteger(result.publicationGeneration) ? result.publicationGeneration! : null;
     const desired = [
       canonical.value, canonical.unavailableReason, canonical.outcome, canonical.observedAt, 'full_scan', revision,
       canonical.roiPct, canonical.profit, canonical.strategy, canonical.daysToExpiry, canonical.expiryAt, revision,

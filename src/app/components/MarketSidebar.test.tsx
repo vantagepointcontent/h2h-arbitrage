@@ -90,6 +90,35 @@ describe.each([
   });
 });
 
+describe('BUG-186 compact APY unavailable reason', () => {
+  it('exposes the exact missing canonical input without changing the persisted ROI display', () => {
+    const noop = vi.fn();
+    const saved: SavedMarket = {
+      id: 'missing-expiry', eventTitle: 'Missing expiry market', kalshiUrl: 'k', polymarketUrl: 'p',
+      createdAt: '2026-08-13T18:00:00Z', expiryDate: null,
+      canonicalApyPct: null, canonicalApyUnavailableReason: 'missing_expiry',
+      canonicalApyObservedAt: '2026-08-16T00:00:00.000Z', canonicalApySource: 'full_scan', canonicalApyRevision: 1,
+      canonicalCurrentRoiPct: 2, canonicalCurrentProfit: null, canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
+      canonicalCurrentDaysToExpiry: null, canonicalCurrentExpiryAt: null, canonicalCurrentRevision: 1,
+      lastScanResult: { bestRoiPct: 2, bestProfit: 0, strategy: 'Buy YES Kalshi + NO PM', outcomeCount: 1,
+        matchedCount: 0, matchStatus: 'unavailable', kalshiCount: 1, pmCount: 1,
+        scannedAt: '2026-08-16T00:00:00.000Z', allArbs: [] },
+    };
+    render(<MarketSidebar markets={[saved]} activeId={null} viewMode="overview" sidebarOpen onToggleSidebar={noop}
+      onSelectMarket={noop} onDeleteMarket={noop} sort="name" sortDir="asc" onToggleSort={noop}
+      timeUntilExpiry={() => 'Unknown'} expiryFilter="all" onSetExpiryFilter={noop}
+      showExpired onToggleShowExpired={noop} showArbOnly={false} onToggleShowArbOnly={noop}
+      onRefreshMarkets={noop} listRefreshState={{ status: 'idle', message: null, observedAt: null, source: null, revision: null }}
+      onGoOverview={noop} onGoOpportunities={noop} onGoScan={noop} onGoMarketFinder={noop}
+      onGoLogs={noop} onGoDashboard={noop} onGoTrades={noop} onGoBotTrader={noop}
+      favoriteIds={new Set()} onToggleFavorite={noop} sidebarFavoritesOnly={false}
+      onToggleSidebarFavorites={noop} mobileMenuOpen={false} onCloseMobileMenu={noop} />);
+
+    expect(screen.getByText('+2.0%')).toBeTruthy();
+    expect(screen.getByTitle('APY unavailable: missing expiry').textContent).toBe('(APY unavailable)');
+  });
+});
+
 describe('BUG-168 lightweight Saved Markets refresh', () => {
   it('renders no healthy persisted-list status or revision details', () => {
     const noop = vi.fn();

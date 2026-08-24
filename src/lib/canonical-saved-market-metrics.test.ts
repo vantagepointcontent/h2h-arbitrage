@@ -58,6 +58,22 @@ describe('BUG-183 canonical saved-market APY derivation', () => {
     expect(result.daysToExpiry).toBe(10);
   });
 
+  it.each(['non_executable', 'unavailable'] as const)(
+    'annualizes persisted ROI when the canonical candidate is currently %s', (executionStatus) => {
+    const result = selectCanonicalSavedMarketMetrics([
+      candidate({ executionStatus, expectedProfit: 0, totalStake: 0 }),
+    ], scannedAt);
+
+    expect(result).toMatchObject({
+      unavailableReason: null,
+      roiPct: 2,
+      profit: null,
+      observedAt: scannedAt,
+      expiryAt: '2026-09-03T00:00:00.000Z',
+    });
+    expect(result.value).toBeCloseTo((1.02 ** 36.5 - 1) * 100, 12);
+  });
+
   it.each([
     ['missing expiry', null, 'missing_expiry'],
     ['invalid expiry', 'not-a-date', 'invalid_expiry'],
