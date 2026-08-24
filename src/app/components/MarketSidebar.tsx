@@ -465,16 +465,16 @@ function MarketSidebarInner({
                         </div>
                       </div>
                       <div className="flex items-center shrink-0">
-                        {roi !== 0 && (
-                          <span className={`text-xs font-bold ${roi > 0 ? "text-[var(--status-positive)]" : "text-[var(--status-negative)]"}`}>
-                            {roi > 0 ? "+" : ""}{formatPercent(roi)}
-                          </span>
-                        )}
-                        {apy != null ? (
-                          <span className="text-[10px] text-[var(--text-secondary)] ml-1">({formatPercent(apy)})</span>
-                        ) : apySummary.unavailableReason ? (
-                          <span className="text-[9px] text-[var(--text-secondary)] ml-1" title={`APY unavailable: ${apySummary.unavailableReason.replaceAll('_', ' ')}`}>(APY unavailable)</span>
-                        ) : null}
+                      {roi !== 0 && (
+                        <span className={`text-xs font-bold ${roi > 0 ? "text-[var(--status-positive)]" : "text-[var(--status-negative)]"}`}>
+                          {roi > 0 ? "+" : ""}{formatPercent(roi)}
+                        </span>
+                      )}
+                      {roi !== 0 && (
+                        <span className="text-[10px] text-[var(--text-secondary)] ml-1">
+                          {apy != null ? `(${formatPercent(apy)})` : '(APY unavailable)'}
+                        </span>
+                      )}
                       </div>
                     </div>
                   );
