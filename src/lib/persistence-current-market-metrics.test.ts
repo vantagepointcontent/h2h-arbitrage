@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createClient } from '@libsql/client';
+import type { InStatement } from '@libsql/core/api';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,6 +11,7 @@ let tempDir = '';
 afterEach(() => {
   delete process.env.H2H_SQLITE_PATH;
   delete process.env.H2H_SAVED_MARKETS_FILE;
+  vi.doUnmock('@libsql/client');
   vi.resetModules();
   if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
 });
@@ -444,6 +446,165 @@ describe('BUG-179 canonical current-market metric projection', () => {
         matchStatus: 'unavailable',
         matchError: 'Current venue depth is unavailable',
       },
+    });
+    expect(persisted?.canonicalApyPct).toBeCloseTo(calculateApyPctFromDays(roiPct, daysToExpiry)!, 12);
+  });
+
+  it('recomputes APY from the persisted ROI observation when the row expiry changes', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-expiry-update-'));
+    process.env.H2H_SQLITE_PATH = path.join(tempDir, 'edgefinder.db');
+    process.env.H2H_SAVED_MARKETS_FILE = path.join(tempDir, 'saved-markets.json');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const observedAt = '2026-08-20T13:00:00.000Z';
+    const initialExpiry = '2026-11-28T00:00:00.000Z';
+    const updatedExpiry = '2027-02-01T00:00:00.000Z';
+    const roiPct = 2;
+    const market = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/bug-186-expiry-update',
+      polymarketUrl: 'https://polymarket.com/event/bug-186-expiry-update',
+      eventTitle: 'BUG-186 expiry update fixture',
+      expiryDate: initialExpiry,
+    });
+    const revision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
+    await persistence.updateSavedMarketScanResult(market.id, {
+      bestRoiPct: roiPct, bestProfit: 1, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',
+      outcomeCount: 1, matchedCount: 1, matchStatus: 'matched', kalshiCount: 1, pmCount: 1,
+      scannedAt: observedAt, publicationGeneration: revision,
+      allArbs: [{ artist: 'Yes', roiPct, expectedProfit: 1, strategy: 'Buy YES Kalshi + NO PM',
+        arbType: 'direct', executionStatus: 'executable', expiryAt: initialExpiry }],
+    });
+
+    expect(await persistence.updateSavedMarket(market.id, { expiryDate: updatedExpiry })).toBe(true);
+
+    const daysToExpiry = (Date.parse(updatedExpiry) - Date.parse(observedAt)) / 86_400_000;
+    const persisted = await persistence.getSavedMarketById(market.id);
+    expect(persisted).toMatchObject({
+      expiryDate: updatedExpiry,
+      canonicalApyUnavailableReason: null,
+      canonicalApyObservedAt: observedAt,
+      canonicalApyRevision: revision,
+      canonicalCurrentRoiPct: roiPct,
+      canonicalCurrentDaysToExpiry: daysToExpiry,
+      canonicalCurrentExpiryAt: updatedExpiry,
+      canonicalCurrentRevision: revision,
+    });
+    expect(persisted?.canonicalApyPct).toBeCloseTo(calculateApyPctFromDays(roiPct, daysToExpiry)!, 12);
+  });
+
+  it('keeps APY expiry provenance coherent when an existing market is upserted', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-expiry-upsert-'));
+    process.env.H2H_SQLITE_PATH = path.join(tempDir, 'edgefinder.db');
+    process.env.H2H_SAVED_MARKETS_FILE = path.join(tempDir, 'saved-markets.json');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const observedAt = '2026-08-20T13:00:00.000Z';
+    const initialExpiry = '2026-11-28T00:00:00.000Z';
+    const updatedExpiry = '2027-02-01T00:00:00.000Z';
+    const roiPct = 2;
+    const market = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/bug-186-expiry-upsert',
+      polymarketUrl: 'https://polymarket.com/event/bug-186-expiry-upsert',
+      eventTitle: 'BUG-186 expiry upsert fixture',
+      expiryDate: initialExpiry,
+    });
+    const revision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
+    await persistence.updateSavedMarketScanResult(market.id, {
+      bestRoiPct: roiPct, bestProfit: 1, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',
+      outcomeCount: 1, matchedCount: 1, matchStatus: 'matched', kalshiCount: 1, pmCount: 1,
+      scannedAt: observedAt, publicationGeneration: revision,
+      allArbs: [{ artist: 'Yes', roiPct, expectedProfit: 1, strategy: 'Buy YES Kalshi + NO PM',
+        arbType: 'direct', executionStatus: 'executable', expiryAt: initialExpiry }],
+    });
+
+    await persistence.upsertSavedMarket({
+      kalshiUrl: market.kalshiUrl,
+      polymarketUrl: market.polymarketUrl,
+      eventTitle: market.eventTitle,
+      expiryDate: updatedExpiry,
+    });
+
+    const daysToExpiry = (Date.parse(updatedExpiry) - Date.parse(observedAt)) / 86_400_000;
+    const persisted = await persistence.getSavedMarketById(market.id);
+    expect(persisted).toMatchObject({
+      expiryDate: updatedExpiry,
+      canonicalCurrentDaysToExpiry: daysToExpiry,
+      canonicalCurrentExpiryAt: updatedExpiry,
+    });
+    expect(persisted?.canonicalApyPct).toBeCloseTo(calculateApyPctFromDays(roiPct, daysToExpiry)!, 12);
+  });
+
+  it('does not publish APY from a stale expiry when expiry changes after reconciliation reads', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-expiry-race-'));
+    const dbPath = path.join(tempDir, 'edgefinder.db');
+    process.env.H2H_SQLITE_PATH = dbPath;
+    process.env.H2H_SAVED_MARKETS_FILE = path.join(tempDir, 'saved-markets.json');
+    let interceptReconciliationWrite = false;
+    let updateExpiry: (() => Promise<void>) | null = null;
+    vi.doMock('@libsql/client', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@libsql/client')>();
+      return {
+        ...actual,
+        createClient(options: Parameters<typeof actual.createClient>[0]) {
+          const client = actual.createClient(options);
+          const execute = client.execute.bind(client);
+          client.execute = (async (statement: InStatement | string) => {
+            const sql = typeof statement === 'string' ? statement : statement.sql;
+            if (interceptReconciliationWrite
+              && sql.includes('UPDATE saved_markets SET\n              canonical_apy_pct = ?')) {
+              interceptReconciliationWrite = false;
+              await updateExpiry?.();
+            }
+            return typeof statement === 'string' ? execute(statement) : execute(statement);
+          }) as typeof client.execute;
+          return client;
+        },
+      };
+    });
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const observedAt = '2026-08-20T13:00:00.000Z';
+    const initialExpiry = '2026-11-28T00:00:00.000Z';
+    const updatedExpiry = '2027-02-01T00:00:00.000Z';
+    const roiPct = 2;
+    const market = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/bug-186-expiry-race',
+      polymarketUrl: 'https://polymarket.com/event/bug-186-expiry-race',
+      eventTitle: 'BUG-186 expiry race fixture',
+      expiryDate: initialExpiry,
+    });
+    const revision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
+    await persistence.updateSavedMarketScanResult(market.id, {
+      bestRoiPct: roiPct, bestProfit: 1, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',
+      outcomeCount: 1, matchedCount: 1, matchStatus: 'matched', kalshiCount: 1, pmCount: 1,
+      scannedAt: observedAt, publicationGeneration: revision,
+      allArbs: [{ artist: 'Yes', roiPct, expectedProfit: 1, strategy: 'Buy YES Kalshi + NO PM',
+        arbType: 'direct', executionStatus: 'executable', expiryAt: initialExpiry }],
+    });
+    const db = createClient({ url: `file:${dbPath}` });
+    await db.execute({
+      sql: `UPDATE saved_markets SET canonical_apy_pct = NULL,
+              canonical_apy_unavailable_reason = 'current_candidate_non_executable',
+              last_scan_result = json_set(last_scan_result, '$.matchStatus', 'unavailable')
+            WHERE id = ?`,
+      args: [market.id],
+    });
+    db.close();
+
+    updateExpiry = async () => {
+      expect(await persistence.updateSavedMarket(market.id, { expiryDate: updatedExpiry })).toBe(true);
+    };
+    interceptReconciliationWrite = true;
+    await persistence.reconcileSavedMarketMatchSummaries();
+
+    const daysToExpiry = (Date.parse(updatedExpiry) - Date.parse(observedAt)) / 86_400_000;
+    const persisted = await persistence.getSavedMarketById(market.id);
+    expect(interceptReconciliationWrite).toBe(false);
+    expect(persisted).toMatchObject({
+      expiryDate: updatedExpiry,
+      canonicalApyUnavailableReason: null,
+      canonicalCurrentDaysToExpiry: daysToExpiry,
+      canonicalCurrentExpiryAt: updatedExpiry,
     });
     expect(persisted?.canonicalApyPct).toBeCloseTo(calculateApyPctFromDays(roiPct, daysToExpiry)!, 12);
   });

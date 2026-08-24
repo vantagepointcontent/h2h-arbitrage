@@ -2195,18 +2195,20 @@ export async function upsertSavedMarket(input: {
   );
 
   if (idx >= 0) {
-  // Update in-place — preserve favorite status and update expiryDate if fetched live
-  const existing = markets[idx];
-  const updated: SavedMarket = {
-    ...existing,
-    eventTitle: input.eventTitle,
-    category: input.category ?? existing.category,
-    expiryDate: input.expiryDate ?? existing.expiryDate,
-    lastScanResult: input.lastScanResult ?? existing.lastScanResult,
-  };
-  await upsertMarketRow(updated);
-  await mirrorMarketsToJson();
-  return updated;
+    // Existing rows must use the fenced update path so an expiry refresh and
+    // its APY/TTE projection change atomically from the retained ROI revision.
+    const existing = markets[idx];
+    await updateSavedMarket(existing.id, {
+      kalshiUrl: input.kalshiUrl,
+      polymarketUrl: input.polymarketUrl,
+      eventTitle: input.eventTitle,
+      category: input.category ?? existing.category,
+      expiryDate: input.expiryDate ?? existing.expiryDate,
+    });
+    if (input.lastScanResult != null) {
+      await updateSavedMarketScanResult(existing.id, input.lastScanResult, input.expiryDate ?? undefined);
+    }
+    return (await getSavedMarketById(existing.id)) ?? existing;
   }
 
   // New market — create
@@ -2539,18 +2541,18 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
       canonical.value, canonical.unavailableReason, canonical.outcome, canonical.observedAt, 'full_scan', revision,
       canonical.roiPct, canonical.profit, canonical.strategy, canonical.daysToExpiry, canonical.expiryAt, revision,
     ];
-    const existing = [
+    const existing: Array<string | number | null> = [
       row.canonical_apy_pct == null ? null : Number(row.canonical_apy_pct),
-      row.canonical_apy_unavailable_reason ?? null,
-      row.canonical_apy_outcome ?? null,
-      row.canonical_apy_observed_at ?? null,
-      row.canonical_apy_source ?? null,
+      row.canonical_apy_unavailable_reason == null ? null : String(row.canonical_apy_unavailable_reason),
+      row.canonical_apy_outcome == null ? null : String(row.canonical_apy_outcome),
+      row.canonical_apy_observed_at == null ? null : String(row.canonical_apy_observed_at),
+      row.canonical_apy_source == null ? null : String(row.canonical_apy_source),
       row.canonical_apy_revision == null ? null : Number(row.canonical_apy_revision),
       row.canonical_current_roi_pct == null ? null : Number(row.canonical_current_roi_pct),
       row.canonical_current_profit == null ? null : Number(row.canonical_current_profit),
-      row.canonical_current_strategy ?? null,
+      row.canonical_current_strategy == null ? null : String(row.canonical_current_strategy),
       row.canonical_current_days_to_expiry == null ? null : Number(row.canonical_current_days_to_expiry),
-      row.canonical_current_expiry_at ?? null,
+      row.canonical_current_expiry_at == null ? null : String(row.canonical_current_expiry_at),
       row.canonical_current_revision == null ? null : Number(row.canonical_current_revision),
     ];
     if (JSON.stringify(existing) === JSON.stringify(desired)) continue;
@@ -2574,8 +2576,18 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
               canonical_apy_observed_at = ?, canonical_apy_source = ?, canonical_apy_revision = ?,
               canonical_current_roi_pct = ?, canonical_current_profit = ?, canonical_current_strategy = ?,
               canonical_current_days_to_expiry = ?, canonical_current_expiry_at = ?, canonical_current_revision = ?
-            WHERE id = ? AND scan_publication_generation = ? AND last_scan_result IS ?`,
-      args: [...desired, String(row.id), Number(row.scan_publication_generation), raw],
+            WHERE id = ? AND expiry_date IS ?
+              AND scan_publication_generation = ? AND last_scan_result IS ?
+              AND canonical_apy_pct IS ? AND canonical_apy_unavailable_reason IS ?
+              AND canonical_apy_outcome IS ? AND canonical_apy_observed_at IS ?
+              AND canonical_apy_source IS ? AND canonical_apy_revision IS ?
+              AND canonical_current_roi_pct IS ? AND canonical_current_profit IS ?
+              AND canonical_current_strategy IS ? AND canonical_current_days_to_expiry IS ?
+              AND canonical_current_expiry_at IS ? AND canonical_current_revision IS ?`,
+      args: [
+        ...desired, String(row.id), row.expiry_date == null ? null : String(row.expiry_date),
+        Number(row.scan_publication_generation), raw, ...existing,
+      ],
     });
     reconciled += repaired.rowsAffected;
   }
@@ -2727,19 +2739,80 @@ export async function updateSavedMarket(
 ): Promise<boolean> {
   await ensureMarketsMigrated();
   const c = getClient();
-  const sets: string[] = [];
-  const args: (string | null)[] = [];
-  if (updates.eventTitle !== undefined) { sets.push('event_title = ?'); args.push(updates.eventTitle); }
-  if (updates.expiryDate !== undefined) { sets.push('expiry_date = ?'); args.push(updates.expiryDate || null); }
-  if (updates.category !== undefined) { sets.push('category = ?'); args.push(updates.category); }
-  if (updates.kalshiUrl !== undefined) { sets.push('kalshi_url = ?'); args.push(updates.kalshiUrl); }
-  if (updates.polymarketUrl !== undefined) { sets.push('polymarket_url = ?'); args.push(updates.polymarketUrl); }
-  if (updates.platformLinks !== undefined) { sets.push('platform_links = ?'); args.push(JSON.stringify(updates.platformLinks)); }
-  if (sets.length === 0) return false;
-  args.push(id);
-  const res = await c.execute({ sql: `UPDATE saved_markets SET ${sets.join(', ')} WHERE id = ?`, args });
+  if (Object.values(updates).every(value => value === undefined)) return false;
+
+  let res: Awaited<ReturnType<typeof c.execute>> | null = null;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const sets: string[] = [];
+    const args: Array<string | number | null> = [];
+    if (updates.eventTitle !== undefined) { sets.push('event_title = ?'); args.push(updates.eventTitle); }
+    if (updates.category !== undefined) { sets.push('category = ?'); args.push(updates.category); }
+    if (updates.kalshiUrl !== undefined) { sets.push('kalshi_url = ?'); args.push(updates.kalshiUrl); }
+    if (updates.polymarketUrl !== undefined) { sets.push('polymarket_url = ?'); args.push(updates.polymarketUrl); }
+    if (updates.platformLinks !== undefined) { sets.push('platform_links = ?'); args.push(JSON.stringify(updates.platformLinks)); }
+
+    if (updates.expiryDate === undefined) {
+      args.push(id);
+      res = await c.execute({ sql: `UPDATE saved_markets SET ${sets.join(', ')} WHERE id = ?`, args });
+      break;
+    }
+
+    const source = await c.execute({
+      sql: `SELECT expiry_date, last_scan_result, scan_publication_generation,
+              canonical_apy_pct, canonical_apy_unavailable_reason, canonical_apy_outcome,
+              canonical_apy_observed_at, canonical_apy_source, canonical_apy_revision,
+              canonical_current_roi_pct, canonical_current_profit, canonical_current_strategy,
+              canonical_current_days_to_expiry, canonical_current_expiry_at, canonical_current_revision
+            FROM saved_markets WHERE id = ?`,
+      args: [id],
+    });
+    const row = source.rows[0];
+    if (!row) return false;
+    const expiryDate = updates.expiryDate || null;
+    const roiPct = row.canonical_current_roi_pct == null ? Number.NaN : Number(row.canonical_current_roi_pct);
+    const observedAt = row.canonical_apy_observed_at == null ? '' : String(row.canonical_apy_observed_at);
+    const apy = calculateScanApy(roiPct, observedAt, expiryDate);
+    sets.push(
+      'expiry_date = ?',
+      'canonical_apy_pct = ?',
+      'canonical_apy_unavailable_reason = ?',
+      'canonical_current_days_to_expiry = ?',
+      'canonical_current_expiry_at = ?',
+    );
+    args.push(expiryDate, apy.apyPct, apy.unavailableReason, apy.daysToExpiry, expiryDate, id);
+
+    const fenced: Array<string | number | null> = [
+      row.expiry_date == null ? null : String(row.expiry_date),
+      row.last_scan_result == null ? null : String(row.last_scan_result),
+      Number(row.scan_publication_generation),
+      row.canonical_apy_pct == null ? null : Number(row.canonical_apy_pct),
+      row.canonical_apy_unavailable_reason == null ? null : String(row.canonical_apy_unavailable_reason),
+      row.canonical_apy_outcome == null ? null : String(row.canonical_apy_outcome),
+      row.canonical_apy_observed_at == null ? null : String(row.canonical_apy_observed_at),
+      row.canonical_apy_source == null ? null : String(row.canonical_apy_source),
+      row.canonical_apy_revision == null ? null : Number(row.canonical_apy_revision),
+      row.canonical_current_roi_pct == null ? null : Number(row.canonical_current_roi_pct),
+      row.canonical_current_profit == null ? null : Number(row.canonical_current_profit),
+      row.canonical_current_strategy == null ? null : String(row.canonical_current_strategy),
+      row.canonical_current_days_to_expiry == null ? null : Number(row.canonical_current_days_to_expiry),
+      row.canonical_current_expiry_at == null ? null : String(row.canonical_current_expiry_at),
+      row.canonical_current_revision == null ? null : Number(row.canonical_current_revision),
+    ];
+    args.push(...fenced);
+    res = await c.execute({
+      sql: `UPDATE saved_markets SET ${sets.join(', ')}
+            WHERE id = ?
+              AND expiry_date IS ? AND last_scan_result IS ? AND scan_publication_generation IS ?
+              AND canonical_apy_pct IS ? AND canonical_apy_unavailable_reason IS ? AND canonical_apy_outcome IS ?
+              AND canonical_apy_observed_at IS ? AND canonical_apy_source IS ? AND canonical_apy_revision IS ?
+              AND canonical_current_roi_pct IS ? AND canonical_current_profit IS ? AND canonical_current_strategy IS ?
+              AND canonical_current_days_to_expiry IS ? AND canonical_current_expiry_at IS ? AND canonical_current_revision IS ?`,
+      args,
+    });
+    if (res.rowsAffected > 0) break;
+  }
   invalidateMarketsCache();
-  const changed = Number((res as any).rowsAffected ?? 0) > 0;
+  const changed = Number(res?.rowsAffected ?? 0) > 0;
   if (changed) await mirrorMarketsToJson();
   return changed;
 }
