@@ -146,10 +146,8 @@ export function summarizeMarketsProjectionHealth(markets: MarketsProjectionRow[]
   }
 
   const unavailableScanStatesPct = markets.length === 0 ? 0 : unavailableScanStates * 100 / markets.length;
-  const applicableRoi = availableRoi + unavailableRoi;
-  const unavailableRoiPct = applicableRoi === 0 ? 0 : unavailableRoi * 100 / applicableRoi;
-  const applicableProfit = availableProfit + unavailableProfit;
-  const unavailableProfitPct = applicableProfit === 0 ? 0 : unavailableProfit * 100 / applicableProfit;
+  const unavailableRoiPct = scanned === 0 ? 0 : unavailableRoi * 100 / scanned;
+  const unavailableProfitPct = scanned === 0 ? 0 : unavailableProfit * 100 / scanned;
 
   const reasons: string[] = [];
   if (markets.length === 0) reasons.push('Canonical Markets population is empty');
@@ -159,10 +157,10 @@ export function summarizeMarketsProjectionHealth(markets: MarketsProjectionRow[]
   if (unavailableRoiWithoutReason > 0) reasons.push(`${unavailableRoiWithoutReason} unavailable current ROI field(s) lack a specific reason`);
   if (unavailableProfitWithoutReason > 0) reasons.push(`${unavailableProfitWithoutReason} unavailable current profit field(s) lack a specific reason`);
   if (unavailableRoiPct > 5) {
-    reasons.push(`${unavailableRoi}/${applicableRoi} applicable current ROI field(s) are unavailable (${unavailableRoiPct.toFixed(2)}%), above the 5% degradation threshold`);
+    reasons.push(`${unavailableRoi}/${scanned} scanned current ROI field(s) are unavailable (${unavailableRoiPct.toFixed(2)}%), above the 5% degradation threshold`);
   }
   if (unavailableProfitPct > 5) {
-    reasons.push(`${unavailableProfit}/${applicableProfit} applicable current profit field(s) are unavailable (${unavailableProfitPct.toFixed(2)}%), above the 5% degradation threshold`);
+    reasons.push(`${unavailableProfit}/${scanned} scanned current profit field(s) are unavailable (${unavailableProfitPct.toFixed(2)}%), above the 5% degradation threshold`);
   }
   if (unavailableScanStatesWithoutReason > 0) {
     reasons.push(`${unavailableScanStatesWithoutReason} unavailable persisted market scan state(s) lack a specific reason`);

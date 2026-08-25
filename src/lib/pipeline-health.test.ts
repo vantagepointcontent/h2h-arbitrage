@@ -132,11 +132,45 @@ describe('producer-to-consumer pipeline health', () => {
       notApplicableProfit: 94,
       unavailableProfit: 6,
       unavailableProfitWithoutReason: 0,
-      unavailableProfitPct: 100,
+      unavailableProfitPct: 6,
       reasons: expect.arrayContaining([
         '1 unavailable current ROI field(s) lack a specific reason',
-        '6/6 applicable current profit field(s) are unavailable (100.00%), above the 5% degradation threshold',
+        '6/100 scanned current profit field(s) are unavailable (6.00%), above the 5% degradation threshold',
       ]),
+    });
+  });
+
+  it('keeps a small explicitly reasoned field-unavailable cohort below the broad-collapse threshold', () => {
+    const rows = [
+      ...Array.from({ length: 472 }, (_, index) => ({
+        id: `no-arb-${index}`,
+        lastScanResult: { matchStatus: 'confirmed_zero', scannedAt: '2026-08-25T22:00:00.000Z' },
+        canonicalCurrentRoiPct: null,
+        canonicalCurrentRoiStatus: 'not_applicable',
+        canonicalCurrentProfit: null,
+        canonicalCurrentProfitStatus: 'not_applicable',
+        canonicalApyPct: null,
+        canonicalApyUnavailableReason: 'no_canonical_arbitrage',
+      })),
+      ...Array.from({ length: 2 }, (_, index) => ({
+        id: `retained-${index}`,
+        lastScanResult: { matchStatus: 'unavailable', matchError: 'clob_book_unavailable', scannedAt: '2026-08-25T22:00:00.000Z' },
+        canonicalCurrentRoiPct: 0.2,
+        canonicalCurrentRoiStatus: 'available',
+        canonicalCurrentProfit: null,
+        canonicalCurrentProfitStatus: 'unavailable',
+        canonicalCurrentProfitUnavailableReason: 'canonical_profit_not_persisted_for_retained_revision',
+        canonicalApyPct: 0.5,
+      })),
+    ];
+
+    const health = summarizeMarketsProjectionHealth(rows);
+    expect(health.reasons).toEqual([]);
+    expect(health).toMatchObject({
+      state: 'healthy',
+      total: 474,
+      unavailableProfit: 2,
+      unavailableProfitWithoutReason: 0,
     });
   });
 });
