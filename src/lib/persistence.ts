@@ -2357,7 +2357,11 @@ export async function updateSavedMarketScanResult(
     };
   }
   const successfulFullScan = prepared.matchStatus === 'matched' || prepared.matchStatus === 'confirmed_zero';
-  const canonicalApy = successfulFullScan ? canonicalSavedMarketApy(prepared) : null;
+  const canonicalApy = successfulFullScan
+    ? canonicalSavedMarketApy(prepared.matchStatus === 'confirmed_zero'
+      ? { ...prepared, allArbs: [] }
+      : prepared)
+    : null;
   const matchedNow = prepared.matchedCount > 0 ? new Date().toISOString() : null;
   const dependencies = prepared.matchDependencies ?? [];
   const dependencyGuard = dependencies.length > 0

@@ -239,7 +239,11 @@ describe('BUG-179 canonical current-market metric projection', () => {
       pmCount: 1,
       scannedAt: '2026-08-20T13:00:00.000Z',
       publicationGeneration: revision,
-      allArbs: [],
+      allArbs: [{
+        artist: 'Diagnostic only', roiPct: 2.5, expectedProfit: 0,
+        strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',
+        totalStake: 0, executionStatus: 'executable', expiryAt: '2026-09-20T13:00:00.000Z',
+      }],
     });
 
     expect(await persistence.getSavedMarketById(market.id)).toMatchObject({
