@@ -179,10 +179,9 @@ describe("saved-market scheduler status", () => {
     expect(updated.canonicalApyPct).toBeCloseTo((Math.pow(1 + roiPct / 100, 365 / daysToExpiry) - 1) * 100, 12);
   });
 
-  it('keeps profit unavailable but annualizes ROI when a full-scan candidate is explicitly non-executable', () => {
+  it('does not promote an explicitly non-executable candidate into current canonical financials', () => {
     const scannedAt = '2026-08-13T19:59:00Z';
     const expiryAt = '2026-10-02T00:00:00.000Z';
-    const daysToExpiry = (Date.parse(expiryAt) - Date.parse(scannedAt)) / 86_400_000;
     const candidate = outcome(2.5, 1.25);
     candidate.arbitrage = {
       ...candidate.arbitrage,
@@ -200,13 +199,14 @@ describe("saved-market scheduler status", () => {
       outcomes: [candidate], kalshiCount: 1, pmCount: 1, matchedCount: 1,
     }, scannedAt);
     expect(updated).toMatchObject({
-      canonicalApyUnavailableReason: null,
-      canonicalCurrentRoiPct: 2.5,
+      canonicalApyPct: null,
+      canonicalApyUnavailableReason: 'no_canonical_arbitrage',
+      canonicalCurrentRoiPct: null,
       canonicalCurrentProfit: null,
-      canonicalCurrentDaysToExpiry: daysToExpiry,
-      canonicalCurrentExpiryAt: expiryAt,
+      canonicalCurrentStrategy: 'No arb',
+      canonicalCurrentDaysToExpiry: null,
+      canonicalCurrentExpiryAt: null,
     });
-    expect(updated.canonicalApyPct).toBeCloseTo((Math.pow(1.025, 365 / daysToExpiry) - 1) * 100, 12);
   });
 
   it('does not publish canonical APY after a persisted full scan with an unrecognized strategy', () => {

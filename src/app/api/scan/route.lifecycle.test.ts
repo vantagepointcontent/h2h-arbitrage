@@ -357,7 +357,7 @@ describe('POST /api/scan saved-market lifecycle', () => {
     });
   });
 
-  it('does not replace a completed publication with a wholly non-executable candidate set', async () => {
+  it('publishes a wholly non-executable candidate set as a completed no-arbitrage observation', async () => {
     mocks.calculateAllArbitrages.mockReturnValue([{
       artist: 'Indicative only',
       kalshi: { ticker: 'KXTX07-I', yesAsk: 0.4, noAsk: 0.6, yesAskDepth: 0, noAskDepth: 0 },
@@ -375,13 +375,70 @@ describe('POST /api/scan saved-market lifecycle', () => {
     }]);
 
     const response = await executeFullScan(request());
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      reasonCode: 'executable_candidate_unavailable',
-      fullScanPersisted: false,
+      fullScanPersisted: true,
     });
-    expect(mocks.updateSavedMarketScanResult).not.toHaveBeenCalled();
-    expect(mocks.persistAndConsumeBotScan).not.toHaveBeenCalled();
-    expect(mocks.appendScanHistory).not.toHaveBeenCalled();
+    expect(mocks.updateSavedMarketScanResult).toHaveBeenCalledWith(
+      'tx-07',
+      expect.objectContaining({
+        bestRoiPct: 0,
+        bestProfit: 0,
+        strategy: 'No arb',
+        arbType: null,
+        matchStatus: 'confirmed_zero',
+        allArbs: [expect.objectContaining({ executionStatus: 'non_executable' })],
+      }),
+      undefined,
+      undefined,
+    );
+    expect(mocks.persistAndConsumeBotScan).toHaveBeenCalledWith(
+      'tx-07',
+      expect.objectContaining({
+        bestRoiPct: 0,
+        bestProfit: 0,
+        strategy: 'No arb',
+        positiveArbCount: 0,
+      }),
+      'scan_api',
+    );
+    expect(mocks.appendScanHistory).toHaveBeenCalledWith(expect.objectContaining({ positiveArbCount: 0 }));
+  });
+
+  it('does not publish a negative executable candidate as a current arbitrage', async () => {
+    mocks.calculateAllArbitrages.mockReturnValue([{
+      artist: 'Executable but unprofitable',
+      kalshi: { ticker: 'KXTX07-N', yesAsk: 0.6, noAsk: 0.4, yesAskDepth: 100, noAskDepth: 100 },
+      polymarket: { conditionId: 'pm-n', yesPrice: 0.6, noPrice: 0.4, askDepth: 100, noAskDepth: 100 },
+      arbitrage: {
+        roiPct: -1,
+        expectedProfit: -1,
+        strategy: 'Buy YES Kalshi + NO PM',
+        arbType: 'direct',
+        kalshiStake: 60,
+        pmStake: 40,
+        executionStatus: 'executable',
+      },
+    }]);
+
+    const response = await executeFullScan(request());
+    expect(response.status).toBe(200);
+    expect(mocks.updateSavedMarketScanResult).toHaveBeenCalledWith(
+      'tx-07',
+      expect.objectContaining({
+        bestRoiPct: 0,
+        bestProfit: 0,
+        strategy: 'No arb',
+        arbType: null,
+        matchStatus: 'confirmed_zero',
+      }),
+      undefined,
+      undefined,
+    );
+    expect(mocks.persistAndConsumeBotScan).toHaveBeenCalledWith(
+      'tx-07',
+      expect.objectContaining({ positiveArbCount: 0, strategy: 'No arb' }),
+      'scan_api',
+    );
   });
 });

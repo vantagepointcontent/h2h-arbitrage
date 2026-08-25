@@ -297,7 +297,13 @@ describe('WS-107 liveResult persistence', () => {
         matchedPairs: status === 'matched'
           ? [{ artist: 'Democratic', kalshiTicker: 'EQUAL-D', pmConditionId: 'equal-d' }]
           : [],
-        allArbs: [],
+        allArbs: status === 'matched'
+          ? [{
+              artist: 'Democratic', roiPct: 5.5, expectedProfit: 55,
+              strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',
+              executionStatus: 'executable',
+            }]
+          : [],
       });
       const read = async (id: string) => {
         const market = await persistence.getSavedMarketById(id);

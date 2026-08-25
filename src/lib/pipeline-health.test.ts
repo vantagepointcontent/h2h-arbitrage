@@ -60,4 +60,37 @@ describe('producer-to-consumer pipeline health', () => {
       unavailableWithReason: 1, unavailableWithoutReason: 1, zeroCurrentRoi: 1,
     });
   });
+
+  it('detects a broad collapse of persisted market scan states to unavailable even when each row has a reason', () => {
+    const healthyRows = Array.from({ length: 94 }, (_, index) => ({
+      lastScanResult: {
+        scannedAt: `2026-08-21T12:${String(index % 60).padStart(2, '0')}:00.000Z`,
+        matchStatus: 'confirmed_zero',
+        matchError: null,
+      },
+      canonicalApyPct: null,
+      canonicalApyUnavailableReason: 'no_canonical_arbitrage',
+      canonicalCurrentRoiPct: null,
+    }));
+    const unavailableRows = Array.from({ length: 6 }, (_, index) => ({
+      lastScanResult: {
+        scannedAt: `2026-08-21T13:0${index}:00.000Z`,
+        matchStatus: 'unavailable',
+        matchError: 'clob_book_unavailable: exact token book request failed',
+      },
+      canonicalApyPct: null,
+      canonicalApyUnavailableReason: 'no_canonical_arbitrage',
+      canonicalCurrentRoiPct: null,
+    }));
+
+    expect(summarizeMarketsProjectionHealth([...healthyRows, ...unavailableRows])).toMatchObject({
+      state: 'degraded',
+      unavailableScanStates: 6,
+      unavailableScanStatesPct: 6,
+      unavailableScanStatesWithoutReason: 0,
+      reasons: expect.arrayContaining([
+        '6/100 persisted market scan state(s) are unavailable (6.00%), above the 5% degradation threshold',
+      ]),
+    });
+  });
 });

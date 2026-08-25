@@ -2315,20 +2315,7 @@ export async function updateSavedMarketScanResult(
   const previous = previousRaw
       ? JSON.parse(previousRaw) as LastScanResult
       : null;
-  const previousCanonical = {
-    roiPct: current.rows[0].canonical_current_roi_pct == null ? null : Number(current.rows[0].canonical_current_roi_pct),
-    profit: current.rows[0].canonical_current_profit == null ? null : Number(current.rows[0].canonical_current_profit),
-    strategy: current.rows[0].canonical_current_strategy == null ? null : String(current.rows[0].canonical_current_strategy),
-    daysToExpiry: current.rows[0].canonical_current_days_to_expiry == null ? null : Number(current.rows[0].canonical_current_days_to_expiry),
-    expiryAt: current.rows[0].canonical_current_expiry_at == null ? null : String(current.rows[0].canonical_current_expiry_at),
-    revision: current.rows[0].canonical_current_revision == null ? null : Number(current.rows[0].canonical_current_revision),
-    apyPct: current.rows[0].canonical_apy_pct == null ? null : Number(current.rows[0].canonical_apy_pct),
-    apyUnavailableReason: current.rows[0].canonical_apy_unavailable_reason == null ? null : String(current.rows[0].canonical_apy_unavailable_reason),
-    apyOutcome: current.rows[0].canonical_apy_outcome == null ? null : String(current.rows[0].canonical_apy_outcome),
-    apyObservedAt: current.rows[0].canonical_apy_observed_at == null ? null : String(current.rows[0].canonical_apy_observed_at),
-    apySource: current.rows[0].canonical_apy_source == null ? null : String(current.rows[0].canonical_apy_source),
-    apyRevision: current.rows[0].canonical_apy_revision == null ? null : Number(current.rows[0].canonical_apy_revision),
-  };
+
   const generation = Number(current.rows[0].scan_publication_generation);
   if (result.publicationGeneration != null && result.publicationGeneration !== generation) return false;
   if (isStaleMatchPublication(previous, result)) return false;
@@ -2341,34 +2328,36 @@ export async function updateSavedMarketScanResult(
     return classification.valid && classification.canonicalType !== null
       && Number.isFinite(candidate.roiPct) && candidate.roiPct > 0;
   });
+  const hasExecutableCandidate = economicCandidates.some(candidate => candidate.executionStatus == null
+    || candidate.executionStatus === 'executable');
+  const hasUnavailableCandidate = economicCandidates.some(candidate => candidate.executionStatus === 'unavailable');
   const incompleteCandidateReplacement = prepared.matchStatus === 'matched'
-    && economicCandidates.length > 0
-    && !economicCandidates.some(candidate => candidate.executionStatus == null || candidate.executionStatus === 'executable');
+    && economicCandidates.length > 0 && !hasExecutableCandidate && hasUnavailableCandidate;
   if (incompleteCandidateReplacement) {
-    prepared = await prepareCanonicalMatchResult({
+    const incompletePrepared = await prepareCanonicalMatchResult({
       ...prepared,
       matchStatus: 'unavailable',
       matchError: `executable_candidate_unavailable: All ${economicCandidates.length} selected candidate(s) lacked complete executable price evidence. The prior completed scan remains canonical.`,
     }, previous, 'saved_market_scan');
-    if (!prepared) return false;
+    if (!incompletePrepared) return false;
+    prepared = incompletePrepared;
   }
-  let successfulFullScan = prepared.matchStatus === 'matched' || prepared.matchStatus === 'confirmed_zero';
-  let canonicalApy = successfulFullScan ? canonicalSavedMarketApy(prepared) : null;
-  // BUG-182: any scan that completes (matched or confirmed_zero) but fails to
-  // produce a positive candidate must not erase a prior valid canonical
-  // ROI/profit/APY. Persist the attempt as unavailable and keep the last-known
-  // canonical values with their original revision/age.
-  const newCanonicalRoiValid = canonicalApy?.roiPct != null && Number.isFinite(canonicalApy.roiPct) && canonicalApy.roiPct > 0;
-  const previousCanonicalRoiValid = previousCanonical.roiPct != null && Number.isFinite(previousCanonical.roiPct) && previousCanonical.roiPct > 0;
-  if (successfulFullScan && !newCanonicalRoiValid && previousCanonicalRoiValid) {
+  const fullScanFinancialObservation = prepared.kalshiCount > 0 && prepared.pmCount > 0;
+  const confirmedNonExecutable = prepared.matchStatus === 'matched'
+    && fullScanFinancialObservation && !hasExecutableCandidate && !hasUnavailableCandidate;
+  if (confirmedNonExecutable) {
     prepared = {
       ...prepared,
-      matchStatus: 'unavailable',
-      matchError: `no_positive_candidate_persists_prior: The latest scan found no positive candidate opportunity, so the prior completed canonical values remain current (revision ${previousCanonical.revision}).`,
+      bestRoiPct: 0,
+      bestProfit: 0,
+      strategy: 'No arb',
+      arbType: null,
+      matchStatus: 'confirmed_zero',
+      matchError: undefined,
     };
-    successfulFullScan = false;
-    canonicalApy = null;
   }
+  const successfulFullScan = prepared.matchStatus === 'matched' || prepared.matchStatus === 'confirmed_zero';
+  const canonicalApy = successfulFullScan ? canonicalSavedMarketApy(prepared) : null;
   const matchedNow = prepared.matchedCount > 0 ? new Date().toISOString() : null;
   const dependencies = prepared.matchDependencies ?? [];
   const dependencyGuard = dependencies.length > 0

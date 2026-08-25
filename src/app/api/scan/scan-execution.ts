@@ -514,16 +514,15 @@ export async function executeFullScan(request: NextRequest) {
           && auditArbClassification(o.arbitrage.strategy, o.arbitrage.arbType).valid
           && o.arbitrage.arbType !== null
           && o.arbitrage.strategy !== 'No arb' && !o.arbitrage.suspicious);
-        if (netArbs.length > 0 && !netArbs.some(o => o.arbitrage?.executionStatus === 'executable')) {
+        const hasUnavailablePositiveCandidate = netArbs.some(o => o.arbitrage!.roiPct > 0
+          && (o.arbitrage?.executionStatus == null || o.arbitrage.executionStatus === 'unavailable'));
+        if (positiveArbs.length === 0 && hasUnavailablePositiveCandidate) {
           return failIncompleteScan(
             'executable_candidate_unavailable',
             `All ${netArbs.length} selected candidate(s) lacked complete executable price evidence.`,
           );
         }
-        const bestNetArb = netArbs.length > 0
-          ? netArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
-          : null;
-        const bestArb = positiveArbs.length > 0
+        const bestNetArb = positiveArbs.length > 0
           ? positiveArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
           : null;
         const scanResult = {
@@ -534,7 +533,7 @@ export async function executeFullScan(request: NextRequest) {
           arbType: bestNetArb ? (bestNetArb.arbitrage as any).arbType ?? null : null,
           outcomeCount: withArbitrage.length,
           matchedCount,
-          matchStatus: netArbs.length > 0 ? 'matched' as const : 'confirmed_zero' as const,
+          matchStatus: positiveArbs.length > 0 ? 'matched' as const : 'confirmed_zero' as const,
           matchedPairs,
           kalshiCount,
           pmCount,
@@ -656,7 +655,7 @@ export async function executeFullScan(request: NextRequest) {
             scanTimestamp: new Date().toISOString(),
             marketId: market.id,
             totalProfit: positiveArbs.reduce((s, a) => s + a.arbitrage!.expectedProfit, 0),
-            bestRoiPct: bestArb ? bestArb.arbitrage!.roiPct : 0,
+            bestRoiPct: bestNetArb ? bestNetArb.arbitrage!.roiPct : 0,
             positiveArbCount: positiveArbs.length,
             matchedCount,
           }));

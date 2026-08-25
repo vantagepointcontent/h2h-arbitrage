@@ -204,7 +204,7 @@ describe('BUG-182 real scan to persistence fencing', () => {
     await expectCanonicalRevisionPreserved('clob_book_empty');
   });
 
-  it('preserves the seeded canonical revision when every selected candidate is non-executable', async () => {
+  it('persists a completed no-arbitrage revision when every selected candidate is confirmed non-executable', async () => {
     state.calculateAllArbitrages.mockReturnValue([{
       artist: 'Indicative only',
       kalshi: { ticker: 'KXBUG182-YES', yesAsk: 0.4, noAsk: 0.6, yesAskDepth: 0, noAskDepth: 0 },
@@ -215,7 +215,25 @@ describe('BUG-182 real scan to persistence fencing', () => {
         executionBlocker: 'Captured direct legs cannot fill one share',
       },
     }]);
-    await expectCanonicalRevisionPreserved('executable_candidate_unavailable');
+    const response = await executeFullScan(request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ fullScanPersisted: true });
+    const persisted = await persistence.getSavedMarketById(marketId);
+    const publishedRevision = persisted?.lastScanResult?.publicationGeneration;
+    expect(publishedRevision).toEqual(expect.any(Number));
+    expect(persisted).toMatchObject({
+      canonicalCurrentRoiPct: null,
+      canonicalCurrentProfit: null,
+      canonicalCurrentStrategy: 'No arb',
+      canonicalCurrentRevision: publishedRevision,
+      canonicalApyPct: null,
+      canonicalApyUnavailableReason: 'no_canonical_arbitrage',
+      canonicalApyRevision: publishedRevision,
+      lastScanResult: {
+        matchStatus: 'confirmed_zero',
+        publicationGeneration: publishedRevision,
+      },
+    });
   });
 });
 

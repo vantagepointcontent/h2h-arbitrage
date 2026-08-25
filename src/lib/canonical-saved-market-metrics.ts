@@ -46,6 +46,7 @@ export function selectCanonicalSavedMarketMetrics(
       ? candidate.arbType : null;
     const classification = auditArbClassification(candidate.strategy, declared);
     return classification.valid && classification.canonicalType !== null
+      && (candidate.executionStatus == null || candidate.executionStatus === 'executable')
       && Number.isFinite(candidate.roiPct) && candidate.roiPct > 0;
   });
   const best = eligible.reduce<CanonicalSavedMarketCandidate | null>((current, candidate) => {

@@ -84,7 +84,7 @@ describe('BUG-179 canonical current-market metric projection', () => {
     });
   });
 
-  it('publishes one executable revision atomically and preserves canonical values on a zero-candidate completion', async () => {
+  it('publishes executable and confirmed-zero revisions atomically while preserving failed-attempt fencing', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-metrics-'));
     const dbPath = path.join(tempDir, 'edgefinder.db');
     process.env.H2H_SQLITE_PATH = dbPath;
@@ -166,17 +166,17 @@ describe('BUG-179 canonical current-market metric projection', () => {
     })).toBe(true);
 
     expect(await persistence.getSavedMarketById(market.id)).toMatchObject({
-      canonicalApyPct: apyPct,
-      canonicalApyRevision: firstRevision,
-      canonicalCurrentRoiPct: roiPct,
-      canonicalCurrentProfit: 1,
-      canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
-      canonicalCurrentDaysToExpiry: daysToExpiry,
-      canonicalCurrentExpiryAt: '2026-11-28T00:00:00.000Z',
-      canonicalCurrentRevision: firstRevision,
+      canonicalApyPct: null,
+      canonicalApyUnavailableReason: 'no_canonical_arbitrage',
+      canonicalApyRevision: secondRevision,
+      canonicalCurrentRoiPct: null,
+      canonicalCurrentProfit: null,
+      canonicalCurrentStrategy: 'No arb',
+      canonicalCurrentDaysToExpiry: null,
+      canonicalCurrentExpiryAt: null,
+      canonicalCurrentRevision: secondRevision,
       lastScanResult: {
-        matchStatus: 'unavailable',
-        matchError: expect.stringContaining('no_positive_candidate_persists_prior'),
+        matchStatus: 'confirmed_zero',
         publicationGeneration: secondRevision,
       },
     });
@@ -255,7 +255,7 @@ describe('BUG-179 canonical current-market metric projection', () => {
     });
   });
 
-  it('preserves prior canonical metrics when a matched scan produces no positive candidate', async () => {
+  it('publishes a completed no-arbitrage revision when a matched scan produces no positive candidate', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-matched-no-positive-'));
     const dbPath = path.join(tempDir, 'edgefinder.db');
     process.env.H2H_SQLITE_PATH = dbPath;
@@ -312,37 +312,37 @@ describe('BUG-179 canonical current-market metric projection', () => {
 
     const saved = await persistence.getSavedMarketById(market.id);
     expect(saved).toMatchObject({
-      canonicalApyPct: apyPct,
-      canonicalApyRevision: firstRevision,
-      canonicalCurrentRoiPct: roiPct,
-      canonicalCurrentProfit: 1,
-      canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
-      canonicalCurrentDaysToExpiry: daysToExpiry,
-      canonicalCurrentExpiryAt: '2026-11-28T00:00:00.000Z',
-      canonicalCurrentRevision: firstRevision,
+      canonicalApyPct: null,
+      canonicalApyUnavailableReason: 'no_canonical_arbitrage',
+      canonicalApyRevision: secondRevision,
+      canonicalCurrentRoiPct: null,
+      canonicalCurrentProfit: null,
+      canonicalCurrentStrategy: 'No arb',
+      canonicalCurrentDaysToExpiry: null,
+      canonicalCurrentExpiryAt: null,
+      canonicalCurrentRevision: secondRevision,
       lastScanResult: {
-        matchStatus: 'unavailable',
-        matchError: expect.stringContaining('no_positive_candidate_persists_prior'),
+        matchStatus: 'confirmed_zero',
         publicationGeneration: secondRevision,
       },
     });
 
     expect(await persistence.reconcileSavedMarketMatchSummaries()).toBe(0);
     expect(await persistence.getSavedMarketById(market.id)).toMatchObject({
-      canonicalApyPct: apyPct,
-      canonicalApyRevision: firstRevision,
-      canonicalApyObservedAt: '2026-08-20T13:00:00.000Z',
-      canonicalCurrentRoiPct: roiPct,
-      canonicalCurrentProfit: 1,
-      canonicalCurrentRevision: firstRevision,
+      canonicalApyPct: null,
+      canonicalApyUnavailableReason: 'no_canonical_arbitrage',
+      canonicalApyRevision: secondRevision,
+      canonicalCurrentRoiPct: null,
+      canonicalCurrentProfit: null,
+      canonicalCurrentRevision: secondRevision,
       lastScanResult: {
-        matchStatus: 'unavailable',
+        matchStatus: 'confirmed_zero',
         publicationGeneration: secondRevision,
       },
     });
   });
 
-  it('preserves a prior executable revision when a matched publisher supplies only non-executable evidence', async () => {
+  it('normalizes a matched publisher with only non-executable evidence to completed no-arbitrage', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-incomplete-replacement-'));
     process.env.H2H_SQLITE_PATH = path.join(tempDir, 'edgefinder.db');
     process.env.H2H_SAVED_MARKETS_FILE = path.join(tempDir, 'saved-markets.json');
@@ -380,15 +380,16 @@ describe('BUG-179 canonical current-market metric projection', () => {
     })).toBe(true);
 
     expect(await persistence.getSavedMarketById(market.id)).toMatchObject({
-      canonicalCurrentRoiPct: roiPct,
-      canonicalCurrentProfit: 1,
-      canonicalCurrentRevision: firstRevision,
-      canonicalApyPct: apyPct,
-      canonicalApyRevision: firstRevision,
+      canonicalCurrentRoiPct: null,
+      canonicalCurrentProfit: null,
+      canonicalCurrentStrategy: 'No arb',
+      canonicalCurrentRevision: failedRevision,
+      canonicalApyPct: null,
+      canonicalApyUnavailableReason: 'no_canonical_arbitrage',
+      canonicalApyRevision: failedRevision,
       lastScanResult: {
-        matchStatus: 'unavailable',
-        matchError: expect.stringContaining('executable_candidate_unavailable'),
-        scannedAt: '2026-08-20T13:00:00.000Z',
+        matchStatus: 'confirmed_zero',
+        scannedAt: '2026-08-20T13:05:00.000Z',
         publicationGeneration: failedRevision,
       },
     });
