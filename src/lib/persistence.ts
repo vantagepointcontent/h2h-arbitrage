@@ -2591,7 +2591,6 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
     const retainedApy = retainedProjection
       ? calculateScanApy(retainedRoi!, retainedObservation ?? '', row.expiry_date == null ? null : String(row.expiry_date))
       : null;
-    if ((result?.matchStatus === 'unavailable' || result?.matchStatus === 'refreshing') && !retainedProjection) continue;
     const canonical: CanonicalSavedMarketMetrics = retainedApy ? {
       value: retainedApy.apyPct,
       unavailableReason: retainedApy.unavailableReason,
@@ -2610,6 +2609,11 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
       strategy: row.canonical_current_strategy == null ? 'No arb' : String(row.canonical_current_strategy),
       daysToExpiry: retainedApy.daysToExpiry,
       expiryAt: row.expiry_date == null ? null : String(row.expiry_date),
+    } : (result?.matchStatus === 'unavailable' || result?.matchStatus === 'refreshing') ? {
+      value: null, unavailableReason: 'current_scan_unavailable', outcome: null, observedAt: result.scannedAt ?? null,
+      roiPct: null, roiStatus: 'unavailable', roiUnavailableReason: 'current_scan_unavailable',
+      profit: null, profitStatus: 'unavailable', profitUnavailableReason: 'current_scan_unavailable',
+      strategy: 'Unavailable', daysToExpiry: null, expiryAt: null,
     } : result ? canonicalSavedMarketApy(result) : {
       value: null, unavailableReason: 'current_scan_revision_unavailable', outcome: null, observedAt: null,
       roiPct: null, roiStatus: 'unavailable', roiUnavailableReason: 'current_scan_revision_unavailable',

@@ -463,6 +463,53 @@ describe('BUG-179 canonical current-market metric projection', () => {
     expect(persisted?.canonicalApyPct).toBeCloseTo(calculateApyPctFromDays(roiPct, daysToExpiry)!, 12);
   });
 
+  it('backfills explicit field reasons on legacy unavailable rows without retained current metrics', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-unavailable-field-status-'));
+    const dbPath = path.join(tempDir, 'edgefinder.db');
+    process.env.H2H_SQLITE_PATH = dbPath;
+    process.env.H2H_SAVED_MARKETS_FILE = path.join(tempDir, 'saved-markets.json');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const market = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/unavailable-field-status',
+      polymarketUrl: 'https://polymarket.com/event/unavailable-field-status',
+      eventTitle: 'Unavailable field status fixture',
+    });
+    const revision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
+    await persistence.updateSavedMarketScanResult(market.id, {
+      bestRoiPct: 0, bestProfit: 0, strategy: 'Unavailable', outcomeCount: 0, matchedCount: 0,
+      matchStatus: 'unavailable', matchError: 'clob_book_empty: source order book empty',
+      kalshiCount: 0, pmCount: 0, scannedAt: '2026-08-25T22:00:00.000Z',
+      publicationGeneration: revision, allArbs: [],
+    });
+
+    const db = createClient({ url: `file:${dbPath}` });
+    await db.execute({
+      sql: `UPDATE saved_markets SET
+              canonical_current_roi_status = NULL,
+              canonical_current_roi_unavailable_reason = NULL,
+              canonical_current_profit_status = NULL,
+              canonical_current_profit_unavailable_reason = NULL
+            WHERE id = ?`,
+      args: [market.id],
+    });
+    db.close();
+
+    expect(await persistence.reconcileSavedMarketMatchSummaries()).toBeGreaterThan(0);
+    expect(await persistence.getSavedMarketById(market.id)).toMatchObject({
+      canonicalCurrentRoiPct: null,
+      canonicalCurrentRoiStatus: 'unavailable',
+      canonicalCurrentRoiUnavailableReason: 'current_scan_unavailable',
+      canonicalCurrentProfit: null,
+      canonicalCurrentProfitStatus: 'unavailable',
+      canonicalCurrentProfitUnavailableReason: 'current_scan_unavailable',
+      lastScanResult: {
+        matchStatus: 'unavailable',
+        matchError: 'clob_book_empty: source order book empty',
+      },
+    });
+  });
+
   it('recomputes APY from the persisted ROI observation when the row expiry changes', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-expiry-update-'));
     process.env.H2H_SQLITE_PATH = path.join(tempDir, 'edgefinder.db');
