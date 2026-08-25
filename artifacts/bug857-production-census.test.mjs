@@ -29,6 +29,7 @@ test('census classifies all confirmed-no-arbitrage historical financial fields a
 });
 
 test('census row, summary, and export scopes reconcile', () => {
+  assert.equal(census.integrity.allChecksPassed, true);
   for (const field of Object.values(census.savedMarketsApi.allRows)) assertReconciled(field);
   assert.equal(census.savedMarketsApi.fullVsBasicCountMatches, true);
   assert.equal(census.logsApi.summary.totalArbs, 0);

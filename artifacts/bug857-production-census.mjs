@@ -226,5 +226,40 @@ const report = {
   },
 };
 
+function reconciles(field, expectedTotal) {
+  return field.total === expectedTotal
+    && field.total === field.available + field.notApplicable + field.unavailable + field.otherLegitimateStates
+    && Object.values(field.states).reduce((sum, count) => sum + count, 0) === field.total
+    && Object.values(field.unavailableReasons).reduce((sum, count) => sum + count, 0) === field.unavailable
+    && Object.values(field.notApplicableReasons).reduce((sum, count) => sum + count, 0) === field.notApplicable;
+}
+
+const integrityChecks = {
+  canonicalDbIntegrityOk: report.canonicalPersistence.integrity === 'ok'
+    && report.canonicalPersistence.foreignKeyViolations === 0,
+  logsPaginationReconciles: report.scope.apiRowsSampled === logs.length
+    && report.scope.apiRowsSampled === report.scope.apiPageSizes.reduce((sum, size) => sum + size, 0)
+    && report.scope.apiPageOverlap === 0,
+  logsFieldsReconcile: Object.values(report.logsApi.rowFields).every((field) => reconciles(field, logs.length)),
+  savedFieldsReconcile: Object.values(report.savedMarketsApi.allRows).every((field) => reconciles(field, markets.length)),
+  positiveSavedFieldsReconcile: Object.entries(report.savedMarketsApi.positiveRoiRows)
+    .filter(([key]) => key !== 'count')
+    .every(([, field]) => reconciles(field, positiveMarkets.length)),
+  exportRowsReconcile: report.logsExport.sampledRows === logs.length,
+  exportReasonColumnsPresent: report.logsExport.hasRequiredReasonColumns,
+  summaryReconcilesWithNoArbitrageSample: Object.values(report.logsApi.rowFields)
+    .slice(0, 4)
+    .every((field) => field.notApplicable === logs.length)
+      ? report.logsApi.summary?.totalArbs === 0
+        && report.logsApi.summary?.avgRoi == null
+        && report.logsApi.summary?.bestRoi == null
+        && report.logsApi.summary?.totalProfit == null
+      : true,
+};
+report.integrity = {
+  ...integrityChecks,
+  allChecksPassed: Object.values(integrityChecks).every(Boolean),
+};
+
 await writeFile(process.env.BUG857_CENSUS_OUTPUT ?? 'artifacts/bug857-before-census.json', `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));

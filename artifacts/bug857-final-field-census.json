@@ -1,0 +1,884 @@
+{
+  "censusAt": "2026-08-25T23:25:56.907Z",
+  "deployment": {
+    "commit": "041c89668cbe0a8a5da822bfa2c42a95408d07e5",
+    "buildId": "rQRgHNW1-dKztoqAgFkUD"
+  },
+  "scope": {
+    "canonicalDbRows": 119419,
+    "apiRowsSampled": 1500,
+    "apiPagesSampled": 3,
+    "apiPageSizes": [
+      500,
+      500,
+      500
+    ],
+    "apiPageOverlap": 0,
+    "savedMarkets": 474,
+    "persistedArbs": 129,
+    "positivePersistedArbs": 129,
+    "exportRowsSampled": 1500
+  },
+  "canonicalPersistence": {
+    "scanResults": {
+      "total": 119419,
+      "completed": 119419,
+      "positive": 0,
+      "roi_present": 119419,
+      "profit_present": 119419,
+      "apy_present": 119200,
+      "stake_present": 119419,
+      "expiry_present": 115185,
+      "historical_revision_present": 95716,
+      "historical_provenance_present": 95716
+    },
+    "tables": [
+      "arb_episode_points",
+      "arb_episodes",
+      "bot_action_log",
+      "bot_consumer_schema_migrations",
+      "bot_entry_recovery_decisions",
+      "bot_entry_recovery_evidence",
+      "bot_entry_recovery_runs",
+      "bot_opportunity_decisions",
+      "bot_paper_position_deletion_runs",
+      "bot_position_reservations",
+      "bot_position_settlement_legs",
+      "bot_position_settlements",
+      "bot_positions",
+      "bot_scan_cursor",
+      "bot_scan_decision_events",
+      "bot_scan_decisions",
+      "bot_scan_evaluations",
+      "bot_trader_messages",
+      "bot_trader_reset_baseline",
+      "closed_positions",
+      "coupling_states",
+      "executions",
+      "logs_data_quality_alerts",
+      "logs_data_quality_batches",
+      "manual_matches",
+      "market_catalog",
+      "market_catalog_meta",
+      "matched_pairs",
+      "platform_price_snapshots",
+      "rate_limiter_metrics",
+      "saved_market_metric_alerts",
+      "saved_markets",
+      "scan_daily_summary",
+      "scan_history",
+      "scan_results",
+      "scan_results_search",
+      "scan_results_search_config",
+      "scan_results_search_content",
+      "scan_results_search_data",
+      "scan_results_search_docsize",
+      "scan_results_search_idx",
+      "settings",
+      "sqlite_sequence",
+      "watch_targets",
+      "watch_tier_state"
+    ],
+    "integrity": "ok",
+    "foreignKeyViolations": 0
+  },
+  "logsApi": {
+    "rowFields": {
+      "scanTimeRoi": {
+        "total": 1500,
+        "available": 0,
+        "notApplicable": 1500,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 0,
+        "availabilityPct": null,
+        "unavailablePct": null,
+        "states": {
+          "not_applicable": 1500
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {
+          "confirmed_no_arbitrage": 1500
+        }
+      },
+      "scanTimeProfit": {
+        "total": 1500,
+        "available": 0,
+        "notApplicable": 1500,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 0,
+        "availabilityPct": null,
+        "unavailablePct": null,
+        "states": {
+          "not_applicable": 1500
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {
+          "confirmed_no_arbitrage": 1500
+        }
+      },
+      "scanTimeApy": {
+        "total": 1500,
+        "available": 0,
+        "notApplicable": 1500,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 0,
+        "availabilityPct": null,
+        "unavailablePct": null,
+        "states": {
+          "not_applicable": 1500
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {
+          "confirmed_no_arbitrage": 1500
+        }
+      },
+      "scanTimeStake": {
+        "total": 1500,
+        "available": 0,
+        "notApplicable": 1500,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 0,
+        "availabilityPct": null,
+        "unavailablePct": null,
+        "states": {
+          "not_applicable": 1500
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {
+          "confirmed_no_arbitrage": 1500
+        }
+      },
+      "expiryAt": {
+        "total": 1500,
+        "available": 0,
+        "notApplicable": 0,
+        "unavailable": 1500,
+        "otherLegitimateStates": 0,
+        "applicable": 1500,
+        "availabilityPct": 0,
+        "unavailablePct": 100,
+        "states": {
+          "unavailable": 1500
+        },
+        "unavailableReasons": {
+          "historical_field_projection_missing": 1500
+        },
+        "notApplicableReasons": {}
+      },
+      "marketName": {
+        "total": 1500,
+        "available": 1500,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 1500,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 1500
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      },
+      "strategy": {
+        "total": 1500,
+        "available": 1500,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 1500,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 1500
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      },
+      "calculationEnvelope": {
+        "total": 1500,
+        "available": 1500,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 1500,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 1500
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      }
+    },
+    "scanStatuses": {
+      "completed": 1500
+    },
+    "botTraderStatuses": {
+      "not_applicable_no_positive_arb": 1500
+    },
+    "summary": {
+      "totalArbs": 0,
+      "avgRoi": null,
+      "bestRoi": null,
+      "totalProfit": null,
+      "arbTypeCounts": {
+        "direct": 0,
+        "cross": 0,
+        "internal": 0
+      }
+    },
+    "dataQuality": {
+      "latest": {
+        "batchId": "scan:918599",
+        "state": "healthy",
+        "fields": {
+          "roi": {
+            "denominator": 0,
+            "available": 0,
+            "unavailable": 0,
+            "unavailablePct": 0,
+            "exactlyZero": 0,
+            "nonZero": 0,
+            "reasons": {}
+          },
+          "profit": {
+            "denominator": 0,
+            "available": 0,
+            "unavailable": 0,
+            "unavailablePct": 0,
+            "exactlyZero": 0,
+            "nonZero": 0,
+            "reasons": {}
+          },
+          "apy": {
+            "denominator": 0,
+            "available": 0,
+            "unavailable": 0,
+            "unavailablePct": 0,
+            "exactlyZero": 0,
+            "nonZero": 0,
+            "reasons": {}
+          },
+          "state": {
+            "denominator": 100,
+            "available": 100,
+            "unavailable": 0,
+            "unavailablePct": 0,
+            "exactlyZero": 0,
+            "nonZero": 0,
+            "reasons": {}
+          },
+          "currentRoi": {
+            "denominator": 0,
+            "available": 0,
+            "unavailable": 0,
+            "unavailablePct": 0,
+            "exactlyZero": 0,
+            "nonZero": 0,
+            "reasons": {}
+          }
+        },
+        "breaches": [],
+        "reconciliation": {
+          "requested": false,
+          "maxAttempts": 2
+        },
+        "recoveryVerified": false
+      },
+      "rolling": {
+        "batches": 100,
+        "degradedBatches": 0,
+        "fields": {
+          "roi": {
+            "denominator": 0,
+            "unavailable": 0,
+            "unavailablePct": 0,
+            "reasons": {}
+          },
+          "profit": {
+            "denominator": 0,
+            "unavailable": 0,
+            "unavailablePct": 0,
+            "reasons": {}
+          },
+          "apy": {
+            "denominator": 0,
+            "unavailable": 0,
+            "unavailablePct": 0,
+            "reasons": {}
+          },
+          "state": {
+            "denominator": 10000,
+            "unavailable": 0,
+            "unavailablePct": 0,
+            "reasons": {}
+          },
+          "currentRoi": {
+            "denominator": 0,
+            "unavailable": 0,
+            "unavailablePct": 0,
+            "reasons": {}
+          }
+        }
+      }
+    },
+    "total": 119419
+  },
+  "savedMarketsApi": {
+    "allRows": {
+      "expiryDate": {
+        "total": 474,
+        "available": 474,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 474,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 474
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      },
+      "canonicalCurrentRoiPct": {
+        "total": 474,
+        "available": 2,
+        "notApplicable": 468,
+        "unavailable": 4,
+        "otherLegitimateStates": 0,
+        "applicable": 6,
+        "availabilityPct": 33.333,
+        "unavailablePct": 66.667,
+        "states": {
+          "not_applicable": 468,
+          "unavailable": 4,
+          "available": 2
+        },
+        "unavailableReasons": {
+          "current_scan_unavailable": 4
+        },
+        "notApplicableReasons": {
+          "confirmed_no_arbitrage": 468
+        }
+      },
+      "canonicalCurrentProfit": {
+        "total": 474,
+        "available": 0,
+        "notApplicable": 468,
+        "unavailable": 6,
+        "otherLegitimateStates": 0,
+        "applicable": 6,
+        "availabilityPct": 0,
+        "unavailablePct": 100,
+        "states": {
+          "not_applicable": 468,
+          "unavailable": 6
+        },
+        "unavailableReasons": {
+          "current_scan_unavailable": 4,
+          "canonical_profit_not_persisted_for_retained_revision": 2
+        },
+        "notApplicableReasons": {
+          "confirmed_no_arbitrage": 468
+        }
+      },
+      "canonicalApyPct": {
+        "total": 474,
+        "available": 2,
+        "notApplicable": 468,
+        "unavailable": 4,
+        "otherLegitimateStates": 0,
+        "applicable": 6,
+        "availabilityPct": 33.333,
+        "unavailablePct": 66.667,
+        "states": {
+          "not_applicable": 468,
+          "unavailable": 4,
+          "available": 2
+        },
+        "unavailableReasons": {
+          "current_scan_unavailable": 4
+        },
+        "notApplicableReasons": {
+          "confirmed_no_arbitrage": 468
+        }
+      },
+      "canonicalCurrentRevision": {
+        "total": 474,
+        "available": 474,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 474,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 474
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      }
+    },
+    "positiveRoiRows": {
+      "count": 2,
+      "expiryDate": {
+        "total": 2,
+        "available": 2,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 2,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 2
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      },
+      "canonicalCurrentRoiPct": {
+        "total": 2,
+        "available": 2,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 2,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 2
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      },
+      "canonicalCurrentProfit": {
+        "total": 2,
+        "available": 0,
+        "notApplicable": 0,
+        "unavailable": 2,
+        "otherLegitimateStates": 0,
+        "applicable": 2,
+        "availabilityPct": 0,
+        "unavailablePct": 100,
+        "states": {
+          "unavailable": 2
+        },
+        "unavailableReasons": {
+          "canonical_profit_not_persisted_for_retained_revision": 2
+        },
+        "notApplicableReasons": {}
+      },
+      "canonicalApyPct": {
+        "total": 2,
+        "available": 2,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 2,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 2
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      },
+      "canonicalCurrentRevision": {
+        "total": 2,
+        "available": 2,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 2,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 2
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      }
+    },
+    "scanStatuses": {
+      "confirmed_zero": 468,
+      "unavailable": 6
+    },
+    "explicitApyReasons": {
+      "no_canonical_arbitrage": 468,
+      "current_scan_unavailable": 4
+    },
+    "fullVsBasicCountMatches": true,
+    "persistedArbFields": {
+      "roiPct": {
+        "total": 129,
+        "available": 129,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 129,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 129
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      },
+      "expectedProfit": {
+        "total": 129,
+        "available": 129,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 129,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 129
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      },
+      "apyPct": {
+        "total": 129,
+        "available": 129,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 129,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 129
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      },
+      "daysToExpiry": {
+        "total": 129,
+        "available": 129,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 129,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 129
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      },
+      "expiryAt": {
+        "total": 129,
+        "available": 129,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 129,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 129
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      },
+      "totalStake": {
+        "total": 129,
+        "available": 129,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 129,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 129
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      },
+      "calculationEnvelope": {
+        "total": 129,
+        "available": 129,
+        "notApplicable": 0,
+        "unavailable": 0,
+        "otherLegitimateStates": 0,
+        "applicable": 129,
+        "availabilityPct": 100,
+        "unavailablePct": 0,
+        "states": {
+          "available": 129
+        },
+        "unavailableReasons": {},
+        "notApplicableReasons": {}
+      }
+    }
+  },
+  "logsExport": {
+    "headerColumns": 67,
+    "sampledRows": 1500,
+    "literalUnavailableCells": 8,
+    "hasRequiredReasonColumns": true
+  },
+  "botTrader": {
+    "status": {
+      "enabled": true,
+      "botStatus": "ON",
+      "paperBlockedReasons": [],
+      "mode": "paper",
+      "selectionMethod": "roi",
+      "minRoiPct": 2,
+      "minApyPct": 0,
+      "minDepthUsd": 0.5,
+      "minSharesPerLeg": 1,
+      "maxExpiryDays": 360,
+      "maxTradesPerDay": 100,
+      "maxUnitsPerMarket": 3,
+      "todayCount": 0,
+      "todayStakeUsd": 0,
+      "lastTradeAt": "2026-08-14T14:05:02.509Z",
+      "lastTradeMarket": "NY-21 House Election Winner",
+      "lastTradeRoiPct": 0.07312764988772014,
+      "scanDecisions": {
+        "count": 100,
+        "latest": {
+          "scanId": 918599,
+          "idempotencyKey": "scan:918599",
+          "source": "scan_api",
+          "state": "criteria_rejected",
+          "reasonCode": "no_positive_arb",
+          "reason": "No Positive Arb — BotTrader not applicable",
+          "receivedAt": "2026-08-25T23:25:25.559Z",
+          "updatedAt": "2026-08-25T23:25:25.566Z",
+          "attempts": 0,
+          "placementCount": 0,
+          "details": {
+            "evaluationStatus": "not_applicable_no_positive_arb",
+            "canonicalPositiveArbCount": 0
+          },
+          "leaseOwner": null
+        },
+        "byState": {
+          "criteria_rejected": 100
+        }
+      },
+      "workflow": {
+        "health": "healthy",
+        "degradedReasons": [],
+        "liveUnavailableReasons": [],
+        "effectiveExecutionMode": "paper",
+        "requestedExecutionMode": "paper",
+        "liveAuthorizationConfigured": false,
+        "credentialsReady": false,
+        "latestCompletedScanId": 918599,
+        "latestCompletedScanAt": "2026-08-25T23:25:25.438Z",
+        "latestPositiveScanId": null,
+        "latestPositiveScanAt": null,
+        "cursorScanId": 918599,
+        "cursorUpdatedAt": "2026-08-25T23:25:25.569Z",
+        "latestDecisionScanId": 918599,
+        "latestDecisionAt": "2026-08-25T23:25:25.566Z",
+        "pendingScans": 0,
+        "cursorLag": 0,
+        "opportunitiesEvaluated": 21418,
+        "eligibleCount": 0,
+        "lastExecutionOrSkip": {
+          "scanId": 918599,
+          "state": "criteria_rejected",
+          "reason": "No Positive Arb — BotTrader not applicable",
+          "at": "2026-08-25T23:25:25.566Z"
+        },
+        "inProgress": null,
+        "consumer": {
+          "state": "healthy",
+          "lastSuccessAt": "2026-08-25T23:28:18.414Z",
+          "ageMs": 306,
+          "processed": 0,
+          "error": null
+        }
+      },
+      "error": null
+    },
+    "positionsTopLevel": [
+      "success",
+      "count",
+      "marketCount",
+      "markets",
+      "nextCursor",
+      "positions"
+    ],
+    "positionCount": 0,
+    "analytics": {
+      "success": true,
+      "analytics": {
+        "positions": [],
+        "totalBotTrades": {
+          "paper": 0,
+          "production": 0,
+          "total": 0
+        },
+        "openPositions": {
+          "count": 0,
+          "unrealizedPnlCents": 0
+        },
+        "settledPositions": {
+          "count": 0,
+          "realizedPnlCents": 0,
+          "winRateBps": 0
+        },
+        "averageRoi": {
+          "atTradeBps": 0,
+          "currentBps": null
+        },
+        "bestTrade": null,
+        "worstTrade": null,
+        "dailyPnl": [],
+        "dailyPnlByMethod": {
+          "roi": [],
+          "apy": [],
+          "hybrid": []
+        },
+        "timeStats": {
+          "tradesPerDayBps": 0,
+          "averageHoldSeconds": 0
+        },
+        "filter": {
+          "method": "all",
+          "mode": "all"
+        },
+        "perMethod": {
+          "roi": {
+            "tradeCount": 0,
+            "deployedCapitalCents": 0,
+            "realizedPnlCents": 0,
+            "unrealizedPnlCents": 0,
+            "winRateBps": 0,
+            "averageEntryRoiBps": 0,
+            "currentRoiBps": 0,
+            "averageApyPct": null
+          },
+          "apy": {
+            "tradeCount": 0,
+            "deployedCapitalCents": 0,
+            "realizedPnlCents": 0,
+            "unrealizedPnlCents": 0,
+            "winRateBps": 0,
+            "averageEntryRoiBps": 0,
+            "currentRoiBps": 0,
+            "averageApyPct": null
+          },
+          "hybrid": {
+            "tradeCount": 0,
+            "deployedCapitalCents": 0,
+            "realizedPnlCents": 0,
+            "unrealizedPnlCents": 0,
+            "winRateBps": 0,
+            "averageEntryRoiBps": 0,
+            "currentRoiBps": 0,
+            "averageApyPct": null
+          },
+          "legacy": {
+            "tradeCount": 0,
+            "deployedCapitalCents": 0,
+            "realizedPnlCents": 0,
+            "unrealizedPnlCents": 0,
+            "winRateBps": 0,
+            "averageEntryRoiBps": 0,
+            "currentRoiBps": 0,
+            "averageApyPct": null
+          }
+        },
+        "performance": {
+          "positionIds": [],
+          "capital": {
+            "deployedCents": 0,
+            "currentCents": 0,
+            "heldToResolutionCents": 0,
+            "excludedOpenCostCents": 0
+          },
+          "entryCost": {
+            "available": 0,
+            "unavailable": 0
+          },
+          "pnl": {
+            "realizedCents": 0,
+            "unrealizedCents": 0,
+            "totalCents": 0,
+            "roiBps": null
+          },
+          "valuation": {
+            "fresh": 0,
+            "stale": 0,
+            "unavailable": 0,
+            "pendingSettlement": 0,
+            "asOf": null
+          },
+          "classification": {
+            "counts": {
+              "verifiedComplementary": 0,
+              "confirmedInvalid": 0,
+              "exactExposureUnresolved": 0,
+              "partialIdentity": 0,
+              "noFillRolledBack": 0,
+              "unrecoverable": 0,
+              "stillUnavailable": 0,
+              "excludedFromVerifiedTotals": 0,
+              "conflicts": 0
+            },
+            "verifiedArbitrage": {
+              "count": 0,
+              "deployedCents": 0,
+              "currentValueCents": 0,
+              "pnlCents": 0,
+              "roiBps": null
+            },
+            "invalidExposure": {
+              "count": 0,
+              "deployedCents": 0,
+              "currentValueCents": 0,
+              "pnlCents": 0,
+              "roiBps": null
+            },
+            "unresolvedExposure": {
+              "count": 0,
+              "deployedCents": 0,
+              "currentValueCents": 0,
+              "pnlCents": 0,
+              "roiBps": null
+            },
+            "unavailable": {
+              "count": 0,
+              "deployedCents": 0,
+              "currentValueCents": 0,
+              "pnlCents": 0,
+              "roiBps": null
+            }
+          },
+          "entryCohorts": []
+        }
+      }
+    },
+    "sampledLogEvaluationStatuses": {
+      "not_applicable_no_positive_arb": 1500
+    }
+  },
+  "integrity": {
+    "canonicalDbIntegrityOk": true,
+    "logsPaginationReconciles": true,
+    "logsFieldsReconcile": true,
+    "savedFieldsReconcile": true,
+    "positiveSavedFieldsReconcile": true,
+    "exportRowsReconcile": true,
+    "exportReasonColumnsPresent": true,
+    "summaryReconcilesWithNoArbitrageSample": true,
+    "allChecksPassed": true
+  }
+}
