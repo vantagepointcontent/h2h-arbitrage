@@ -27,6 +27,8 @@ describe('POST /api/saved-markets/list-refresh', () => {
       canonicalApyPct: 18.2, canonicalApyObservedAt: '2026-08-19T14:50:00.000Z',
       canonicalApySource: 'full_scan', canonicalApyRevision: 7,
       canonicalCurrentRoiPct: 2.5, canonicalCurrentProfit: 5,
+      canonicalCurrentRoiStatus: 'available', canonicalCurrentRoiUnavailableReason: null,
+      canonicalCurrentProfitStatus: 'available', canonicalCurrentProfitUnavailableReason: null,
       canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
       canonicalCurrentDaysToExpiry: 365 * Math.log(1.025) / Math.log(1.182),
       canonicalCurrentExpiryAt: '2026-09-01T00:00:00.000Z', canonicalCurrentRevision: 7,
@@ -60,6 +62,8 @@ describe('POST /api/saved-markets/list-refresh', () => {
       markets: [{
         id: 'market-1', canonicalApyPct: 18.2, canonicalApySource: 'full_scan', canonicalApyRevision: 7,
         canonicalCurrentRoiPct: 2.5, canonicalCurrentProfit: 5,
+        canonicalCurrentRoiStatus: 'available', canonicalCurrentRoiUnavailableReason: null,
+        canonicalCurrentProfitStatus: 'available', canonicalCurrentProfitUnavailableReason: null,
         canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
         canonicalCurrentDaysToExpiry: 365 * Math.log(1.025) / Math.log(1.182),
         canonicalCurrentExpiryAt: '2026-09-01T00:00:00.000Z', canonicalCurrentRevision: 7,

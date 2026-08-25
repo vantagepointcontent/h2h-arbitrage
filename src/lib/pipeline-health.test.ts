@@ -93,4 +93,50 @@ describe('producer-to-consumer pipeline health', () => {
       ]),
     });
   });
+
+  it('detects field-level profit collapse and unexplained null ROI without counting confirmed no-arb as unavailable', () => {
+    const noArbRows = Array.from({ length: 94 }, () => ({
+      lastScanResult: { scannedAt: '2026-08-21T12:00:00.000Z', matchStatus: 'confirmed_zero' },
+      canonicalApyPct: null,
+      canonicalApyUnavailableReason: 'no_canonical_arbitrage',
+      canonicalCurrentRoiPct: null,
+      canonicalCurrentRoiStatus: 'not_applicable',
+      canonicalCurrentRoiUnavailableReason: null,
+      canonicalCurrentProfit: null,
+      canonicalCurrentProfitStatus: 'not_applicable',
+      canonicalCurrentProfitUnavailableReason: null,
+    }));
+    const collapsedProfitRows = Array.from({ length: 5 }, () => ({
+      lastScanResult: { scannedAt: '2026-08-21T12:00:00.000Z', matchStatus: 'matched' },
+      canonicalApyPct: 12,
+      canonicalApyUnavailableReason: null,
+      canonicalCurrentRoiPct: 2,
+      canonicalCurrentRoiStatus: 'available',
+      canonicalCurrentRoiUnavailableReason: null,
+      canonicalCurrentProfit: null,
+      canonicalCurrentProfitStatus: 'unavailable',
+      canonicalCurrentProfitUnavailableReason: 'non_positive_canonical_candidate_profit',
+    }));
+    const unexplainedRoi = {
+      ...collapsedProfitRows[0],
+      canonicalCurrentRoiPct: null,
+      canonicalCurrentRoiStatus: 'unavailable',
+      canonicalCurrentRoiUnavailableReason: null,
+    };
+
+    expect(summarizeMarketsProjectionHealth([...noArbRows, ...collapsedProfitRows, unexplainedRoi])).toMatchObject({
+      state: 'degraded',
+      notApplicableRoi: 94,
+      unavailableRoi: 1,
+      unavailableRoiWithoutReason: 1,
+      notApplicableProfit: 94,
+      unavailableProfit: 6,
+      unavailableProfitWithoutReason: 0,
+      unavailableProfitPct: 100,
+      reasons: expect.arrayContaining([
+        '1 unavailable current ROI field(s) lack a specific reason',
+        '6/6 applicable current profit field(s) are unavailable (100.00%), above the 5% degradation threshold',
+      ]),
+    });
+  });
 });

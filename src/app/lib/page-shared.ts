@@ -497,7 +497,11 @@ export interface SavedMarket {
   canonicalApySource?: 'full_scan' | null;
   canonicalApyRevision?: number | null;
   canonicalCurrentRoiPct?: number | null;
+  canonicalCurrentRoiStatus?: 'available' | 'not_applicable' | 'unavailable' | null;
+  canonicalCurrentRoiUnavailableReason?: string | null;
   canonicalCurrentProfit?: number | null;
+  canonicalCurrentProfitStatus?: 'available' | 'not_applicable' | 'unavailable' | null;
+  canonicalCurrentProfitUnavailableReason?: string | null;
   canonicalCurrentStrategy?: string | null;
   canonicalCurrentDaysToExpiry?: number | null;
   canonicalCurrentExpiryAt?: string | null;
@@ -518,7 +522,11 @@ export interface MarketApySummary {
 
 export interface CanonicalCurrentMarketMetrics {
   roiPct: number | null;
+  roiStatus: 'available' | 'not_applicable' | 'unavailable';
+  roiUnavailableReason: string | null;
   profit: number | null;
+  profitStatus: 'available' | 'not_applicable' | 'unavailable';
+  profitUnavailableReason: string | null;
   strategy: string;
   apyPct: number | null;
   daysToExpiry: number | null;
@@ -534,6 +542,18 @@ export function getCanonicalCurrentMarketMetrics(market: SavedMarket): Canonical
     ? market.canonicalCurrentProfit : null;
   const strategy = typeof market.canonicalCurrentStrategy === 'string' && market.canonicalCurrentStrategy.trim()
     ? market.canonicalCurrentStrategy : 'No arb';
+  const roiStatus = market.canonicalCurrentRoiStatus === 'available'
+    || market.canonicalCurrentRoiStatus === 'not_applicable'
+    || market.canonicalCurrentRoiStatus === 'unavailable' ? market.canonicalCurrentRoiStatus
+    : roiPct != null ? 'available' : strategy === 'No arb' ? 'not_applicable' : 'unavailable';
+  const roiUnavailableReason = roiStatus === 'unavailable'
+    ? market.canonicalCurrentRoiUnavailableReason ?? 'canonical_roi_status_missing' : null;
+  const profitStatus = market.canonicalCurrentProfitStatus === 'available'
+    || market.canonicalCurrentProfitStatus === 'not_applicable'
+    || market.canonicalCurrentProfitStatus === 'unavailable' ? market.canonicalCurrentProfitStatus
+    : profit != null ? 'available' : roiStatus === 'not_applicable' ? 'not_applicable' : 'unavailable';
+  const profitUnavailableReason = profitStatus === 'unavailable'
+    ? market.canonicalCurrentProfitUnavailableReason ?? 'canonical_profit_status_missing' : null;
   const rawApy = typeof market.canonicalApyPct === 'number' && Number.isFinite(market.canonicalApyPct)
     ? market.canonicalApyPct : null;
   const daysToExpiry = typeof market.canonicalCurrentDaysToExpiry === 'number'
@@ -551,7 +571,11 @@ export function getCanonicalCurrentMarketMetrics(market: SavedMarket): Canonical
     && strategy !== 'No arb' && !strategy.startsWith('Unavailable')
     && daysToExpiry != null && expiryAt != null && revision != null && revision === apyRevision
     && market.canonicalApySource === 'full_scan' && apyMatches;
-  return { roiPct, profit, strategy, apyPct: valid ? rawApy : null, daysToExpiry, expiryAt, revision, valid };
+  return {
+    roiPct, roiStatus, roiUnavailableReason,
+    profit, profitStatus, profitUnavailableReason,
+    strategy, apyPct: valid ? rawApy : null, daysToExpiry, expiryAt, revision, valid,
+  };
 }
 
 export interface QuickApyProvenance {
@@ -682,7 +706,11 @@ export function mergeSavedMarketHydration(current: SavedMarket, incoming: SavedM
     merged.canonicalApySource = current.canonicalApySource ?? null;
     merged.canonicalApyRevision = current.canonicalApyRevision ?? null;
     merged.canonicalCurrentRoiPct = current.canonicalCurrentRoiPct ?? null;
+    merged.canonicalCurrentRoiStatus = current.canonicalCurrentRoiStatus ?? null;
+    merged.canonicalCurrentRoiUnavailableReason = current.canonicalCurrentRoiUnavailableReason ?? null;
     merged.canonicalCurrentProfit = current.canonicalCurrentProfit ?? null;
+    merged.canonicalCurrentProfitStatus = current.canonicalCurrentProfitStatus ?? null;
+    merged.canonicalCurrentProfitUnavailableReason = current.canonicalCurrentProfitUnavailableReason ?? null;
     merged.canonicalCurrentStrategy = current.canonicalCurrentStrategy ?? null;
     merged.canonicalCurrentDaysToExpiry = current.canonicalCurrentDaysToExpiry ?? null;
     merged.canonicalCurrentExpiryAt = current.canonicalCurrentExpiryAt ?? null;
@@ -756,7 +784,11 @@ export function applyDurableFullScanToSavedMarket(
     canonicalApySource: 'full_scan',
     canonicalApyRevision: Number.isSafeInteger(scan.publicationGeneration) ? scan.publicationGeneration! : null,
     canonicalCurrentRoiPct: canonical.roiPct,
+    canonicalCurrentRoiStatus: canonical.roiStatus,
+    canonicalCurrentRoiUnavailableReason: canonical.roiUnavailableReason,
     canonicalCurrentProfit: canonical.profit,
+    canonicalCurrentProfitStatus: canonical.profitStatus,
+    canonicalCurrentProfitUnavailableReason: canonical.profitUnavailableReason,
     canonicalCurrentStrategy: canonical.strategy,
     canonicalCurrentDaysToExpiry: canonical.daysToExpiry,
     canonicalCurrentExpiryAt: canonical.expiryAt,

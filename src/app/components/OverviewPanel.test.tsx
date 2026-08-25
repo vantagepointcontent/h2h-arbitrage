@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { OverviewPanel } from './OverviewPanel';
 import type { SavedMarket } from '@/app/lib/page-shared';
 
@@ -155,6 +155,31 @@ describe('BUG-133 canonical matched state', () => {
 
     expect(screen.getByText('2 matched')).toBeTruthy();
     expect(screen.getByText('No arb')).toBeTruthy();
+  });
+
+  it('renders a reasoned unavailable profit separately from confirmed no-arbitrage N/A', () => {
+    const unavailableProfit = marketWithOpportunity('profit-unavailable', 'Profit unavailable market');
+    unavailableProfit.canonicalCurrentProfit = null;
+    unavailableProfit.canonicalCurrentProfitStatus = 'unavailable';
+    unavailableProfit.canonicalCurrentProfitUnavailableReason = 'non_positive_canonical_candidate_profit';
+    const noArb = market('no-arb', 'No-arbitrage market');
+    noArb.canonicalCurrentRoiStatus = 'not_applicable';
+    noArb.canonicalCurrentProfitStatus = 'not_applicable';
+    noArb.canonicalCurrentStrategy = 'No arb';
+    const unavailableRoi = market('roi-unavailable', 'ROI unavailable market');
+    unavailableRoi.canonicalCurrentRoiStatus = 'unavailable';
+    unavailableRoi.canonicalCurrentRoiUnavailableReason = 'current_scan_revision_unavailable';
+    unavailableRoi.canonicalCurrentProfitStatus = 'not_applicable';
+
+    render(<OverviewPanel {...props} layout="table" markets={[unavailableProfit, unavailableRoi, noArb]} />);
+
+    const unavailable = screen.getByLabelText('Estimated profit unavailable');
+    expect(unavailable.textContent).toBe('Unavailable');
+    expect(unavailable.getAttribute('title')).toContain('non positive canonical candidate profit');
+    expect(screen.getByLabelText('Current ROI unavailable').getAttribute('title'))
+      .toContain('current scan revision unavailable');
+    expect(within(screen.getByRole('row', { name: /No-arbitrage market/ }))
+      .queryByLabelText('Estimated profit unavailable')).toBeNull();
   });
 
   it.each([

@@ -42,7 +42,11 @@ describe('BUG-179 canonical current-market metric projection', () => {
     const persisted = await persistence.getSavedMarketById(market.id);
     expect(persisted).toMatchObject({
       canonicalCurrentRoiPct: 2,
+      canonicalCurrentRoiStatus: 'available',
+      canonicalCurrentRoiUnavailableReason: null,
       canonicalCurrentProfit: null,
+      canonicalCurrentProfitStatus: 'unavailable',
+      canonicalCurrentProfitUnavailableReason: 'non_positive_canonical_candidate_profit',
       canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
       canonicalApyUnavailableReason: null,
       canonicalCurrentDaysToExpiry: daysToExpiry,
@@ -170,7 +174,11 @@ describe('BUG-179 canonical current-market metric projection', () => {
       canonicalApyUnavailableReason: 'no_canonical_arbitrage',
       canonicalApyRevision: secondRevision,
       canonicalCurrentRoiPct: null,
+      canonicalCurrentRoiStatus: 'not_applicable',
+      canonicalCurrentRoiUnavailableReason: null,
       canonicalCurrentProfit: null,
+      canonicalCurrentProfitStatus: 'not_applicable',
+      canonicalCurrentProfitUnavailableReason: null,
       canonicalCurrentStrategy: 'No arb',
       canonicalCurrentDaysToExpiry: null,
       canonicalCurrentExpiryAt: null,

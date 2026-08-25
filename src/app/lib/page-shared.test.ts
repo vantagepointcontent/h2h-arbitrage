@@ -8,6 +8,7 @@ import {
   getCanonicalMatchState,
   formatCanonicalMatchState,
   getMarketApySummary,
+  getCanonicalCurrentMarketMetrics,
   compareSavedMarketApy,
   getQuickApyProvenance,
   mergeSavedMarketHydration,
@@ -429,6 +430,9 @@ describe('canonical market APY summary', () => {
       canonicalApyObservedAt: '2026-08-20T13:00:00.000Z',
       canonicalApySource: 'full_scan', canonicalApyRevision: 12,
       canonicalCurrentRoiPct: 2, canonicalCurrentProfit: null,
+      canonicalCurrentRoiStatus: 'available', canonicalCurrentRoiUnavailableReason: null,
+      canonicalCurrentProfitStatus: 'unavailable',
+      canonicalCurrentProfitUnavailableReason: 'non_positive_canonical_candidate_profit',
       canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
       canonicalCurrentDaysToExpiry: 100,
       canonicalCurrentExpiryAt: '2026-11-28T13:00:00.000Z',
@@ -439,6 +443,14 @@ describe('canonical market APY summary', () => {
       scalarApyPct: apyPct,
       sortApyPct: apyPct,
       unavailableReason: null,
+    });
+    expect(getCanonicalCurrentMarketMetrics(market)).toMatchObject({
+      roiPct: 2,
+      roiStatus: 'available',
+      roiUnavailableReason: null,
+      profit: null,
+      profitStatus: 'unavailable',
+      profitUnavailableReason: 'non_positive_canonical_candidate_profit',
     });
   });
 
@@ -521,13 +533,18 @@ describe('canonical market APY summary', () => {
     const current: SavedMarket = {
       ...base, canonicalApyPct: 30, canonicalApyObservedAt: '2026-08-19T14:30:00Z',
       canonicalApySource: 'full_scan', canonicalApyRevision: 12,
+      canonicalCurrentProfitStatus: 'unavailable',
+      canonicalCurrentProfitUnavailableReason: 'non_positive_canonical_candidate_profit',
     };
     const delayed: SavedMarket = {
       ...base, eventTitle: 'Server title', canonicalApyPct: 29.7,
       canonicalApyObservedAt: '2026-08-19T14:29:00Z', canonicalApySource: 'full_scan', canonicalApyRevision: 11,
+      canonicalCurrentProfitStatus: 'available', canonicalCurrentProfitUnavailableReason: null,
     };
     expect(mergeSavedMarketHydration(current, delayed)).toMatchObject({
       eventTitle: 'Server title', canonicalApyPct: 30, canonicalApyRevision: 12,
+      canonicalCurrentProfitStatus: 'unavailable',
+      canonicalCurrentProfitUnavailableReason: 'non_positive_canonical_candidate_profit',
     });
   });
 

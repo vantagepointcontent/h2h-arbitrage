@@ -471,10 +471,10 @@ function OverviewPanelInner({
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredByExpiry.map((m) => {
             const current = getCanonicalCurrentMarketMetrics(m);
-            const roi = current.roiPct ?? 0;
+            const roi = current.roiPct;
             const apySummary = getMarketApySummary(m);
             const apy = apySummary.sortApyPct ?? 0;
-            const profit = current.profit ?? 0;
+            const profit = current.profit;
             const allArbs = m.lastScanResult?.allArbs;
             const matchedLabel = formatCanonicalMatchState(m);
             const arbCount = allArbs ? allArbs.filter(a => a.expectedProfit > 0).length : 0;
@@ -498,8 +498,11 @@ function OverviewPanelInner({
                   <div className="text-[var(--text-secondary)]">Matched</div>
                   <div className="text-[var(--text-secondary)] text-right">{matchedLabel}</div>
                   <div className="text-[var(--text-secondary)]">ROI</div>
-                  <div className={`text-right font-bold ${roi > 0 ? "text-[var(--status-positive)]" : roi < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
-                    {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
+                  <div className={`text-right font-bold ${roi != null && roi > 0 ? "text-[var(--status-positive)]" : roi != null && roi < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
+                    {roi != null ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}`
+                      : current.roiStatus === "unavailable"
+                        ? <span aria-label="Current ROI unavailable" title={`Current ROI unavailable: ${(current.roiUnavailableReason ?? 'missing reason').replaceAll('_', ' ')}`}>Unavailable</span>
+                        : "—"}
                   </div>
                   <div className="text-[var(--text-secondary)] inline-flex items-center gap-1">APY <ApyHeaderInfo /></div>
                   <div className={`text-right font-bold ${apy > 0 ? "text-[var(--status-positive)]" : apy < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]"}`}>
@@ -507,7 +510,12 @@ function OverviewPanelInner({
                         : <span title={`APY unavailable: ${(apySummary.unavailableReason ?? 'missing settlement timing').replaceAll('_', ' ')}`}>Unavailable</span>}
                   </div>
                   <div className="text-[var(--text-secondary)]">Est. Profit</div>
-                  <div className="text-[var(--text-primary)] text-right">{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</div>
+                  <div className="text-[var(--text-primary)] text-right">
+                    {profit != null ? formatProfitDisplay(profit, allArbs)
+                      : current.profitStatus === "unavailable"
+                        ? <span aria-label="Estimated profit unavailable" title={`Estimated profit unavailable: ${(current.profitUnavailableReason ?? 'missing reason').replaceAll('_', ' ')}`}>Unavailable</span>
+                        : "—"}
+                  </div>
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-[var(--text-secondary)]">
                   <div className="flex items-center gap-1">
@@ -555,10 +563,10 @@ function OverviewPanelInner({
             <tbody>
               {filteredByExpiry.map((m) => {
                 const current = getCanonicalCurrentMarketMetrics(m);
-                const roi = current.roiPct ?? 0;
+                const roi = current.roiPct;
                 const apySummary = getMarketApySummary(m);
                 const apy = apySummary.sortApyPct ?? 0;
-                const profit = current.profit ?? 0;
+                const profit = current.profit;
                 const allArbs = m.lastScanResult?.allArbs;
                 const strategy = current.strategy;
                 const matchState = getCanonicalMatchState(m);
@@ -598,14 +606,22 @@ function OverviewPanelInner({
                     <td className="text-right">
                       {arbCount > 0 ? <span aria-label={`${arbCount} ${metricsAreCurrent ? "active" : "cached"} arbitrage ${arbCount === 1 ? "opportunity" : "opportunities"}`} className={`inline-flex min-w-6 items-center justify-center gap-1 rounded-md border px-1.5 py-0.5 font-bold ${metricsAreCurrent ? "border-[var(--status-positive)]/30 bg-[var(--status-positive)]/10 text-[var(--status-positive)]" : "border-[var(--border-strong)] bg-[var(--surface-workspace)] text-[var(--text-secondary)]"}`}><Zap aria-hidden="true" className="h-2.5 w-2.5" />{arbCount}</span> : <span className="text-[var(--text-secondary)]">—</span>}
                     </td>
-                    <td className={`text-right font-bold ${metricTone(roi)}`} title={metricsAreCurrent ? undefined : "Cached metric; see scan status"}>
-                      {roi !== 0 ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}` : "—"}
+                    <td className={`text-right font-bold ${roi == null ? "text-[var(--text-secondary)]" : metricTone(roi)}`} title={metricsAreCurrent ? undefined : "Cached metric; see scan status"}>
+                      {roi != null ? `${roi > 0 ? "+" : ""}${formatPercent(roi)}`
+                        : current.roiStatus === "unavailable"
+                          ? <span aria-label="Current ROI unavailable" title={`Current ROI unavailable: ${(current.roiUnavailableReason ?? 'missing reason').replaceAll('_', ' ')}`}>Unavailable</span>
+                          : "—"}
                     </td>
                     <td className={`text-right font-bold ${metricTone(apy)}`} title={metricsAreCurrent ? undefined : "Cached metric; see scan status"}>
                       {apySummary.scalarApyPct != null ? `${apy > 0 ? "+" : ""}${formatPercent(apy)}`
                           : <span title={`APY unavailable: ${(apySummary.unavailableReason ?? 'missing settlement timing').replaceAll('_', ' ')}`}>Unavailable</span>}
                     </td>
-                    <td className={`whitespace-nowrap text-right font-semibold ${metricTone(profit)}`} title={metricsAreCurrent ? undefined : "Cached metric; see scan status"}>{profit !== 0 ? formatProfitDisplay(profit, allArbs) : "—"}</td>
+                    <td className={`whitespace-nowrap text-right font-semibold ${profit == null ? "text-[var(--text-secondary)]" : metricTone(profit)}`} title={metricsAreCurrent ? undefined : "Cached metric; see scan status"}>
+                      {profit != null ? formatProfitDisplay(profit, allArbs)
+                        : current.profitStatus === "unavailable"
+                          ? <span aria-label="Estimated profit unavailable" title={`Estimated profit unavailable: ${(current.profitUnavailableReason ?? 'missing reason').replaceAll('_', ' ')}`}>Unavailable</span>
+                          : "—"}
+                    </td>
                     <td className="whitespace-nowrap text-xs"><CompactStrategyDisplay strategy={strategy} /></td>
                     <td className="whitespace-nowrap text-right text-[10px]"><MarketFreshness market={m} scannedAt={scannedAt} refreshing={matchState.status === "refreshing"} nowMs={renderedAt} /></td>
                   </tr>

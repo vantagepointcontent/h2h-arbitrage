@@ -42,6 +42,10 @@ export async function GET(request: NextRequest) {
         canonicalApyPct: current.apyPct,
         canonicalApyUnavailableReason: market.canonicalApyPct != null && !current.valid
           ? 'current_metric_invariant_failed' : market.canonicalApyUnavailableReason ?? null,
+        canonicalCurrentRoiStatus: current.roiStatus,
+        canonicalCurrentRoiUnavailableReason: current.roiUnavailableReason,
+        canonicalCurrentProfitStatus: current.profitStatus,
+        canonicalCurrentProfitUnavailableReason: current.profitUnavailableReason,
         scheduler: scheduler ? { ...scheduler, lastSuccessAt } : null,
       };
     });
@@ -90,7 +94,11 @@ export async function GET(request: NextRequest) {
           canonicalApySource: m.canonicalApySource ?? null,
           canonicalApyRevision: m.canonicalApyRevision ?? null,
           canonicalCurrentRoiPct: m.canonicalCurrentRoiPct ?? null,
+          canonicalCurrentRoiStatus: m.canonicalCurrentRoiStatus,
+          canonicalCurrentRoiUnavailableReason: m.canonicalCurrentRoiUnavailableReason,
           canonicalCurrentProfit: m.canonicalCurrentProfit ?? null,
+          canonicalCurrentProfitStatus: m.canonicalCurrentProfitStatus,
+          canonicalCurrentProfitUnavailableReason: m.canonicalCurrentProfitUnavailableReason,
           canonicalCurrentStrategy: m.canonicalCurrentStrategy ?? 'No arb',
           canonicalCurrentDaysToExpiry: m.canonicalCurrentDaysToExpiry ?? null,
           canonicalCurrentExpiryAt: m.canonicalCurrentExpiryAt ?? null,

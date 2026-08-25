@@ -391,7 +391,11 @@ async function initDb(): Promise<void> {
     // BUG-179: one atomic current-market metric projection. APY is valid only
     // when these fields bind ROI/strategy/TTE to the same full-scan revision.
     `ALTER TABLE saved_markets ADD COLUMN canonical_current_roi_pct REAL`,
+    `ALTER TABLE saved_markets ADD COLUMN canonical_current_roi_status TEXT`,
+    `ALTER TABLE saved_markets ADD COLUMN canonical_current_roi_unavailable_reason TEXT`,
     `ALTER TABLE saved_markets ADD COLUMN canonical_current_profit REAL`,
+    `ALTER TABLE saved_markets ADD COLUMN canonical_current_profit_status TEXT`,
+    `ALTER TABLE saved_markets ADD COLUMN canonical_current_profit_unavailable_reason TEXT`,
     `ALTER TABLE saved_markets ADD COLUMN canonical_current_strategy TEXT`,
     `ALTER TABLE saved_markets ADD COLUMN canonical_current_days_to_expiry REAL`,
     `ALTER TABLE saved_markets ADD COLUMN canonical_current_expiry_at TEXT`,
@@ -418,7 +422,11 @@ async function initDb(): Promise<void> {
     BEGIN
       UPDATE saved_markets SET
         canonical_current_roi_pct = NULL,
+        canonical_current_roi_status = 'not_applicable',
+        canonical_current_roi_unavailable_reason = NULL,
         canonical_current_profit = NULL,
+        canonical_current_profit_status = 'not_applicable',
+        canonical_current_profit_unavailable_reason = NULL,
         canonical_current_strategy = 'No arb',
         canonical_current_days_to_expiry = NULL,
         canonical_current_expiry_at = NULL,
@@ -1819,7 +1827,11 @@ export interface SavedMarket {
   canonicalApySource?: 'full_scan' | null;
   canonicalApyRevision?: number | null;
   canonicalCurrentRoiPct?: number | null;
+  canonicalCurrentRoiStatus?: 'available' | 'not_applicable' | 'unavailable' | null;
+  canonicalCurrentRoiUnavailableReason?: string | null;
   canonicalCurrentProfit?: number | null;
+  canonicalCurrentProfitStatus?: 'available' | 'not_applicable' | 'unavailable' | null;
+  canonicalCurrentProfitUnavailableReason?: string | null;
   canonicalCurrentStrategy?: string | null;
   canonicalCurrentDaysToExpiry?: number | null;
   canonicalCurrentExpiryAt?: string | null;
@@ -1903,8 +1915,18 @@ function rowToMarket(r: any): SavedMarket {
       ? Number(r.canonical_apy_revision) : null,
     canonicalCurrentRoiPct: r.canonical_current_roi_pct != null && Number.isFinite(Number(r.canonical_current_roi_pct))
       ? Number(r.canonical_current_roi_pct) : null,
+    canonicalCurrentRoiStatus: r.canonical_current_roi_status === 'available'
+      || r.canonical_current_roi_status === 'not_applicable'
+      || r.canonical_current_roi_status === 'unavailable' ? r.canonical_current_roi_status : null,
+    canonicalCurrentRoiUnavailableReason: r.canonical_current_roi_unavailable_reason != null
+      ? String(r.canonical_current_roi_unavailable_reason) : null,
     canonicalCurrentProfit: r.canonical_current_profit != null && Number.isFinite(Number(r.canonical_current_profit))
       ? Number(r.canonical_current_profit) : null,
+    canonicalCurrentProfitStatus: r.canonical_current_profit_status === 'available'
+      || r.canonical_current_profit_status === 'not_applicable'
+      || r.canonical_current_profit_status === 'unavailable' ? r.canonical_current_profit_status : null,
+    canonicalCurrentProfitUnavailableReason: r.canonical_current_profit_unavailable_reason != null
+      ? String(r.canonical_current_profit_unavailable_reason) : null,
     canonicalCurrentStrategy: r.canonical_current_strategy != null ? String(r.canonical_current_strategy) : null,
     canonicalCurrentDaysToExpiry: r.canonical_current_days_to_expiry != null && Number.isFinite(Number(r.canonical_current_days_to_expiry))
       ? Number(r.canonical_current_days_to_expiry) : null,
@@ -2396,7 +2418,11 @@ export async function updateSavedMarketScanResult(
               canonical_apy_source = CASE WHEN ? THEN 'full_scan' ELSE canonical_apy_source END,
               canonical_apy_revision = CASE WHEN ? THEN ? ELSE canonical_apy_revision END,
               canonical_current_roi_pct = CASE WHEN ? THEN ? ELSE canonical_current_roi_pct END,
+              canonical_current_roi_status = CASE WHEN ? THEN ? ELSE canonical_current_roi_status END,
+              canonical_current_roi_unavailable_reason = CASE WHEN ? THEN ? ELSE canonical_current_roi_unavailable_reason END,
               canonical_current_profit = CASE WHEN ? THEN ? ELSE canonical_current_profit END,
+              canonical_current_profit_status = CASE WHEN ? THEN ? ELSE canonical_current_profit_status END,
+              canonical_current_profit_unavailable_reason = CASE WHEN ? THEN ? ELSE canonical_current_profit_unavailable_reason END,
               canonical_current_strategy = CASE WHEN ? THEN ? ELSE canonical_current_strategy END,
               canonical_current_days_to_expiry = CASE WHEN ? THEN ? ELSE canonical_current_days_to_expiry END,
               canonical_current_expiry_at = CASE WHEN ? THEN ? ELSE canonical_current_expiry_at END,
@@ -2420,7 +2446,11 @@ export async function updateSavedMarketScanResult(
         successfulFullScan ? 1 : 0,
         successfulFullScan ? 1 : 0, result.publicationGeneration ?? null,
         successfulFullScan ? 1 : 0, canonicalApy?.roiPct ?? null,
+        successfulFullScan ? 1 : 0, canonicalApy?.roiStatus ?? 'not_applicable',
+        successfulFullScan ? 1 : 0, canonicalApy?.roiUnavailableReason ?? null,
         successfulFullScan ? 1 : 0, canonicalApy?.profit ?? null,
+        successfulFullScan ? 1 : 0, canonicalApy?.profitStatus ?? 'not_applicable',
+        successfulFullScan ? 1 : 0, canonicalApy?.profitUnavailableReason ?? null,
         successfulFullScan ? 1 : 0, canonicalApy?.strategy ?? 'No arb',
         successfulFullScan ? 1 : 0, canonicalApy?.daysToExpiry ?? null,
         successfulFullScan ? 1 : 0, canonicalApy?.expiryAt ?? null,
@@ -2532,7 +2562,9 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
   const metricRows = await c.execute(`SELECT id, expiry_date, last_scan_result, scan_publication_generation,
       canonical_apy_pct, canonical_apy_unavailable_reason, canonical_apy_outcome,
       canonical_apy_observed_at, canonical_apy_source, canonical_apy_revision,
-      canonical_current_roi_pct, canonical_current_profit, canonical_current_strategy,
+      canonical_current_roi_pct, canonical_current_roi_status, canonical_current_roi_unavailable_reason,
+      canonical_current_profit, canonical_current_profit_status, canonical_current_profit_unavailable_reason,
+      canonical_current_strategy,
       canonical_current_days_to_expiry, canonical_current_expiry_at, canonical_current_revision
     FROM saved_markets
     WHERE last_scan_result IS NOT NULL OR canonical_apy_pct IS NOT NULL
@@ -2566,19 +2598,31 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
       outcome: row.canonical_apy_outcome == null ? null : String(row.canonical_apy_outcome),
       observedAt: retainedObservation,
       roiPct: retainedRoi,
+      roiStatus: 'available',
+      roiUnavailableReason: null,
       profit: row.canonical_current_profit == null ? null : Number(row.canonical_current_profit),
+      profitStatus: row.canonical_current_profit == null ? 'unavailable' : 'available',
+      profitUnavailableReason: row.canonical_current_profit == null
+        ? (row.canonical_current_profit_unavailable_reason == null
+          ? 'canonical_profit_not_persisted_for_retained_revision'
+          : String(row.canonical_current_profit_unavailable_reason))
+        : null,
       strategy: row.canonical_current_strategy == null ? 'No arb' : String(row.canonical_current_strategy),
       daysToExpiry: retainedApy.daysToExpiry,
       expiryAt: row.expiry_date == null ? null : String(row.expiry_date),
     } : result ? canonicalSavedMarketApy(result) : {
       value: null, unavailableReason: 'current_scan_revision_unavailable', outcome: null, observedAt: null,
-      roiPct: null, profit: null, strategy: 'No arb', daysToExpiry: null, expiryAt: null,
+      roiPct: null, roiStatus: 'unavailable', roiUnavailableReason: 'current_scan_revision_unavailable',
+      profit: null, profitStatus: 'unavailable', profitUnavailableReason: 'current_scan_revision_unavailable',
+      strategy: 'No arb', daysToExpiry: null, expiryAt: null,
     };
     const revision = retainedProjection ? retainedRevision
       : result && Number.isSafeInteger(result.publicationGeneration) ? result.publicationGeneration! : null;
     const desired = [
       canonical.value, canonical.unavailableReason, canonical.outcome, canonical.observedAt, 'full_scan', revision,
-      canonical.roiPct, canonical.profit, canonical.strategy, canonical.daysToExpiry, canonical.expiryAt, revision,
+      canonical.roiPct, canonical.roiStatus, canonical.roiUnavailableReason,
+      canonical.profit, canonical.profitStatus, canonical.profitUnavailableReason,
+      canonical.strategy, canonical.daysToExpiry, canonical.expiryAt, revision,
     ];
     const existing: Array<string | number | null> = [
       row.canonical_apy_pct == null ? null : Number(row.canonical_apy_pct),
@@ -2588,7 +2632,11 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
       row.canonical_apy_source == null ? null : String(row.canonical_apy_source),
       row.canonical_apy_revision == null ? null : Number(row.canonical_apy_revision),
       row.canonical_current_roi_pct == null ? null : Number(row.canonical_current_roi_pct),
+      row.canonical_current_roi_status == null ? null : String(row.canonical_current_roi_status),
+      row.canonical_current_roi_unavailable_reason == null ? null : String(row.canonical_current_roi_unavailable_reason),
       row.canonical_current_profit == null ? null : Number(row.canonical_current_profit),
+      row.canonical_current_profit_status == null ? null : String(row.canonical_current_profit_status),
+      row.canonical_current_profit_unavailable_reason == null ? null : String(row.canonical_current_profit_unavailable_reason),
       row.canonical_current_strategy == null ? null : String(row.canonical_current_strategy),
       row.canonical_current_days_to_expiry == null ? null : Number(row.canonical_current_days_to_expiry),
       row.canonical_current_expiry_at == null ? null : String(row.canonical_current_expiry_at),
@@ -2613,14 +2661,18 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
       sql: `UPDATE saved_markets SET
               canonical_apy_pct = ?, canonical_apy_unavailable_reason = ?, canonical_apy_outcome = ?,
               canonical_apy_observed_at = ?, canonical_apy_source = ?, canonical_apy_revision = ?,
-              canonical_current_roi_pct = ?, canonical_current_profit = ?, canonical_current_strategy = ?,
+              canonical_current_roi_pct = ?, canonical_current_roi_status = ?, canonical_current_roi_unavailable_reason = ?,
+              canonical_current_profit = ?, canonical_current_profit_status = ?, canonical_current_profit_unavailable_reason = ?,
+              canonical_current_strategy = ?,
               canonical_current_days_to_expiry = ?, canonical_current_expiry_at = ?, canonical_current_revision = ?
             WHERE id = ? AND expiry_date IS ?
               AND scan_publication_generation = ? AND last_scan_result IS ?
               AND canonical_apy_pct IS ? AND canonical_apy_unavailable_reason IS ?
               AND canonical_apy_outcome IS ? AND canonical_apy_observed_at IS ?
               AND canonical_apy_source IS ? AND canonical_apy_revision IS ?
-              AND canonical_current_roi_pct IS ? AND canonical_current_profit IS ?
+              AND canonical_current_roi_pct IS ? AND canonical_current_roi_status IS ?
+              AND canonical_current_roi_unavailable_reason IS ? AND canonical_current_profit IS ?
+              AND canonical_current_profit_status IS ? AND canonical_current_profit_unavailable_reason IS ?
               AND canonical_current_strategy IS ? AND canonical_current_days_to_expiry IS ?
               AND canonical_current_expiry_at IS ? AND canonical_current_revision IS ?`,
       args: [
@@ -2651,7 +2703,11 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
       canonical_apy_pct = NULL,
       canonical_apy_unavailable_reason = 'current_metric_invariant_failed',
       canonical_current_roi_pct = NULL,
+      canonical_current_roi_status = 'unavailable',
+      canonical_current_roi_unavailable_reason = 'current_metric_invariant_failed',
       canonical_current_profit = NULL,
+      canonical_current_profit_status = 'unavailable',
+      canonical_current_profit_unavailable_reason = 'current_metric_invariant_failed',
       canonical_current_strategy = 'No arb',
       canonical_current_days_to_expiry = NULL,
       canonical_current_expiry_at = NULL,

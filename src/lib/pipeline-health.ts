@@ -77,6 +77,11 @@ interface MarketsProjectionRow {
   canonicalApyPct?: unknown;
   canonicalApyUnavailableReason?: unknown;
   canonicalCurrentRoiPct?: unknown;
+  canonicalCurrentRoiStatus?: unknown;
+  canonicalCurrentRoiUnavailableReason?: unknown;
+  canonicalCurrentProfit?: unknown;
+  canonicalCurrentProfitStatus?: unknown;
+  canonicalCurrentProfitUnavailableReason?: unknown;
 }
 
 export function summarizeMarketsProjectionHealth(markets: MarketsProjectionRow[]) {
@@ -85,6 +90,14 @@ export function summarizeMarketsProjectionHealth(markets: MarketsProjectionRow[]
   let unavailableWithReason = 0;
   let unavailableWithoutReason = 0;
   let zeroCurrentRoi = 0;
+  let availableRoi = 0;
+  let notApplicableRoi = 0;
+  let unavailableRoi = 0;
+  let unavailableRoiWithoutReason = 0;
+  let availableProfit = 0;
+  let notApplicableProfit = 0;
+  let unavailableProfit = 0;
+  let unavailableProfitWithoutReason = 0;
   let unavailableScanStates = 0;
   let unavailableScanStatesWithoutReason = 0;
 
@@ -99,6 +112,31 @@ export function summarizeMarketsProjectionHealth(markets: MarketsProjectionRow[]
       unavailableWithoutReason += 1;
     }
     if (market.canonicalCurrentRoiPct === 0) zeroCurrentRoi += 1;
+    const noArb = market.canonicalApyUnavailableReason === 'no_canonical_arbitrage';
+    const roiStatus = market.canonicalCurrentRoiStatus === 'available'
+      || market.canonicalCurrentRoiStatus === 'not_applicable'
+      || market.canonicalCurrentRoiStatus === 'unavailable' ? market.canonicalCurrentRoiStatus
+      : typeof market.canonicalCurrentRoiPct === 'number' && Number.isFinite(market.canonicalCurrentRoiPct)
+        ? 'available' : noArb ? 'not_applicable' : 'unavailable';
+    if (roiStatus === 'available') availableRoi += 1;
+    else if (roiStatus === 'not_applicable') notApplicableRoi += 1;
+    else {
+      unavailableRoi += 1;
+      if (typeof market.canonicalCurrentRoiUnavailableReason !== 'string'
+        || market.canonicalCurrentRoiUnavailableReason.length === 0) unavailableRoiWithoutReason += 1;
+    }
+    const profitStatus = market.canonicalCurrentProfitStatus === 'available'
+      || market.canonicalCurrentProfitStatus === 'not_applicable'
+      || market.canonicalCurrentProfitStatus === 'unavailable' ? market.canonicalCurrentProfitStatus
+      : typeof market.canonicalCurrentProfit === 'number' && Number.isFinite(market.canonicalCurrentProfit)
+        ? 'available' : noArb ? 'not_applicable' : 'unavailable';
+    if (profitStatus === 'available') availableProfit += 1;
+    else if (profitStatus === 'not_applicable') notApplicableProfit += 1;
+    else {
+      unavailableProfit += 1;
+      if (typeof market.canonicalCurrentProfitUnavailableReason !== 'string'
+        || market.canonicalCurrentProfitUnavailableReason.length === 0) unavailableProfitWithoutReason += 1;
+    }
     if (market.lastScanResult?.matchStatus === 'unavailable') {
       unavailableScanStates += 1;
       if (typeof market.lastScanResult.matchError !== 'string' || market.lastScanResult.matchError.length === 0) {
@@ -108,12 +146,24 @@ export function summarizeMarketsProjectionHealth(markets: MarketsProjectionRow[]
   }
 
   const unavailableScanStatesPct = markets.length === 0 ? 0 : unavailableScanStates * 100 / markets.length;
+  const applicableRoi = availableRoi + unavailableRoi;
+  const unavailableRoiPct = applicableRoi === 0 ? 0 : unavailableRoi * 100 / applicableRoi;
+  const applicableProfit = availableProfit + unavailableProfit;
+  const unavailableProfitPct = applicableProfit === 0 ? 0 : unavailableProfit * 100 / applicableProfit;
 
   const reasons: string[] = [];
   if (markets.length === 0) reasons.push('Canonical Markets population is empty');
   if (scanned !== markets.length) reasons.push(`${markets.length - scanned} market(s) have no persisted scan timestamp`);
   if (unavailableWithoutReason > 0) reasons.push(`${unavailableWithoutReason} unavailable APY field(s) lack a specific reason`);
   if (zeroCurrentRoi > 0) reasons.push(`${zeroCurrentRoi} current ROI field(s) were projected as zero instead of unavailable`);
+  if (unavailableRoiWithoutReason > 0) reasons.push(`${unavailableRoiWithoutReason} unavailable current ROI field(s) lack a specific reason`);
+  if (unavailableProfitWithoutReason > 0) reasons.push(`${unavailableProfitWithoutReason} unavailable current profit field(s) lack a specific reason`);
+  if (unavailableRoiPct > 5) {
+    reasons.push(`${unavailableRoi}/${applicableRoi} applicable current ROI field(s) are unavailable (${unavailableRoiPct.toFixed(2)}%), above the 5% degradation threshold`);
+  }
+  if (unavailableProfitPct > 5) {
+    reasons.push(`${unavailableProfit}/${applicableProfit} applicable current profit field(s) are unavailable (${unavailableProfitPct.toFixed(2)}%), above the 5% degradation threshold`);
+  }
   if (unavailableScanStatesWithoutReason > 0) {
     reasons.push(`${unavailableScanStatesWithoutReason} unavailable persisted market scan state(s) lack a specific reason`);
   }
@@ -130,6 +180,16 @@ export function summarizeMarketsProjectionHealth(markets: MarketsProjectionRow[]
     unavailableWithReason,
     unavailableWithoutReason,
     zeroCurrentRoi,
+    availableRoi,
+    notApplicableRoi,
+    unavailableRoi,
+    unavailableRoiWithoutReason,
+    unavailableRoiPct,
+    availableProfit,
+    notApplicableProfit,
+    unavailableProfit,
+    unavailableProfitWithoutReason,
+    unavailableProfitPct,
     unavailableScanStates,
     unavailableScanStatesPct,
     unavailableScanStatesWithoutReason,

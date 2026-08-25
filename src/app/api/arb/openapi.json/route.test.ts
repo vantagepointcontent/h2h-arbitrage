@@ -68,6 +68,12 @@ describe('GET /api/arb/openapi.json Entry Arb Profit contract', () => {
         entryRoi: { $ref: '#/components/schemas/EntryArbProfitRoi' },
       },
     });
+    expect(spec.components.schemas.SavedMarket.properties).toMatchObject({
+      canonicalCurrentRoiStatus: { type: ['string', 'null'], enum: ['available', 'not_applicable', 'unavailable', null] },
+      canonicalCurrentRoiUnavailableReason: { type: ['string', 'null'] },
+      canonicalCurrentProfitStatus: { type: ['string', 'null'], enum: ['available', 'not_applicable', 'unavailable', null] },
+      canonicalCurrentProfitUnavailableReason: { type: ['string', 'null'] },
+    });
     expect(spec.components.schemas.BotPositionSettlementProjection.properties).toMatchObject({
       relationshipValidity: { $ref: '#/components/schemas/RelationshipValidity' },
       exposureIdentityStatus: { $ref: '#/components/schemas/ExposureIdentityStatus' },
