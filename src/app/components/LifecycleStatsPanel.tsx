@@ -56,7 +56,7 @@ function Stat({ label, value, sub, color }: { label: string; value: string; sub?
   return (
     <div className="bg-[#0E1621] rounded-lg p-3">
       <div className="text-[10px] uppercase tracking-wide text-[#8A9BA8]">{label}</div>
-      <div className="text-lg font-bold" style={{ color: color ?? '#FFFFFF' }}>{value}</div>
+      <div className="text-lg font-bold" style={{ color: color ?? 'var(--text-primary)' }}>{value}</div>
       {sub && <div className="text-[10px] text-[#8A9BA8]">{sub}</div>}
     </div>
   );
@@ -94,15 +94,15 @@ function LifecycleStatsPanelInner({ days = 30 }: { days?: number }) {
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Stat label="Episodes" value={episodes.toLocaleString()} sub={`last ${data.days}d`} />
-        <Stat label="Open now" value={String(t.open_now ?? 0)} color="#facc15" />
+        <Stat label="Open now" value={String(t.open_now ?? 0)} color="var(--status-warning)" />
         <Stat label="Avg lifetime" value={fmtDuration(t.avg_duration_sec)} sub="closed episodes" />
         <Stat
           label="Durable ≥5m"
           value={String(durable)}
           sub={durablePct != null ? `${durablePct}% of classified` : undefined}
-          color="#5DBE81"
+          color="var(--status-positive)"
         />
-        <Stat label="Phantom <1m" value={String(phantom)} color="#ef4444" />
+        <Stat label="Phantom <1m" value={String(phantom)} color="var(--status-negative)" />
       </div>
 
       {/* Per-category table */}

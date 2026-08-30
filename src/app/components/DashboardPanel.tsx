@@ -370,7 +370,7 @@ export default function DashboardPanel() {
                 onClick={() => setRange(opt.key)}
                 className={`px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
                   range === opt.key
-                    ? "bg-[var(--status-positive)]/20 text-[var(--status-positive)]"
+                    ? "bg-[var(--status-positive)] text-white light-text-white"
                     : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 }`}
               >

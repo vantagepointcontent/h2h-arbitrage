@@ -74,16 +74,16 @@ export function CalculationProvenance({
 
       {envelope.blocker && (
         <div role="status" className="mt-2 rounded border border-current/20 px-2 py-1 font-medium">
-          {envelope.blocker.message} <span className="font-mono opacity-75">({envelope.blocker.code})</span>
+          {envelope.blocker.message} <span className="font-mono">({envelope.blocker.code})</span>
         </div>
       )}
 
       <div className="mt-2 grid min-w-[36rem] grid-cols-5 gap-2 border-t border-current/15 pt-2 tabular-nums">
-        <div><span className="block opacity-70">Gross cost</span>{formatMicros(envelope.totals.grossCostMicros, 'money')}</div>
-        <div><span className="block opacity-70">Gross payout</span>{formatMicros(envelope.totals.grossPayoutMicros, 'money')}</div>
-        <div><span className="block opacity-70">Gross profit</span>{formatMicros(envelope.totals.grossProfitMicros, 'money')}</div>
-        <div><span className="block opacity-70">Fees</span>{formatMicros(envelope.totals.totalFeesMicros, 'money')}</div>
-        <div><span className="block opacity-70">Net P&amp;L</span>{formatMicros(envelope.totals.netPnlMicros, 'money')}</div>
+        <div><span className="block">Gross cost</span>{formatMicros(envelope.totals.grossCostMicros, 'money')}</div>
+        <div><span className="block">Gross payout</span>{formatMicros(envelope.totals.grossPayoutMicros, 'money')}</div>
+        <div><span className="block">Gross profit</span>{formatMicros(envelope.totals.grossProfitMicros, 'money')}</div>
+        <div><span className="block">Fees</span>{formatMicros(envelope.totals.totalFeesMicros, 'money')}</div>
+        <div><span className="block">Net P&amp;L</span>{formatMicros(envelope.totals.netPnlMicros, 'money')}</div>
       </div>
 
       {envelope.legs.length > 0 && (
@@ -94,20 +94,20 @@ export function CalculationProvenance({
                 <span>{leg.venue} · {leg.side.toUpperCase()} · {leg.action.toUpperCase()}</span>
                 <span>{feeLabel(leg)}</span>
               </div>
-              <div className="mt-1 tabular-nums opacity-80">
+              <div className="mt-1 tabular-nums">
                 Requested {formatMicros(leg.requestedQuantityMicros, 'quantity')} · Executable {formatMicros(leg.executableQuantityMicros, 'quantity')}
                 {leg.vwapPriceMicros != null ? ` · VWAP ${formatMicros(leg.vwapPriceMicros, 'price')}` : ''}
               </div>
-              <div className="mt-1 opacity-75">Book observed {formatTimestamp(leg.bookObservedAt)}</div>
+              <div className="mt-1">Book observed {formatTimestamp(leg.bookObservedAt)}</div>
               {leg.fee.schedule ? (
-                <div className="opacity-75">
+                <div>
                   {leg.fee.schedule.source} · {leg.fee.schedule.version} · authority observed {formatTimestamp(leg.fee.schedule.observedAt)}
                 </div>
               ) : (
-                <div className="font-medium opacity-90">Fee authority unavailable</div>
+                <div className="font-medium">Fee authority unavailable</div>
               )}
               {!compact && leg.fillLevels.length > 0 && (
-                <div className="mt-1 font-mono opacity-70">
+                <div className="mt-1 font-mono">
                   Fills: {leg.fillLevels.map((level) => `${formatMicros(level.quantityMicros, 'quantity')} @ ${formatMicros(level.priceMicros, 'price')}`).join(' · ')}
                 </div>
               )}

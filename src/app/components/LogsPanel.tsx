@@ -604,11 +604,11 @@ export default function LogsPanel() {
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
           <StatBox label="Total Scans" value={stats.count.toString()} />
-          <StatBox label="Unique Markets" value={uniqueMarkets != null ? uniqueMarkets.toLocaleString() : "—"} color="#5DBE81" />
-          <StatBox label="Total Arbs" value={stats.totalArbs.toString()} color="#5DBE81" />
-          <StatBox label="Avg ROI" value={stats.avgRoi == null ? "—" : fmtPct(stats.avgRoi)} color={stats.avgRoi != null && stats.avgRoi > 0 ? "#5DBE81" : "#ef4444"} />
-          <StatBox label="Best ROI" value={stats.bestRoi == null ? "—" : fmtPct(stats.bestRoi)} color="#5DBE81" />
-          <StatBox label="Total Profit" value={stats.totalProfit == null ? "—" : fmtUsd(stats.totalProfit)} color="#facc15" />
+          <StatBox label="Unique Markets" value={uniqueMarkets != null ? uniqueMarkets.toLocaleString() : "—"} color="var(--status-positive)" />
+          <StatBox label="Total Arbs" value={stats.totalArbs.toString()} color="var(--status-positive)" />
+          <StatBox label="Avg ROI" value={stats.avgRoi == null ? "—" : fmtPct(stats.avgRoi)} color={stats.avgRoi != null && stats.avgRoi > 0 ? "var(--status-positive)" : "var(--status-negative)"} />
+          <StatBox label="Best ROI" value={stats.bestRoi == null ? "—" : fmtPct(stats.bestRoi)} color="var(--status-positive)" />
+          <StatBox label="Total Profit" value={stats.totalProfit == null ? "—" : fmtUsd(stats.totalProfit)} color="var(--status-warning)" />
         </div>
       )}
 
@@ -1592,7 +1592,7 @@ function StatBox({ label, value, color }: { label: string; value: string; color?
   return (
     <div className="rounded-lg border border-[#182533] bg-[#17212B] p-2.5">
       <div className="text-[10px] text-[#8A9BA8] mb-0.5">{label}</div>
-      <div className="text-sm font-bold" style={{ color: color || "#FFFFFF" }}>
+      <div className="text-sm font-bold" style={{ color: color || "var(--text-primary)" }}>
         {value}
       </div>
     </div>
