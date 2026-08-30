@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { connection, NextResponse } from 'next/server';
 import { getSavedMarkets, recoverInterruptedScanPublications, getLogsDataQualityHealth } from '@/lib/persistence';
 import { clientSafeError } from '@/lib/error-handler';
 import { getScanWorkerMetrics } from '@/lib/scan-worker-coordinator';
@@ -54,6 +54,7 @@ async function readRagnarHealth(): Promise<Record<string, unknown> | null> {
 }
 
 export async function GET() {
+  await connection();
   try {
     recovery ??= recoverInterruptedScanPublications();
     await recovery;
