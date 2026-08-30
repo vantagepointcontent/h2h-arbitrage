@@ -330,9 +330,10 @@ export function createMatchedMarketMappingStore(client: Client) {
 
   async function resolveOrDerive(input: MatchedMarketDerivationInput): Promise<MatchedMarketMappingResolution> {
     const current = await resolve(input);
-    if (current.state !== 'missing') return current;
+    if (current.state === 'verified' || current.state === 'invalid') return current;
     const marketId = input.matchedMarketId.trim();
     if (!Number.isSafeInteger(input.sourceScanId) || Number(input.sourceScanId) <= 0) {
+      if (current.state === 'mismatch') return current;
       return {
         state: 'invalid', matchedMarketId: marketId,
         reason: `Matched market ${marketId} cannot derive exact tuple ${input.kalshiTicker}/${input.pmConditionId}/${input.pmTokenId}/${input.kalshiSide}/${input.pmSide}: persisted source scan ID is missing`,

@@ -116,6 +116,36 @@ describe('Matched Market executable mapping authority', () => {
     expect(batch).not.toHaveBeenCalled();
   });
 
+  it('derives additional reviewed outcomes after the Matched Market already has another cached tuple', async () => {
+    const { client, store } = await harness();
+    const candidate = (outcome: string, ticker: string, condition: string, token: string) => ({
+      artist: outcome, kalshiOutcomeLabel: outcome, pmOutcomeLabel: outcome,
+      kalshiMarketQuestion: `Will ${outcome} happen?`, pmMarketQuestion: `Will ${outcome} happen?`,
+      strategy: 'Buy YES Kalshi + NO PM', kalshiTicker: ticker, pmConditionId: condition,
+      pmYesTokenId: `${token}-yes`, pmNoTokenId: token,
+    });
+    await client.execute({
+      sql: `INSERT INTO scan_results (id,market_id,scanned_at,raw_result) VALUES (?,?,?,?)`,
+      args: [1020904, 'matched-1', '2026-08-30T22:22:16.910Z', JSON.stringify({ allArbs: [
+        candidate('Phone', 'KXPHONE', '0xphone', 'phone-no'),
+        candidate('Watch', 'KXWATCH', '0xwatch', 'watch-no'),
+      ] })],
+    });
+    for (const tuple of [
+      { kalshiTicker: 'KXPHONE', pmConditionId: '0xphone', pmTokenId: 'phone-no' },
+      { kalshiTicker: 'KXWATCH', pmConditionId: '0xwatch', pmTokenId: 'watch-no' },
+    ]) {
+      await expect(store.resolveOrDerive({
+        matchedMarketId: 'matched-1', ...tuple, kalshiSide: 'yes', pmSide: 'no', sourceScanId: 1020904,
+      })).resolves.toMatchObject({ state: 'verified', matchedMarketId: 'matched-1' });
+    }
+    const rows = await client.execute(`SELECT kalshi_ticker FROM matched_market_mappings ORDER BY kalshi_ticker`);
+    expect(rows.rows).toEqual([
+      expect.objectContaining({ kalshi_ticker: 'KXPHONE' }),
+      expect.objectContaining({ kalshi_ticker: 'KXWATCH' }),
+    ]);
+  });
+
   it.each([
     ['conflicting labels', { pmOutcomeLabel: 'Basketball' }, /labels conflict.*Computer.*Basketball/i],
     ['settlement conflict', { outcomeApy: {
