@@ -35,6 +35,12 @@ export interface KalshiMarket {
   can_close_early?: boolean;
   early_close_condition?: string;
   feeAuthority?: KalshiFeeAuthority;
+  /** Client receipt time for this exact market/depth response; retained by the short TTL cache. */
+  quoteObservedAt?: string;
+}
+
+function attachKalshiObservation(markets: KalshiMarket[], observedAt: string): KalshiMarket[] {
+  return markets.map((market) => ({ ...market, quoteObservedAt: observedAt }));
 }
 
 export function extractKalshiEventTicker(url: string): string | null {
@@ -357,7 +363,7 @@ async function fetchKalshiPage(
   );
   if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);
   const data: any = await res.json();
-  const markets: KalshiMarket[] = data.markets || [];
+  const markets = attachKalshiObservation(data.markets || [], new Date().toISOString());
   const nextCursor = typeof data.cursor === 'string' && data.cursor ? data.cursor : null;
   return { markets, nextCursor, offset };
 }
@@ -372,7 +378,7 @@ export async function fetchKalshiEventMarkets(eventTicker: string): Promise<Kals
   );
   if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);
   const data = await res.json();
-  return data.markets || [];
+  return attachKalshiObservation(data.markets || [], new Date().toISOString());
   });
 }
 
@@ -386,7 +392,7 @@ export async function fetchKalshiSeriesMarkets(seriesTicker: string): Promise<Ka
   );
   if (!res.ok) throw new Error(`Kalshi API error: ${res.status}`);
   const data = await res.json();
-  return data.markets || [];
+  return attachKalshiObservation(data.markets || [], new Date().toISOString());
   });
 }
 

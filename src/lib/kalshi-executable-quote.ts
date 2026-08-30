@@ -20,6 +20,37 @@ export interface KalshiQuoteSourceProvenance {
   detail?: string | null;
 }
 
+export const KALSHI_EXECUTABLE_QUOTE_MAX_AGE_MS = 30_000;
+
+/** Classify the exact observation attached by the Kalshi HTTP adapter. */
+export function resolveKalshiQuoteSourceProvenance(
+  observedAt: string | null | undefined,
+  attemptedAt: string,
+  maxAgeMs = KALSHI_EXECUTABLE_QUOTE_MAX_AGE_MS,
+): KalshiQuoteSourceProvenance {
+  const attemptedMs = Date.parse(attemptedAt);
+  const observedMs = typeof observedAt === 'string' ? Date.parse(observedAt) : Number.NaN;
+  if (!Number.isFinite(attemptedMs) || !Number.isFinite(observedMs) || observedMs > attemptedMs
+      || !Number.isSafeInteger(maxAgeMs) || maxAgeMs < 0) {
+    return {
+      status: 'source_unavailable', attemptedAt, observedAt: null,
+      failureKind: 'source_error', detail: 'Kalshi depth observation timestamp is missing or invalid',
+    };
+  }
+  const validObservedAt = observedAt as string;
+  const ageMs = attemptedMs - observedMs;
+  if (ageMs > maxAgeMs) {
+    return {
+      status: 'stale', attemptedAt, observedAt: validObservedAt,
+      failureKind: 'stale_snapshot',
+      detail: `Kalshi depth is ${ageMs}ms old (maximum ${maxAgeMs}ms)`,
+    };
+  }
+  return {
+    status: 'fresh', attemptedAt, observedAt: validObservedAt, failureKind: null, detail: null,
+  };
+}
+
 function unavailableReason(status: KalshiAskDepthStatus | undefined): Extract<ExecutableBookReason,
   'authoritative_empty' | 'missing_depth' | 'malformed_depth' | 'inactive_market'> | undefined {
   if (status === 'authoritative_empty') return 'authoritative_empty';

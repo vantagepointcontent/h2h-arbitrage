@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   eventMarkets: vi.fn(),
   seriesMarkets: vi.fn(),
   filter: vi.fn((markets: unknown[]) => markets),
+  calculateAllArbitrages: vi.fn((): unknown[] => []),
 }));
 
 vi.mock('@/lib/kalshi', () => ({
@@ -29,7 +30,7 @@ vi.mock('@/lib/polymarket-clob', () => ({
   getClobPrices: vi.fn(),
 }));
 vi.mock('@/lib/matcher', () => ({
-  matchOutcomes: () => [], calculateAllArbitrages: () => [], parseDepth: () => 0,
+  matchOutcomes: () => [], calculateAllArbitrages: mocks.calculateAllArbitrages, parseDepth: () => 0,
   attachOutcomeContingentApy: (outcomes: unknown[]) => outcomes,
   applyManualMatches: (outcomes: unknown[]) => outcomes,
 }));
@@ -53,6 +54,8 @@ describe('saved refresh Kalshi source provenance', () => {
     vi.clearAllMocks();
     mocks.filter.mockImplementation((markets: unknown[]) => markets);
     mocks.seriesMarkets.mockResolvedValue([]);
+    mocks.calculateAllArbitrages.mockReset();
+    mocks.calculateAllArbitrages.mockReturnValue([]);
   });
 
   it.each([
@@ -76,5 +79,39 @@ describe('saved refresh Kalshi source provenance', () => {
     mocks.filter.mockReturnValueOnce([]);
 
     await expect(refreshSingleMarket(savedMarket, [])).rejects.toThrow('kalshi_wrong_ticker');
+  });
+
+  it('classifies a real refresh result from an old Kalshi observation as stale without redating it', async () => {
+    vi.setSystemTime(new Date('2026-08-30T17:35:00.000Z'));
+    mocks.eventMarkets.mockResolvedValue([{
+      ticker: 'KXBUG858-TEST', event_ticker: 'KXBUG858', status: 'active',
+      quoteObservedAt: '2026-08-30T17:30:00.000Z',
+    }]);
+    mocks.calculateAllArbitrages.mockReturnValue([{
+      artist: 'Stale Candidate',
+      kalshi: {
+        ticker: 'KXBUG858-TEST', yesBid: 0.44, yesAsk: 0.45, noBid: 0.54, noAsk: 0.55,
+        lastPrice: 0.44, yesAskDepth: '45.000000', noAskDepth: '55.000000',
+        yesAskDepthStatus: 'available', noAskDepthStatus: 'available',
+        yesTickSize: 0.01, noTickSize: 0.01,
+        quoteObservedAt: '2026-08-30T17:30:00.000Z',
+      },
+      polymarket: null,
+      arbitrage: {
+        roiPct: 5, expectedProfit: 5, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',
+        kalshiStake: 45, pmStake: 50, selectedKalshiSide: 'yes', selectedPmSide: 'no',
+      },
+    }]);
+
+    const result = await refreshSingleMarket(savedMarket, []);
+    expect(result.allArbs[0]).toMatchObject({
+      kalshiYesExecutableQuote: {
+        status: 'unavailable', reason: 'stale_book', sourceStatus: 'stale',
+        sourceObservedAt: '2026-08-30T17:30:00.000Z',
+        sourceAttemptedAt: '2026-08-30T17:35:00.000Z',
+        sourceFailureKind: 'stale_snapshot',
+      },
+    });
+    vi.useRealTimers();
   });
 });

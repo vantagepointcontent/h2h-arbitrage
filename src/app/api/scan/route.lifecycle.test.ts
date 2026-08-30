@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { executableEnvelopeFixture } from '@/lib/test-fixtures/calculation-envelope';
+import { evaluateBotTrade } from '@/lib/bot-trader';
+import { parseBotScanCandidate } from '@/lib/bot-scan-consumer';
 
 const mocks = vi.hoisted(() => ({
   upstream: vi.fn(),
@@ -66,7 +68,10 @@ vi.mock('@/lib/persistence', () => ({
   updateSavedMarketScanResult: mocks.updateSavedMarketScanResult,
   appendScanHistory: mocks.appendScanHistory,
 }));
-vi.mock('@/lib/bot-scan-consumer', () => ({ persistAndConsumeBotScan: mocks.persistAndConsumeBotScan }));
+vi.mock('@/lib/bot-scan-consumer', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/bot-scan-consumer')>(),
+  persistAndConsumeBotScan: mocks.persistAndConsumeBotScan,
+}));
 vi.mock('@/lib/arb-lifecycle', () => ({ recordArbObservations: vi.fn(async () => ({ opened: 0, extended: 0, closed: 0 })) }));
 vi.mock('@/lib/telegram-alerts', () => ({ sendBatchAlerts: vi.fn(async () => undefined) }));
 vi.mock('@/lib/saved-market-scan-lock', () => ({
@@ -475,5 +480,60 @@ describe('POST /api/scan saved-market lifecycle', () => {
       expect.objectContaining({ positiveArbCount: 0, strategy: 'No arb' }),
       'scan_api',
     );
+  });
+
+  it('persists a stale Kalshi venue observation and BotTrader renders its exact age without numeric zero', async () => {
+    vi.setSystemTime(new Date('2026-08-30T17:35:00.000Z'));
+    mocks.calculateAllArbitrages.mockReturnValue([{
+      artist: 'Stale Candidate',
+      kalshiMarketQuestion: 'Will Stale Candidate win on Kalshi?',
+      pmMarketQuestion: 'Will Stale Candidate win on Polymarket?',
+      kalshiOutcomeLabel: 'Stale Candidate',
+      pmOutcomeLabel: 'Stale Candidate',
+      kalshi: {
+        ticker: 'KXTX07-STALE', yesBid: 0.44, yesAsk: 0.45, noBid: 0.54, noAsk: 0.55,
+        lastPrice: 0.44, yesAskDepth: '45.000000', noAskDepth: '55.000000',
+        yesAskDepthStatus: 'available', noAskDepthStatus: 'available',
+        yesTickSize: 0.01, noTickSize: 0.01,
+        quoteObservedAt: '2026-08-30T17:30:00.000Z',
+      },
+      polymarket: {
+        conditionId: 'pm-condition', yesPrice: 0.49, noPrice: 0.5,
+        askDepth: 49, noAskDepth: 50, yesTickSize: 0.01, noTickSize: 0.01,
+        yesMinOrderSize: 1, noMinOrderSize: 1,
+      },
+      arbitrage: {
+        roiPct: 5, expectedProfit: 5, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',
+        kalshiStake: 45, pmStake: 50, executionStatus: 'executable',
+        selectedKalshiSide: 'yes', selectedPmSide: 'no',
+        selectedRelationshipState: 'verified_complementary',
+        fees: { kalshiFee: 0.01, pmFee: 0.01 },
+      },
+    }]);
+
+    const response = await executeFullScan(request());
+    expect(response.status).toBe(200);
+    const persisted = (mocks.persistAndConsumeBotScan.mock.calls.at(-1)?.[1] as {
+      raw?: { allArbs?: unknown[] };
+    }).raw?.allArbs?.[0] as Record<string, unknown>;
+    expect(persisted.kalshiYesExecutableQuote).toMatchObject({
+      status: 'unavailable', reason: 'stale_book', sourceStatus: 'stale',
+      sourceObservedAt: '2026-08-30T17:30:00.000Z',
+      sourceAttemptedAt: '2026-08-30T17:35:00.000Z',
+      sourceFailureKind: 'stale_snapshot',
+      sourceDetail: 'Kalshi depth is 300000ms old (maximum 30000ms)',
+    });
+
+    const candidate = parseBotScanCandidate(persisted);
+    expect(candidate).not.toBeNull();
+    const evaluation = evaluateBotTrade(candidate!, {
+      enabled: true, mode: 'paper', selectionMethod: 'hybrid', minRoiPct: 2, minApyPct: 0,
+      minDepthUsd: 0.5, minSharesPerLeg: 1, maxExpiryDays: 365, maxTradesPerDay: 10,
+    });
+    expect(evaluation.shouldTrade).toBe(false);
+    expect(evaluation.reason).toContain('source status stale; source age at attempt 300000ms');
+    expect(evaluation.reason).not.toContain('Kalshi 0.00');
+    expect(evaluation.reason).not.toContain('Kalshi $0.00');
+    vi.useRealTimers();
   });
 });
