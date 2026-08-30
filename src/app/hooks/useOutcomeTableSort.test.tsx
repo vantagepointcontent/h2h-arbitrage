@@ -26,6 +26,9 @@ describe('useOutcomeTableSort', () => {
 
     rerender({ marketId: 'market-b' });
     expect(result.current).toMatchObject({ field: 'roi', direction: 'desc' });
+
+    rerender({ marketId: 'market-a' });
+    expect(result.current).toMatchObject({ field: 'roi', direction: 'desc' });
   });
 
   it('preserves manual column selection and direction toggling during the active market view', () => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 export type OutcomeSortField = 'roi' | 'apy' | 'profit' | 'spread';
 export type OutcomeSortDirection = 'asc' | 'desc';
@@ -36,9 +36,9 @@ export function useOutcomeTableSort(marketId: string | null) {
   });
   const activeSort = sort.marketId === marketId ? sort : { marketId, ...DEFAULT_OUTCOME_SORT };
 
-  useEffect(() => {
-    if (sort.marketId !== marketId) setSort({ marketId, ...DEFAULT_OUTCOME_SORT });
-  }, [marketId, sort.marketId]);
+  if (sort.marketId !== marketId) {
+    setSort({ marketId, ...DEFAULT_OUTCOME_SORT });
+  }
 
   const toggle = useCallback((field: OutcomeSortField) => {
     setSort((current) => {
