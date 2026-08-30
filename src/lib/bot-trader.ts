@@ -554,14 +554,20 @@ export async function authorizeBotTradeInput(input: BotTradeInput): Promise<BotT
   if (!legs.supported || !input.kalshiTicker || !input.pmConditionId || !selectedPmToken) {
     return { reason: 'Matched market exact outcome mapping cannot be resolved: selected stable identifiers are missing' };
   }
-  const resolved = await resolveMatchedMarketMapping({
-    matchedMarketId: input.pairId,
-    kalshiTicker: input.kalshiTicker,
-    pmConditionId: input.pmConditionId,
-    pmTokenId: selectedPmToken,
-    kalshiSide: legs.kalshiOutcome,
-    pmSide: legs.pmOutcome,
-  });
+  let resolved: Awaited<ReturnType<typeof resolveMatchedMarketMapping>>;
+  try {
+    resolved = await resolveMatchedMarketMapping({
+      matchedMarketId: input.pairId,
+      kalshiTicker: input.kalshiTicker,
+      pmConditionId: input.pmConditionId,
+      pmTokenId: selectedPmToken,
+      kalshiSide: legs.kalshiOutcome,
+      pmSide: legs.pmOutcome,
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return { reason: `Matched market exact outcome mapping authority is unavailable: ${detail}` };
+  }
   if (resolved.state !== 'verified') return { reason: resolved.reason };
   return {
     ...input,

@@ -1066,6 +1066,24 @@ describe('maybeExecuteBotTrade safety', () => {
     expect(executeArb).not.toHaveBeenCalled();
   });
 
+  it('fails closed without placement when persisted Matched Market authority cannot be read', async () => {
+    const executeArb = vi.fn();
+    vi.doMock('./auto-execute', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('./auto-execute')>()),
+      executeArb,
+    }));
+    const mapping = await import('./matched-market-mapping');
+    vi.mocked(mapping.resolveMatchedMarketMapping).mockRejectedValueOnce(new Error('SQLITE_BUSY: database is locked'));
+    const { maybeExecuteBotTrade } = await import('./bot-trader');
+
+    const result = await maybeExecuteBotTrade(makeInput());
+
+    expect(result).toMatchObject({ executed: false });
+    expect(result.reason).toContain('Matched market exact outcome mapping authority is unavailable');
+    expect(result.reason).toContain('SQLITE_BUSY: database is locked');
+    expect(executeArb).not.toHaveBeenCalled();
+  });
+
   it('preserves a Matched Market-resolved exact relationship through the execution alert path', async () => {
     const canonicalRelationship = verifiedRelationship();
     vi.doMock('./proposition-registry', () => ({

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createClient, type Client } from '@libsql/client';
 import type { PropositionRelationshipV2 } from './proposition-identity';
 import {
@@ -71,6 +71,18 @@ describe('Matched Market executable mapping authority', () => {
       state: 'missing', matchedMarketId: 'matched-1',
       reason: 'Matched market exists, but exact outcome mapping is missing/unverified',
     });
+  });
+
+  it('resolves from the pre-existing authority schema without issuing DDL in the execution hot path', async () => {
+    const { client, store } = await harness();
+    await store.persistVerified(mapping);
+    const batch = vi.spyOn(client, 'batch').mockRejectedValue(new Error('resolve attempted a schema write'));
+
+    await expect(store.resolve({
+      matchedMarketId: 'matched-1', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
+      pmTokenId: 'pm-no-token', kalshiSide: 'yes', pmSide: 'no',
+    })).resolves.toMatchObject({ state: 'verified', matchedMarketId: 'matched-1' });
+    expect(batch).not.toHaveBeenCalled();
   });
 
   it.each([

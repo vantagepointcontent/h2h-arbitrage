@@ -155,7 +155,6 @@ export function createMatchedMarketMappingStore(client: Client) {
   }
 
   async function resolve(input: MatchedMarketExecutionTuple): Promise<MatchedMarketMappingResolution> {
-    await ensureSchema();
     const marketId = input.matchedMarketId.trim();
     const market = await client.execute({ sql: 'SELECT id FROM saved_markets WHERE id=? LIMIT 1', args: [marketId] });
     if (market.rows.length === 0) {
