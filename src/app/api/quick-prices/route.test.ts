@@ -52,6 +52,12 @@ describe('POST /api/quick-prices diagnostics', () => {
 
     const first = POST(quickRequest('mlb-steals'));
     await vi.waitFor(() => expect(mocks.quickPricesScan).toHaveBeenCalledTimes(1));
+    expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenNthCalledWith(1, 'mlb-steals', expect.objectContaining({
+      matchStatus: 'refreshing',
+      refreshLifecycle: {
+        requestedAt: expect.any(String), structureFetchedAt: null, completedAt: null,
+      },
+    }));
     const repeated = POST(quickRequest('mlb-steals'));
     await new Promise((resolve) => setTimeout(resolve, 0));
     release({
@@ -175,6 +181,11 @@ describe('POST /api/quick-prices diagnostics', () => {
   });
 
   it('returns partial linked-event data without discarding the successful platform', async () => {
+    mocks.snapshotInputsFromOutcomes.mockReturnValueOnce([{
+      platform: 'polymarket', marketId: 'pm-democratic', side: 'yes', tokenId: 'pm-democratic-yes',
+      priceCents: 20, priceMicrocents: 20_000_000, observedAt: '2026-08-13T18:30:00.000Z',
+      source: 'saved-market-quick-refresh',
+    }]);
     mocks.quickPricesScan.mockResolvedValue({
       matchedCount: 0, matchStatus: 'unavailable', matchedPairs: [],
       refreshStatus: 'partial', retryable: true, platformWarnings: ['Kalshi request failed.'],
@@ -182,8 +193,20 @@ describe('POST /api/quick-prices diagnostics', () => {
         kalshi: { status: 'failed', count: 0, reason: 'Kalshi request failed.' },
         polymarket: { status: 'fresh', count: 1 },
       },
-      outcomes: [{ artist: 'Democratic', kalshi: null, polymarket: { yesPrice: 0.2 } }],
+      outcomes: [{
+        artist: 'Democratic', kalshi: null,
+        polymarket: {
+          conditionId: 'pm-democratic', yesTokenId: 'pm-democratic-yes', noTokenId: 'pm-democratic-no',
+          yesPrice: 0.2, noPrice: 0.8,
+        },
+      }],
+      _kalshiFetchedAt: '2026-08-13T18:29:59.000Z',
       _pmFetchedAt: '2026-08-13T18:30:00.000Z',
+      _priceDataObservedAt: '2026-08-13T18:30:00.000Z',
+      refreshLifecycle: {
+        requestedAt: '2026-08-13T18:29:58.000Z', structureFetchedAt: '2026-08-13T18:29:59.000Z',
+        completedAt: '2026-08-13T18:30:01.000Z',
+      },
     });
     const request = new NextRequest('http://localhost/api/quick-prices', {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -196,6 +219,25 @@ describe('POST /api/quick-prices diagnostics', () => {
     expect(response.status).toBe(207);
     expect(body.outcomes[0].polymarket.yesPrice).toBe(0.2);
     expect(body.platformDiagnostics.kalshi.status).toBe('failed');
+    expect(body.venuePriceFreshness).toEqual({
+      kalshi: {
+        status: 'failed', observedAt: null, source: null, reason: 'Kalshi request failed.',
+      },
+      polymarket: {
+        status: 'fresh', observedAt: '2026-08-13T18:30:00.000Z',
+        source: 'saved-market-quick-refresh', reason: null,
+      },
+    });
+    expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenLastCalledWith('nc-14', expect.objectContaining({
+      refreshStatus: 'partial',
+      scannedAt: body.refreshLifecycle.completedAt,
+      refreshLifecycle: body.refreshLifecycle,
+      platformDiagnostics: body.platformDiagnostics,
+      _kalshiFetchedAt: '2026-08-13T18:29:59.000Z',
+      _pmFetchedAt: '2026-08-13T18:30:00.000Z',
+      _priceDataObservedAt: '2026-08-13T18:30:00.000Z',
+      venuePriceFreshness: body.venuePriceFreshness,
+    }));
   });
 
   it('atomically reconciles canonical pair ids before returning a successful detail refresh', async () => {
@@ -225,6 +267,9 @@ describe('POST /api/quick-prices diagnostics', () => {
       matchedPairs: undefined,
       scannedAt: expect.any(String),
       publicationGeneration: 7,
+      refreshLifecycle: {
+        requestedAt: expect.any(String), structureFetchedAt: null, completedAt: null,
+      },
     });
     expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenNthCalledWith(2, 'tx-07', {
       matchedCount: 2,
@@ -233,6 +278,17 @@ describe('POST /api/quick-prices diagnostics', () => {
       matchedPairs: result.matchedPairs,
       scannedAt: result._pmFetchedAt,
       publicationGeneration: 7,
+      _pmFetchedAt: result._pmFetchedAt,
+      venuePriceFreshness: {
+        kalshi: {
+          status: 'not_scanned', observedAt: null, source: null,
+          reason: 'No Kalshi price snapshot has been recorded',
+        },
+        polymarket: {
+          status: 'not_scanned', observedAt: null, source: null,
+          reason: 'No Polymarket price snapshot has been recorded',
+        },
+      },
     });
   });
 
@@ -258,6 +314,10 @@ describe('POST /api/quick-prices diagnostics', () => {
       matchedPairs: undefined,
       scannedAt: expect.any(String),
       publicationGeneration: 7,
+      refreshStatus: 'failed',
+      refreshLifecycle: {
+        requestedAt: expect.any(String), structureFetchedAt: null, completedAt: expect.any(String),
+      },
     });
   });
 

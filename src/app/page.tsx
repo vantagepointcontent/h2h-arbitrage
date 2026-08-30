@@ -106,6 +106,7 @@ import {
   createQuickPricesRequestOwner, createSavedMarketsListRequestOwner, createSavedMarketHydrationOwner, restoreSavedMarketPopNavigation,
   mergeQuickPricesResult, mergeSavedMarketMatchRefresh, markSavedMarketMatchRefreshing,
   selectSavedMarketPriceCache, normalizeSavedMarketsList, mergeSavedMarketHydration, buildSavedMarketsListFailureState,
+  venuePriceFreshnessFromScan,
 } from "@/app/lib/page-shared";
 import type {
   ArbitrageInfo, UnifiedOutcome, UnmatchedKalshi, UnmatchedPolymarket,
@@ -515,9 +516,10 @@ export default function Home() {
               })),
               unmatchedKalshi: [],
               unmatchedPolymarket: [],
+              venuePriceFreshness: cached.venuePriceFreshness,
             };
             setResult(cachedResult);
-            setLastUpdated(new Date(cached.scannedAt));
+            setLastUpdated(cached.scannedAt ? new Date(cached.scannedAt) : null);
             setLastScanTimestamp(cached.scannedAt ?? null);
           }
           // Background refresh (silent) — skip for expired markets
@@ -1083,9 +1085,10 @@ export default function Home() {
         })),
         unmatchedKalshi: [],
         unmatchedPolymarket: [],
+        venuePriceFreshness: cached.venuePriceFreshness,
       };
       setResult(cachedResult);
-      setLastUpdated(new Date(cached.scannedAt));
+      setLastUpdated(cached.scannedAt ? new Date(cached.scannedAt) : null);
       setLastScanTimestamp(cached.scannedAt ?? null);
     } else {
       // Expired market: show empty result with clear state
@@ -2004,8 +2007,13 @@ export default function Home() {
                       return <MarketWorkspaceHeader
                         market={{ ...market, eventTitle: result.eventTitle, expiryDate: market.expiryDate ?? undefined }}
                         outcomes={(result.outcomes ?? []) as Array<Record<string, any>>}
-                        scannedAt={lastScanTimestamp ?? lastUpdated?.toISOString()}
-                        refreshStatus={result.refreshStatus}
+                        lifecycle={market.lifecycle}
+                        priceFreshness={result.venuePriceFreshness ?? venuePriceFreshnessFromScan({
+                          platformDiagnostics: {
+                            kalshi: { status: 'empty', count: 0, reason: 'Displayed persisted Kalshi prices have no trustworthy per-venue timestamp' },
+                            polymarket: { status: 'empty', count: 0, reason: 'Displayed persisted Polymarket prices have no trustworthy per-venue timestamp' },
+                          },
+                        }, 'saved-market-full-scan')}
                         loading={loading}
                         refreshing={bgRefreshing}
                         favorite={favoriteIds.has(activeMarketId)}

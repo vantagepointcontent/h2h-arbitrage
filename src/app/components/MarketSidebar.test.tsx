@@ -35,8 +35,8 @@ describe('saved-market full scan states', () => {
   it.each([
     ['fresh', market({ lastSuccessAt: '2026-08-13T19:30:00Z', freshnessSlaMs: 60 * 60_000 }), /30m ago/],
     ['scanning', market({ lastSuccessAt: '2026-08-13T19:30:00Z', inProgress: true, freshnessSlaMs: 60 * 60_000 }), /Scanning · 30m ago/],
-    ['failed', market({ lastSuccessAt: '2026-08-13T19:30:00Z', failureReason: 'Kalshi HTTP 503', freshnessSlaMs: 60 * 60_000 }), /Failed · 30m ago/],
-    ['rate limited', market({ lastSuccessAt: '2026-08-13T19:30:00Z', failureReason: 'HTTP 429', freshnessSlaMs: 60 * 60_000 }), /Rate limited · 30m ago/],
+    ['failed', market({ lastSuccessAt: '2026-08-13T19:30:00Z', failureReason: 'Kalshi HTTP 503', freshnessSlaMs: 60 * 60_000 }), /Last scan failed · showing data from 30m ago/],
+    ['rate limited', market({ lastSuccessAt: '2026-08-13T19:30:00Z', failureReason: 'HTTP 429', freshnessSlaMs: 60 * 60_000 }), /Last scan rate limited · showing data from 30m ago/],
     ['due', market({ lastSuccessAt: '2026-08-13T19:30:00Z', nextDueAt: '2026-08-13T19:59:00Z', freshnessSlaMs: 60 * 60_000 }), /Due · 30m ago/],
     ['overdue', market({ lastSuccessAt: '2026-08-13T18:00:00Z', freshnessSlaMs: 60 * 60_000 }), /Overdue · 2h ago/],
     ['unavailable', market(null, null), /Unavailable · Never/],

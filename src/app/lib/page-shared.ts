@@ -5,6 +5,19 @@ import type { OutcomeContingentApy } from '@/lib/settlement-apy';
 import { selectCanonicalSavedMarketMetrics } from '@/lib/canonical-saved-market-metrics';
 import type { ArbType } from '@/lib/arb-types';
 import { calculateApyPctFromDays } from '@/lib/scan-apy';
+import { buildSavedMarketLifecycle, type SavedMarketLifecycle } from '@/lib/saved-market-lifecycle';
+import {
+  mergeVenuePriceFreshness,
+  venuePriceFreshnessFromScan,
+  type VenuePriceFreshnessMap,
+} from './venue-price-freshness';
+export {
+  mergeVenuePriceFreshness,
+  venuePriceFreshnessFromScan,
+  type VenuePriceFreshness,
+  type VenuePriceFreshnessMap,
+  type VenuePriceFreshnessStatus,
+} from './venue-price-freshness';
 
 // ─── Generic localStorage helpers ───
 
@@ -358,10 +371,19 @@ export interface LastScanResult {
   kalshiCount: number;
   pmCount: number;
   scannedAt: string | null;
+  venuePriceFreshness?: VenuePriceFreshnessMap;
   matchStatus?: 'not_scanned' | 'refreshing' | 'unavailable' | 'confirmed_zero' | 'matched';
   matchError?: string;
   matchedPairs?: { artist: string; kalshiTicker: string; pmConditionId: string }[];
   publicationGeneration?: number;
+  refreshStatus?: 'complete' | 'partial' | 'failed';
+  refreshLifecycle?: { requestedAt: string; structureFetchedAt: string | null; completedAt: string | null };
+  platformDiagnostics?: Record<'kalshi' | 'polymarket', {
+    status: 'fresh' | 'partial' | 'empty' | 'failed'; count: number; reason?: string;
+  }>;
+  _kalshiFetchedAt?: string | null;
+  _pmFetchedAt?: string | null;
+  _priceDataObservedAt?: string | null;
   pmClosed?: boolean; // UI-013: PM reports market closed (endDate may still be future)
   priceResolved?: boolean; // BUG-05b: at least one outcome at 99/1 extremes
   allArbs?: {
@@ -454,15 +476,23 @@ export interface SavedMarket {
   favorited?: boolean;
   lastScanResult?: LastScanResult | null;
   scheduler?: SavedMarketScheduleState | null;
+  lifecycle?: SavedMarketLifecycle;
   liveResult?: {
     bestRoiPct: number;
     bestProfit: number;
     strategy: string;
     scannedAt: string | null;
+    venuePriceFreshness?: VenuePriceFreshnessMap;
     matchStatus?: LastScanResult['matchStatus'];
     matchError?: string;
     matchedPairs?: LastScanResult['matchedPairs'];
     publicationGeneration?: number;
+    refreshStatus?: LastScanResult['refreshStatus'];
+    refreshLifecycle?: LastScanResult['refreshLifecycle'];
+    platformDiagnostics?: LastScanResult['platformDiagnostics'];
+    _kalshiFetchedAt?: string | null;
+    _pmFetchedAt?: string | null;
+    _priceDataObservedAt?: string | null;
     kalshiCount?: number;
     pmCount?: number;
     matchedCount?: number;
@@ -724,6 +754,14 @@ export function mergeSavedMarketHydration(current: SavedMarket, incoming: SavedM
     rank(current.liveResult?.scannedAt, current.liveResult?.publicationGeneration),
     rank(incoming.liveResult?.scannedAt, incoming.liveResult?.publicationGeneration),
   )) merged.liveResult = current.liveResult;
+  if (current.lifecycle || incoming.lifecycle) {
+    merged.lifecycle = buildSavedMarketLifecycle({
+      scheduler: merged.scheduler,
+      lastScanResult: merged.lastScanResult,
+      liveResult: merged.liveResult,
+      canonicalApyObservedAt: merged.canonicalApyObservedAt,
+    });
+  }
   return merged;
 }
 
@@ -743,7 +781,16 @@ export function selectSavedMarketPriceCache(
       typeof priced.pmConditionId === 'string' && priced.pmConditionId !== '' &&
       priced.kalshiYesAsk != null && priced.pmYesPrice != null;
   });
-  return hasLivePrices ? live! : market.lastScanResult ?? null;
+  if (hasLivePrices) return live!;
+  const persisted = market.lastScanResult;
+  if (!persisted) return null;
+  if (!live?.platformDiagnostics) return persisted;
+  const latestRefresh = live.venuePriceFreshness
+    ?? venuePriceFreshnessFromScan(live, 'saved-market-quick-refresh');
+  return {
+    ...persisted,
+    venuePriceFreshness: mergeVenuePriceFreshness(persisted.venuePriceFreshness, latestRefresh),
+  };
 }
 
 export function getSavedMarketLastSuccessAt(market: SavedMarket): string | null {
@@ -826,8 +873,11 @@ export interface ScanResult {
   retryable?: boolean;
   fullScanPersisted?: boolean;
   publicationGeneration?: number;
+  _kalshiFetchedAt?: string | null;
+  _pmFetchedAt?: string | null;
   _priceDataObservedAt?: string | null;
-  refreshLifecycle?: { requestedAt: string; structureFetchedAt: string | null; completedAt: string };
+  venuePriceFreshness?: VenuePriceFreshnessMap;
+  refreshLifecycle?: { requestedAt: string; structureFetchedAt: string | null; completedAt: string | null };
   pmRefresh?: import('@/lib/quick-prices').QuickPmRefresh;
   platformDiagnostics?: Record<'kalshi' | 'polymarket', {
     status: 'fresh' | 'partial' | 'empty' | 'failed';
@@ -880,7 +930,10 @@ export function mergeQuickPricesResult(previous: ScanResult, incoming: ScanResul
       polymarketStale: polymarketOutcomeStale,
     };
   }).filter((outcome): outcome is UnifiedOutcome => outcome !== null);
-  return { ...previous, ...incoming, outcomes };
+  const venuePriceFreshness = incoming.venuePriceFreshness
+    ? mergeVenuePriceFreshness(previous.venuePriceFreshness, incoming.venuePriceFreshness)
+    : previous.venuePriceFreshness;
+  return { ...previous, ...incoming, outcomes, venuePriceFreshness };
 }
 
 /* ── Utility helpers ── */

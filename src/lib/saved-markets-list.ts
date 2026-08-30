@@ -7,6 +7,7 @@ import {
   type SavedMarket,
 } from './persistence';
 import { getCanonicalCurrentMarketMetrics, type SavedMarket as SavedMarketView } from '@/app/lib/page-shared';
+import { buildSavedMarketLifecycle } from './saved-market-lifecycle';
 
 export async function readSavedMarketSchedulerState(): Promise<Record<string, unknown>> {
   try {
@@ -54,12 +55,22 @@ function summarizeScan(ls: any, defaultNotScanned: boolean) {
       ? 'not_scanned' : ((ls.matchedCount ?? 0) > 0 ? 'matched' : 'confirmed_zero')),
     matchError: ls.matchError ?? null,
     matchedPairs: Array.isArray(ls.matchedPairs) ? ls.matchedPairs : [],
+    refreshStatus: ls.refreshStatus ?? undefined,
+    refreshLifecycle: ls.refreshLifecycle ?? undefined,
+    platformDiagnostics: ls.platformDiagnostics ?? undefined,
+    _kalshiFetchedAt: ls._kalshiFetchedAt ?? null,
+    _pmFetchedAt: ls._pmFetchedAt ?? null,
+    _priceDataObservedAt: ls._priceDataObservedAt ?? null,
     allArbs: allArbs.map(summarizeArb),
   };
 }
 
 /** Canonical projection shared by GET ?fields=basic and the protected list refresh. */
-export function buildBasicSavedMarketList(savedMarkets: SavedMarket[], schedulerState: Record<string, unknown>) {
+export function buildBasicSavedMarketList(
+  savedMarkets: SavedMarket[],
+  schedulerState: Record<string, unknown>,
+  now = Date.now(),
+) {
   return savedMarkets.map((market) => {
     const scheduler = schedulerState[market.id] as Record<string, unknown> | undefined;
     const scanAt = market.lastScanResult?.scannedAt;
@@ -80,6 +91,12 @@ export function buildBasicSavedMarketList(savedMarkets: SavedMarket[], scheduler
       expiryObservedAt: market.expiryObservedAt ?? null,
       category: market.category,
       scheduler: scheduler ? { ...scheduler, lastSuccessAt } : null,
+      lifecycle: buildSavedMarketLifecycle({
+        scheduler: scheduler as Parameters<typeof buildSavedMarketLifecycle>[0]['scheduler'],
+        lastScanResult: market.lastScanResult,
+        liveResult: market.liveResult,
+        canonicalApyObservedAt: market.canonicalApyObservedAt,
+      }, now),
       canonicalApyPct: current.apyPct,
       canonicalApyUnavailableReason: market.canonicalApyPct != null && !current.valid
         ? 'current_metric_invariant_failed' : market.canonicalApyUnavailableReason ?? null,

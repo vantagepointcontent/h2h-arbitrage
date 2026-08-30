@@ -25,6 +25,7 @@ import {
 } from './historical-scan-financials';
 import { recoverHistoricalScanFinancials } from './historical-scan-financial-recovery';
 import type { CanonicalMarketExpirySource } from './canonical-market-expiry';
+import type { VenuePriceFreshnessMap } from '../app/lib/venue-price-freshness';
 
 const DATA_FILE = process.env.H2H_SAVED_MARKETS_FILE || path.join(process.cwd(), 'data', 'saved-markets.json');
 
@@ -1726,6 +1727,16 @@ export interface LastScanResult {
   matchedPairs?: { artist: string; kalshiTicker: string; pmConditionId: string }[];
   matchDependencies?: import('./coupling-store').CouplingDependency[];
   publicationGeneration?: number;
+  /** Quick-refresh lifecycle is persisted only on the fenced live channel. */
+  refreshStatus?: 'complete' | 'partial' | 'failed';
+  refreshLifecycle?: { requestedAt: string; structureFetchedAt: string | null; completedAt: string | null };
+  platformDiagnostics?: Record<'kalshi' | 'polymarket', {
+    status: 'fresh' | 'partial' | 'empty' | 'failed'; count: number; reason?: string;
+  }>;
+  _kalshiFetchedAt?: string | null;
+  _pmFetchedAt?: string | null;
+  _priceDataObservedAt?: string | null;
+  venuePriceFreshness?: VenuePriceFreshnessMap;
   category?: string;        // market domain classification (e.g. politics, sports)
   pmClosed?: boolean;       // UI-013: PM reports market closed (endDate may still be future)
   priceResolved?: boolean;  // BUG-05b: at least one outcome at 99/1 extremes (true market resolution)
@@ -1881,8 +1892,10 @@ function rowToMarket(r: any): SavedMarket {
   // recomputing it. If it's older than the TTL (watcher down, pair left HOT
   // tier), drop it so the UI falls back to the poller's lastScanResult.
   if (liveResult?.scannedAt) {
-    const age = Date.now() - new Date(liveResult.scannedAt).getTime();
-    if (!(age >= 0 && age <= LIVE_RESULT_TTL_MS)) liveResult = null;
+    if (liveResult.refreshStatus == null) {
+      const age = Date.now() - new Date(liveResult.scannedAt).getTime();
+      if (!(age >= 0 && age <= LIVE_RESULT_TTL_MS)) liveResult = null;
+    }
   } else {
     liveResult = null;
   }
@@ -2817,7 +2830,8 @@ export async function reconcileSavedMarketMatchSummary(
  * replace the authoritative full-scan economics or compact APY snapshot. */
 export async function reconcileSavedMarketLiveSummary(
   id: string,
-  summary: Pick<LastScanResult, 'matchedCount' | 'matchStatus' | 'matchError' | 'matchedPairs' | 'matchDependencies' | 'scannedAt' | 'publicationGeneration'>,
+  summary: Pick<LastScanResult, 'matchedCount' | 'matchStatus' | 'matchError' | 'matchedPairs' | 'matchDependencies' | 'scannedAt' | 'publicationGeneration'>
+    & Partial<Pick<LastScanResult, 'refreshStatus' | 'refreshLifecycle' | 'platformDiagnostics' | '_kalshiFetchedAt' | '_pmFetchedAt' | '_priceDataObservedAt' | 'venuePriceFreshness'>>,
 ): Promise<void> {
   const fallback: LastScanResult = {
     bestRoiPct: 0, bestProfit: 0, strategy: 'No arb', outcomeCount: summary.matchedCount,

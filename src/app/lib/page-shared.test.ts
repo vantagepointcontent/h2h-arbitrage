@@ -548,6 +548,56 @@ describe('canonical market APY summary', () => {
     });
   });
 
+  it('cannot restore an older failed lifecycle after a newer manual refresh', () => {
+    const base: SavedMarket = { id: 'm', eventTitle: 'Market', kalshiUrl: '', polymarketUrl: '', createdAt: '' };
+    const current: SavedMarket = {
+      ...base,
+      liveResult: {
+        bestRoiPct: 1, bestProfit: 1, strategy: 'arb', matchedCount: 1, matchStatus: 'matched',
+        scannedAt: '2026-08-30T16:55:00.000Z', publicationGeneration: 12,
+        refreshStatus: 'complete',
+        refreshLifecycle: {
+          requestedAt: '2026-08-30T16:54:58.000Z', structureFetchedAt: '2026-08-30T16:54:59.000Z',
+          completedAt: '2026-08-30T16:55:00.000Z',
+        },
+        _priceDataObservedAt: '2026-08-30T16:54:59.000Z',
+        platformDiagnostics: {
+          kalshi: { status: 'fresh', count: 1 }, polymarket: { status: 'fresh', count: 1 },
+        },
+      },
+      lifecycle: {
+        overallStatus: 'partial',
+        fullScan: { status: 'failed', attemptedAt: '2026-08-30T16:50:00.000Z', completedAt: null, observedAt: '2026-08-30T16:00:00.000Z', lastSuccessAt: '2026-08-30T16:00:00.000Z', reason: 'HTTP 503' },
+        manualRefresh: { status: 'fresh', attemptedAt: '2026-08-30T16:54:58.000Z', completedAt: '2026-08-30T16:55:00.000Z', observedAt: '2026-08-30T16:54:59.000Z', lastSuccessAt: '2026-08-30T16:54:59.000Z', reason: null },
+        venues: {
+          kalshi: { status: 'fresh', observedAt: '2026-08-30T16:54:59.000Z', reason: null },
+          polymarket: { status: 'fresh', observedAt: '2026-08-30T16:54:59.000Z', reason: null },
+        },
+        cachedData: { status: 'available', observedAt: '2026-08-30T16:54:59.000Z' },
+      },
+    };
+    const delayed: SavedMarket = {
+      ...base,
+      liveResult: {
+        bestRoiPct: 0, bestProfit: 0, strategy: 'No arb', scannedAt: '2026-08-30T16:50:00.000Z',
+        publicationGeneration: 11, matchedCount: 0, matchStatus: 'unavailable', matchError: 'HTTP 503',
+      },
+      lifecycle: {
+        ...current.lifecycle!, overallStatus: 'failed',
+        manualRefresh: { status: 'not_refreshed', attemptedAt: null, completedAt: null, observedAt: null, lastSuccessAt: null, reason: null },
+        cachedData: { status: 'available', observedAt: '2026-08-30T16:00:00.000Z' },
+      },
+    };
+
+    expect(mergeSavedMarketHydration(current, delayed)).toMatchObject({
+      liveResult: { publicationGeneration: 12, refreshStatus: 'complete' },
+      lifecycle: {
+        overallStatus: 'stale',
+        manualRefresh: { status: 'stale', observedAt: '2026-08-30T16:54:59.000Z' },
+      },
+    });
+  });
+
   it('uses publication revision before a conflicting observation timestamp', () => {
     const base: SavedMarket = { id: 'm', eventTitle: 'Market', kalshiUrl: '', polymarketUrl: '', createdAt: '' };
     const current: SavedMarket = {
