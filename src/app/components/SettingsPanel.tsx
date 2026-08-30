@@ -656,7 +656,7 @@ export default function SettingsPanel() {
                   setLiveConfirmed(true);
                   setConfirmDanger(null);
                 }}
-                className="px-4 py-1.5 rounded-lg text-sm bg-red-600 hover:bg-red-500 font-semibold disabled:opacity-40"
+                className="px-4 py-1.5 rounded-lg text-sm bg-red-600 hover:bg-red-500 font-semibold text-white light-text-white disabled:opacity-40"
               >
                 Confirm live mode
               </button>
@@ -695,7 +695,7 @@ export default function SettingsPanel() {
                   setValue("bot.mode", "production");
                   setConfirmDanger(null);
                 }}
-                className="px-4 py-1.5 rounded-lg text-sm bg-red-600 hover:bg-red-500 font-semibold disabled:opacity-40"
+                className="px-4 py-1.5 rounded-lg text-sm bg-red-600 hover:bg-red-500 font-semibold text-white light-text-white disabled:opacity-40"
               >
                 Confirm production mode
               </button>

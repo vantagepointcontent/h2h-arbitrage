@@ -424,7 +424,7 @@ export function ExecuteArbModal({ arb, onClose }: { arb: ExecutableArb; onClose:
             <button
               onClick={run}
               disabled={busy || arb.executionStatus !== 'executable' || !gates || (!gates.dryRun && gates.killSwitch)}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50 ${isReal ? "bg-[#ef4444] text-white hover:bg-[#dc2626]" : "bg-[#5DBE81] text-black hover:bg-[#4DA66E]"}`}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50 ${isReal ? "bg-[#ef4444] text-white light-text-white hover:bg-[#dc2626]" : "bg-[#5DBE81] text-black hover:bg-[#4DA66E]"}`}
             >
               {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {gates?.dryRun ? "Place test bet" : gates?.killSwitch ? "Real execution locked" : isReal ? "Execute REAL orders" : "Execute"}

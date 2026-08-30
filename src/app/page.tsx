@@ -1925,7 +1925,7 @@ export default function Home() {
                         onClick={() => setMatchMode("manual")}
                         className={`min-h-11 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                           matchMode === "manual"
-                            ? "bg-[var(--platform-polymarket)] text-white"
+                            ? "bg-[var(--platform-polymarket)] text-white light-text-white"
                             : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                         }`}
                       >

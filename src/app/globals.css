@@ -120,18 +120,18 @@
   --card-foreground: #1a1a2e;
   --popover: #f0e8dc;
   --popover-foreground: #1a1a2e;
-  --primary: #4DA66E;
+  --primary: #27643d;
   --primary-foreground: #ffffff;
   --secondary: #efe8dc;
   --secondary-foreground: #1a1a2e;
   --muted: #efe8dc;
-  --muted-foreground: #5E6875;
+  --muted-foreground: #46515d;
   --accent: #e8ddd0;
   --accent-foreground: #1a1a2e;
   --destructive: #dc2626;
   --border: #d4c8b8;
   --input: #d4c8b8;
-  --ring: #4DA66E;
+  --ring: #27643d;
   --chart-1: #4DA66E;
   --chart-2: #2563eb;
   --chart-3: #ca8a04;
@@ -147,19 +147,19 @@
   --surface-selected: rgba(77, 166, 110, 0.12);
   --text: #1a1a2e;
   --text-primary: #1a1a2e;
-  --text-secondary: #5E6875;
-  --text-muted: #5E6875;
-  --text-faint: #6b7280;
+  --text-secondary: #46515d;
+  --text-muted: #46515d;
+  --text-faint: #555e69;
   --border-subtle: #d4c8b8;
-  --border-strong: #b9ab98;
+  --border-strong: #817462;
   --divider: #d4c8b8;
-  --focus-ring: #327a4f;
-  --status-positive: #327a4f;
+  --focus-ring: #27643d;
+  --status-positive: #27643d;
   --status-negative: #b91c1c;
-  --status-warning: #8a5a00;
+  --status-warning: #744900;
   --status-info: #1d4ed8;
-  --status-stale: #5E6875;
-  --status-blocked: #c2410c;
+  --status-stale: #46515d;
+  --status-blocked: #9f3508;
   --platform-kalshi: #245eb5;
   --platform-polymarket: #5b4fc4;
   --header-bg: #f0e8dc;
@@ -194,16 +194,44 @@ html {
 [data-theme="light"] .bg-\[\#232E3C\]  { background-color: #d4c8b8 !important; }
 [data-theme="light"] .bg-\[\#334155\]  { background-color: #e8ddd0 !important; }
 [data-theme="light"] .text-\[\#FFFFFF\]  { color: #1a1a2e !important; }
-[data-theme="light"] .text-\[\#8A9BA8\]  { color: #666677 !important; }
-[data-theme="light"] .text-\[\#5E6875\]  { color: #888899 !important; }
+[data-theme="light"] .text-white,
+[data-theme="light"] .text-\[\#8A9BA8\],
+[data-theme="light"] .text-\[\#A8B8C4\],
+[data-theme="light"] .text-\[\#B8C5D0\] { color: var(--text-secondary) !important; }
+[data-theme="light"] .text-\[\#5E6875\] { color: var(--text-faint) !important; }
+[data-theme="light"] .text-\[\#5DBE81\],
+[data-theme="light"] .text-\[\#4DA66E\],
+[data-theme="light"] .text-\[\#A9DDB9\],
+[data-theme="light"] .text-emerald-400 { color: var(--status-positive) !important; }
+[data-theme="light"] .text-\[\#ef4444\],
+[data-theme="light"] .text-\[\#F4B0B0\],
+[data-theme="light"] .text-red-200,
+[data-theme="light"] .text-red-300,
+[data-theme="light"] .text-red-400 { color: var(--status-negative) !important; }
+[data-theme="light"] .text-\[\#facc15\],
+[data-theme="light"] .text-amber-300,
+[data-theme="light"] .text-amber-400,
+[data-theme="light"] .text-amber-600 { color: var(--status-warning) !important; }
+[data-theme="light"] .text-blue-400 { color: var(--status-info) !important; }
+[data-theme="light"] .text-\[\#a855f7\],
+[data-theme="light"] .text-\[\#a78bfa\],
+[data-theme="light"] .text-purple-400 { color: var(--platform-polymarket) !important; }
+[data-theme="light"] .hover\:text-white:hover,
+[data-theme="light"] .hover\:text-\[\#FFFFFF\]:hover { color: var(--text-primary) !important; }
+[data-theme="light"] .bg-\[\#5DBE81\] { background-color: var(--status-positive) !important; }
+[data-theme="light"] .bg-\[\#ef4444\] { background-color: var(--status-negative) !important; }
+[data-theme="light"] .text-black { color: #ffffff !important; }
+[data-theme="light"] .light-text-white { color: #ffffff !important; }
 [data-theme="light"] .border-\[\#182533\] { border-color: #d4c8b8 !important; }
-[data-theme="light"] .border-\[\#232E3C\] { border-color: #c4b8a8 !important; }
+[data-theme="light"] .border-\[\#232E3C\],
+[data-theme="light"] .border-\[\#3A4858\],
+[data-theme="light"] .border-\[\#3A4A59\] { border-color: var(--border-strong) !important; }
 [data-theme="light"] .border-\[\#0E1621\]  { border-color: #e0d8cc !important; }
 /* Ring/border accent overrides */
 [data-theme="light"] .ring-\[\#5DBE81\]\/30 { --tw-ring-color: rgba(77, 166, 110, 0.3) !important; }
 [data-theme="light"] .hover\:bg-\[\#182533\]:hover { background-color: #e8ddd0 !important; }
 [data-theme="light"] .hover\:bg-\[\#232E3C\]:hover { background-color: #d4c8b8 !important; }
-[data-theme="light"] .hover\:text-\[\#FFFFFF\]:hover { color: #1a1a2e !important; }
+[data-theme="light"] :disabled { opacity: 0.9 !important; }
 
 /* Transition all themed properties smoothly */
 html,
