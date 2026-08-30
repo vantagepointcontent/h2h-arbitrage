@@ -77,4 +77,51 @@ describe('saved-market refresh Kalshi executable quote parity', () => {
       depthTimestamp: OBSERVED_AT,
     });
   });
+
+  it.each([
+    ['rate_limited', 'Kalshi API error: 429'],
+    ['timeout', 'Kalshi event markets timed out after 3000ms'],
+    ['wrong_ticker', 'Kalshi returned no market matching KXBUG858-TEST'],
+  ] as const)('produces auditable source-unavailable quotes for %s failures', (failureKind, detail) => {
+    const normalized = buildKalshiArbShape(market());
+    const quote = buildRefreshKalshiExecutableQuote(normalized, 'yes', OBSERVED_AT, {
+      status: 'source_unavailable',
+      attemptedAt: '2026-08-30T17:30:02.000Z',
+      observedAt: null,
+      failureKind,
+      detail,
+    });
+
+    expect(quote).toMatchObject({
+      status: 'unavailable',
+      reason: 'source_unavailable',
+      depthTimestamp: null,
+      sourceStatus: 'source_unavailable',
+      sourceAttemptedAt: '2026-08-30T17:30:02.000Z',
+      sourceObservedAt: null,
+      sourceFailureKind: failureKind,
+      sourceDetail: detail,
+    });
+  });
+
+  it('produces stale-book provenance without redating the last successful observation', () => {
+    const normalized = buildKalshiArbShape(market());
+    const quote = buildRefreshKalshiExecutableQuote(normalized, 'no', OBSERVED_AT, {
+      status: 'stale',
+      attemptedAt: '2026-08-30T17:35:00.000Z',
+      observedAt: OBSERVED_AT,
+      failureKind: 'stale_snapshot',
+      detail: 'Kalshi depth is 300000ms old (maximum 30000ms)',
+    });
+
+    expect(quote).toMatchObject({
+      status: 'unavailable',
+      reason: 'stale_book',
+      depthTimestamp: OBSERVED_AT,
+      sourceStatus: 'stale',
+      sourceObservedAt: OBSERVED_AT,
+      sourceAttemptedAt: '2026-08-30T17:35:00.000Z',
+      sourceFailureKind: 'stale_snapshot',
+    });
+  });
 });

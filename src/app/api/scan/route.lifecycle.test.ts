@@ -16,13 +16,14 @@ const mocks = vi.hoisted(() => ({
   getClobPrices: vi.fn(),
   acquireSavedMarketScanLock: vi.fn(),
   releaseSavedMarketScanLock: vi.fn(async () => undefined),
+  filterKalshiMarketsToMatch: vi.fn((markets: unknown[]) => markets),
 }));
 
 vi.mock('@/lib/kalshi', () => ({
   extractKalshiEventTicker: () => 'KXTX07',
   extractKalshiSeriesFromUrl: () => null,
   extractKalshiMatchKey: () => null,
-  filterKalshiMarketsToMatch: (markets: unknown[]) => markets,
+  filterKalshiMarketsToMatch: mocks.filterKalshiMarketsToMatch,
   fetchKalshiEventMarkets: mocks.upstream,
   fetchKalshiSeriesMarkets: vi.fn(async () => []),
   fetchKalshiMultiSeriesMarkets: vi.fn(async () => ({ markets: [], seriesFetched: [] })),
@@ -103,6 +104,7 @@ describe('POST /api/scan saved-market lifecycle', () => {
     vi.clearAllMocks();
     mocks.upstream.mockReset();
     mocks.upstream.mockResolvedValue([{ ticker: 'KXTX07-YES', title: 'Will TX-07 occur?', yes_ask: 40, no_ask: 60 }]);
+    mocks.filterKalshiMarketsToMatch.mockImplementation((markets: unknown[]) => markets);
     mocks.appendScanHistory.mockReset();
     mocks.appendScanHistory.mockResolvedValue(undefined);
     mocks.acquireSavedMarketScanLock.mockResolvedValue({
@@ -217,6 +219,9 @@ describe('POST /api/scan saved-market lifecycle', () => {
     const body = await response.json();
 
     expect(response.status).toBeGreaterThanOrEqual(500);
+    expect(body).toMatchObject({ reasonCode: 'kalshi_source_timeout', fullScanPersisted: false });
+    expect(body.error).not.toContain('Kalshi 0.00');
+    expect(body.error).not.toContain('Kalshi $0.00');
     expect(mocks.reconcileSavedMarketMatchSummary).toHaveBeenLastCalledWith('tx-07', {
       matchedCount: 0,
       matchStatus: 'unavailable',
@@ -242,6 +247,36 @@ describe('POST /api/scan saved-market lifecycle', () => {
       matchError: expect.stringContaining('Kalshi'),
       publicationGeneration: 41,
     }));
+  });
+
+  it.each([
+    ['Kalshi API error: 429', 'kalshi_source_rate_limited'],
+    ['Kalshi API connection reset', 'kalshi_source_unavailable'],
+  ])('preserves the exact Kalshi source failure instead of rendering numeric zero: %s', async (message, reasonCode) => {
+    mocks.upstream.mockRejectedValue(new Error(message));
+
+    const response = await executeFullScan(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toMatchObject({ reasonCode, fullScanPersisted: false });
+    expect(body.error).toContain(message);
+    expect(body.error).not.toContain('Kalshi 0.00');
+    expect(body.error).not.toContain('Kalshi $0.00');
+    expect(mocks.updateSavedMarketScanResult).not.toHaveBeenCalled();
+    expect(mocks.persistAndConsumeBotScan).not.toHaveBeenCalled();
+  });
+
+  it('distinguishes a filtered wrong-ticker result from an authoritative empty book', async () => {
+    mocks.filterKalshiMarketsToMatch.mockReturnValueOnce([]);
+
+    const response = await executeFullScan(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toMatchObject({ reasonCode: 'kalshi_wrong_ticker', fullScanPersisted: false });
+    expect(body.error).toContain('matched no market for the requested ticker/outcome');
+    expect(body.error).not.toContain('0.00');
   });
 
   it.each([

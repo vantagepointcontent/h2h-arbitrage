@@ -12,6 +12,7 @@ import {
 import type { UnifiedOutcome } from './matcher';
 import type { BotScanCandidate, PersistedBotScan } from './bot-scan-consumer';
 import { quoteOneShareFromTopAsk, walkExecutableBook } from './executable-book';
+import { buildKalshiExecutableQuote } from './kalshi-executable-quote';
 import { orderbookState } from './orderbook-state';
 import type { PropositionRelationship } from './proposition-identity';
 
@@ -419,6 +420,35 @@ describe('evaluateBotTrade', () => {
     const ev = evaluateBotTrade(makeInput({
       kalshiYesDepth: 0,
       kalshiYesExecutableQuote: unavailableQuote,
+    }), baseSettings());
+
+    expect(ev.shouldTrade).toBe(false);
+    expect(ev.reason).toContain(expected);
+    expect(ev.reason).not.toContain('Kalshi 0.00');
+    expect(ev.reason).not.toContain('Kalshi $0.00');
+  });
+
+  it.each([
+    [{
+      status: 'source_unavailable' as const,
+      attemptedAt: '2026-08-30T17:30:02.000Z', observedAt: null,
+      failureKind: 'rate_limited' as const, detail: 'Kalshi API error: 429',
+    }, 'source status source_unavailable; source age unavailable; attempted 2026-08-30T17:30:02.000Z; rate_limited: Kalshi API error: 429'],
+    [{
+      status: 'stale' as const,
+      attemptedAt: '2026-08-30T17:35:00.000Z', observedAt: '2026-08-30T17:30:00.000Z',
+      failureKind: 'stale_snapshot' as const, detail: 'Kalshi depth exceeded freshness budget',
+    }, 'source status stale; source age at attempt 300000ms; observed 2026-08-30T17:30:00.000Z; attempted 2026-08-30T17:35:00.000Z'],
+  ])('renders source status, age, and exact failure provenance without numeric zero', (source, expected) => {
+    const quote = buildKalshiExecutableQuote({
+      ticker: 'KXBUG858', yesBid: 0.44, yesAsk: 0.45, noBid: 0.54, noAsk: 0.55, lastPrice: 0.44,
+      yesAskDepth: '45.000000', noAskDepth: '55.000000',
+      yesAskDepthStatus: 'available', noAskDepthStatus: 'available',
+      yesTickSize: 0.01, noTickSize: 0.01,
+    }, 'yes', source.observedAt ?? source.attemptedAt, source);
+    const ev = evaluateBotTrade(makeInput({
+      kalshiYesDepth: 0,
+      kalshiYesExecutableQuote: quote,
     }), baseSettings());
 
     expect(ev.shouldTrade).toBe(false);

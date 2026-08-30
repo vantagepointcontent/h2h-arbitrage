@@ -506,6 +506,35 @@ describe('durable BotTrader scan consumer', () => {
     expect(parsed).toMatchObject({ requestedContracts: 1, evaluationContracts: 5 });
   });
 
+  it.each([
+    ['source_unavailable', null, 'source_unavailable'],
+    ['stale', '2026-08-11T12:00:10.000Z', 'stale_book'],
+  ] as const)('round-trips %s Kalshi source provenance through persisted candidate parsing', (sourceStatus, observedAt, reason) => {
+    const unavailable = {
+      ...quoteOneShareFromTopAsk({
+        price: 0.45, depthUsd: null, tickSize: 0.01, minimumOrderSize: 1,
+        depthTimestamp: observedAt,
+        unavailableReason: reason,
+      }),
+      sourceStatus,
+      sourceAttemptedAt: '2026-08-11T12:05:10.000Z',
+      sourceObservedAt: observedAt,
+      sourceFailureKind: sourceStatus === 'stale' ? 'stale_snapshot' : 'rate_limited',
+      sourceDetail: sourceStatus === 'stale' ? 'depth exceeded freshness budget' : 'Kalshi API error: 429',
+    };
+    const parsed = parseBotScanCandidate({
+      artist: 'A', strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct', roiPct: 5, expectedProfit: 5,
+      kalshiTicker: 'KX-A', pmConditionId: 'pm-a',
+      kalshiYesExecutableQuote: unavailable,
+      requestedContracts: 1,
+      fees: { kalshiFee: 0.01, pmFee: 0.01 },
+    });
+
+    expect(parsed?.kalshiYesExecutableQuote).toMatchObject({
+      status: 'unavailable', reason, sourceStatus, sourceObservedAt: observedAt,
+    });
+  });
+
   it('preserves authoritative fee values and calculation provenance from persisted candidates', () => {
     const parsed = parseBotScanCandidate({
       artist: 'A', strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct', roiPct: 5, expectedProfit: 5,
