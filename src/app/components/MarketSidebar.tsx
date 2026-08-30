@@ -6,6 +6,7 @@ import { Bot, FileText, Globe, Layers, LayoutDashboard, Loader2, Receipt, Refres
 import { SavedMarket, compareSavedMarketApy, formatPercent, getCanonicalCurrentMarketMetrics, getMarketApySummary, getSavedMarketLastSuccessAt, getSavedMarketScheduleView, isMarketExpired } from "@/app/lib/page-shared";
 import { tickFreshness, freshnessColor, hotPairIdSet } from "@/lib/watcher-status";
 import { ApyHeaderInfo, buildMarketTooltip } from "./ApyTooltip";
+import { buildSavedMarketLifecycle, formatSavedMarketLifecycleSummary } from "@/lib/saved-market-lifecycle";
 
 /** Format a "time ago" string from an ISO timestamp for the sidebar hover tooltip. */
 function formatTimeAgo(scannedAt: string | null | undefined): string {
@@ -58,12 +59,18 @@ export function FullScanStatus({ market, now }: { market: SavedMarket; now?: num
   const lastSuccessfulScanAt = getSavedMarketLastSuccessAt(market);
   const schedule = getSavedMarketScheduleView(market.scheduler, lastSuccessfulScanAt, observedAt);
   const f = tickFreshness(lastSuccessfulScanAt, observedAt);
+  const lifecycle = market.lifecycle ?? buildSavedMarketLifecycle({
+    scheduler: market.scheduler,
+    lastScanResult: market.lastScanResult,
+    liveResult: market.liveResult,
+    canonicalApyObservedAt: market.canonicalApyObservedAt,
+  }, observedAt);
+  const lifecycleSummary = formatSavedMarketLifecycleSummary(lifecycle, observedAt);
+  const hasManualLifecycle = lifecycle.manualRefresh.status !== 'not_refreshed';
   const label = schedule.status === 'scanning'
     ? `Scanning · ${f.label}`
-    : schedule.status === 'rate_limited'
-      ? `Rate limited · ${f.label}`
-    : schedule.status === 'failed'
-      ? `Failed · ${f.label}`
+    : hasManualLifecycle || schedule.status === 'rate_limited' || schedule.status === 'failed'
+    ? lifecycleSummary.label
     : schedule.status === 'overdue'
       ? `Overdue · ${f.label}`
     : schedule.status === 'due'
@@ -76,7 +83,7 @@ export function FullScanStatus({ market, now }: { market: SavedMarket; now?: num
       : schedule.status === 'overdue' || schedule.status === 'due' || schedule.status === 'rate_limited' ? 'text-[var(--status-warning)]'
         : freshnessColor(f.level);
   return (
-    <span className={`text-[9px] inline-flex items-center gap-0.5 ${color}`} title={schedule.reason ?? `Last successful full scan: ${f.label}`}>
+    <span className={`text-[9px] inline-flex items-center gap-0.5 ${color}`} title={lifecycleSummary.reason ?? schedule.reason ?? `Last successful full scan: ${f.label}`}>
       <span className={`w-1 h-1 rounded-full ${schedule.status === 'scanning' ? 'bg-[var(--status-positive)] animate-pulse' : schedule.status === 'fresh' ? 'bg-[var(--text-secondary)]' : schedule.status === 'overdue' || schedule.status === 'due' || schedule.status === 'rate_limited' ? 'bg-[var(--status-warning)]' : 'bg-[var(--status-negative)]'}`} />
       {label}
     </span>

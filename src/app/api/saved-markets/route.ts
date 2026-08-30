@@ -108,6 +108,7 @@ export async function GET(request: NextRequest) {
             bestProfit: ls.bestProfit ?? 0,
             strategy: ls.strategy ?? '',
             scannedAt: ls.scannedAt ?? null,
+            venuePriceFreshness: ls.venuePriceFreshness ?? null,
             matchedCount: ls.matchedCount ?? 0,
             matchStatus: ls.matchStatus ?? (ls.scannedAt ? ((ls.matchedCount ?? 0) > 0 ? 'matched' : 'confirmed_zero') : 'not_scanned'),
             matchError: ls.matchError ?? null,
@@ -149,6 +150,7 @@ export async function GET(request: NextRequest) {
           liveResult: m.liveResult ? {
             bestRoiPct: m.liveResult.bestRoiPct ?? 0,
             scannedAt: m.liveResult.scannedAt ?? null,
+            venuePriceFreshness: m.liveResult.venuePriceFreshness ?? null,
             matchedCount: m.liveResult.matchedCount ?? 0,
             matchStatus: m.liveResult.matchStatus ?? ((m.liveResult.matchedCount ?? 0) > 0 ? 'matched' : 'confirmed_zero'),
             matchError: m.liveResult.matchError ?? null,
