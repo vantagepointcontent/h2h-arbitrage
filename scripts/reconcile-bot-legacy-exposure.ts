@@ -30,7 +30,7 @@ import {
   historicalAuditPmEntryToken,
   historicalPropositionAudit,
 } from '../src/lib/bot-proposition-audit';
-import { findCanonicalPropositionRelationship } from '../src/lib/proposition-registry';
+import { validatePropositionRelationship, type PropositionRelationship } from '../src/lib/proposition-identity';
 
 const SCHEMA: Record<string, string> = {
   relationship_validity: "TEXT NOT NULL DEFAULT 'unresolved_relationship'",
@@ -77,6 +77,31 @@ function exactString(value: unknown): string | null {
 
 function lower(value: string | null): string {
   return value?.toLowerCase() ?? '';
+}
+
+async function findMatchedMarketRelationship(client: Client, input: {
+  matchedMarketId: string | null;
+  kalshiTicker: string | null;
+  pmConditionId: string | null;
+  pmTokenId: string;
+  kalshiSide: 'yes' | 'no';
+  pmSide: 'yes' | 'no';
+}): Promise<PropositionRelationship | null> {
+  if (!input.matchedMarketId || !input.kalshiTicker || !input.pmConditionId) return null;
+  const result = await client.execute({
+    sql: `SELECT relationship_json FROM matched_market_mappings WHERE matched_market_id=?
+      AND kalshi_ticker=? AND pm_condition_id=? AND pm_token_id=? AND kalshi_side=? AND pm_side=? LIMIT 1`,
+    args: [input.matchedMarketId, input.kalshiTicker.trim().toUpperCase(), input.pmConditionId.trim().toLowerCase(),
+      input.pmTokenId.trim(), input.kalshiSide, input.pmSide],
+  });
+  if (!result.rows[0]) return null;
+  try {
+    const relationship = JSON.parse(String(result.rows[0].relationship_json)) as PropositionRelationship;
+    return validatePropositionRelationship(relationship).valid && relationship.schemaVersion === 2
+      ? relationship : null;
+  } catch {
+    return null;
+  }
 }
 
 function sha256(value: unknown): string {
@@ -162,12 +187,12 @@ async function queryCorrelatedEvidence(client: Client, position: Row, execution:
 
 function relationshipAuthority(
   position: Row,
-  canonical: ReturnType<typeof findCanonicalPropositionRelationship>,
+  canonical: PropositionRelationship | null,
   audit: ReturnType<typeof historicalPropositionAudit>,
   auditRevision: string,
 ): LegacyExposurePositionEvidence['relationshipAuthority'] {
   if (canonical) return {
-    verdict: 'verified_complementary', source: 'canonical-proposition-relationships-v1',
+    verdict: 'verified_complementary', source: 'matched-market-mapping-v1',
     sourceRevision: legacyExposureEvidenceRevision(canonical), capturedAt: canonical.verifiedAt,
     kalshiMarketQuestion: canonical.legs.kalshi.marketQuestion,
     pmMarketQuestion: canonical.legs.polymarket.marketQuestion,
@@ -256,11 +281,14 @@ async function main(): Promise<void> {
         });
       }
       const candidateTokens = [...new Set(bindingCandidates.map((snapshot) => snapshot.tokenId).filter(Boolean))] as string[];
-      const canonicalCandidates = [...new Set([persistedToken, ...candidateTokens].filter((token): token is string => Boolean(token)))]
-        .map((token) => findCanonicalPropositionRelationship({
-          kalshiTicker: exactString(position.kalshi_ticker), pmConditionId: pmMarket, pmTokenId: token,
-          kalshiSide: String(position.kalshi_side) as 'yes' | 'no', pmSide,
-        })).filter((value) => value != null);
+      const canonicalCandidates = (await Promise.all(
+        [...new Set([persistedToken, ...candidateTokens].filter((token): token is string => Boolean(token)))]
+          .map((token) => findMatchedMarketRelationship(client, {
+            matchedMarketId: exactString(position.market_id),
+            kalshiTicker: exactString(position.kalshi_ticker), pmConditionId: pmMarket, pmTokenId: token,
+            kalshiSide: String(position.kalshi_side) as 'yes' | 'no', pmSide,
+          })),
+      )).filter((value): value is PropositionRelationship => value != null);
       const canonical = canonicalCandidates.length === 1 ? canonicalCandidates[0] : null;
       let relation = relationshipAuthority(position, canonical, audit, auditRevision);
       if (candidateTokens.length > 1 || canonicalCandidates.length > 1) {

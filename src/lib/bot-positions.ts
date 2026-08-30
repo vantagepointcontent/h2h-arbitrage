@@ -17,10 +17,7 @@ import {
 } from './proposition-identity';
 import { historicalAuditLegMetadata, historicalAuditPmEntryToken, historicalPropositionAudit } from './bot-proposition-audit';
 import type { ReconciledSettlementLeg, SettlementPositionState } from './bot-settlement';
-import {
-  findCanonicalPropositionRelationship,
-  resolveCanonicalPropositionRelationship,
-} from './proposition-registry';
+import { resolveMatchedMarketMapping } from './matched-market-mapping';
 import type {
   ExposureIdentityVerdict,
   LegacyExposureVerdict,
@@ -1207,7 +1204,7 @@ function parsePropositionRelationship(value: unknown): PropositionRelationship |
   try {
     const parsed = JSON.parse(value) as PropositionRelationship;
     if (!validatePropositionRelationship(parsed).valid) return null;
-    return resolveCanonicalPropositionRelationship(parsed);
+    return parsed;
   } catch {
     return null;
   }
@@ -1225,13 +1222,13 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
     pmSide: String(row.pm_side),
   });
   const storedRelationship = parsePropositionRelationship(row.proposition_relationship_json);
-  const canonicalEntryRelationship = findCanonicalPropositionRelationship({
-    kalshiTicker: row.kalshi_ticker != null ? String(row.kalshi_ticker) : null,
-    pmConditionId: row.pm_condition_id != null ? String(row.pm_condition_id) : null,
-    pmTokenId: row.pm_entry_token_id != null ? String(row.pm_entry_token_id) : null,
-    kalshiSide: String(row.kalshi_side) as BotPositionSide,
-    pmSide: String(row.pm_side) as BotPositionSide,
-  });
+  const canonicalEntryRelationship = storedRelationship
+    && storedRelationship.legs.kalshi.platformMarketId.trim().toLowerCase() === String(row.kalshi_ticker ?? '').trim().toLowerCase()
+    && storedRelationship.legs.polymarket.platformMarketId.trim().toLowerCase() === String(row.pm_condition_id ?? '').trim().toLowerCase()
+    && storedRelationship.legs.polymarket.tokenId === String(row.pm_entry_token_id ?? '')
+    && storedRelationship.legs.kalshi.contractSide === String(row.kalshi_side)
+    && storedRelationship.legs.polymarket.contractSide === String(row.pm_side)
+    ? storedRelationship : null;
   const normalizedIdentity = (value: unknown) => typeof value === 'string' ? value.trim().toLowerCase() : '';
   const canonicalLabelsMatch = canonicalEntryRelationship != null
     && normalizedIdentity(row.kalshi_market_question) === normalizedIdentity(canonicalEntryRelationship.legs.kalshi.marketQuestion)
@@ -1241,7 +1238,7 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
   const outcomeIdentityVerified = row.outcome_identity_status === 'verified' && canonicalLabelsMatch;
   const storedRelationshipInvalid = typeof row.proposition_relationship_json === 'string'
     && row.proposition_relationship_json.length > 0
-    && resolveCanonicalPropositionRelationship(storedRelationship) == null;
+    && validatePropositionRelationship(storedRelationship).valid === false;
   const storedVerifiedWithoutRelationship = row.proposition_relationship_state === 'verified_complementary'
     && !outcomeIdentityVerified;
   const auditedInvalid = !outcomeIdentityVerified && historicalAudit?.classification === 'confirmed_invalid';
@@ -1335,7 +1332,7 @@ function rowToPosition(row: Record<string, unknown>): BotPosition {
       ? null
       : row.outcome_identity_failure_reason != null
         ? String(row.outcome_identity_failure_reason)
-        : 'Persisted held outcome identity is not bound to a server-owned canonical exact-leg relationship',
+        : 'Persisted held outcome identity is not bound to a verified Matched Market exact-leg mapping',
     relationshipValidity,
     exposureIdentityStatus,
     legacyExposureVerdict,
@@ -2114,16 +2111,14 @@ export class BotPositionStore {
     }
     let canonicalRelationship: PropositionRelationship | null = null;
     if (input.propositionRelationship || input.propositionRelationshipState === 'verified_complementary') {
-      canonicalRelationship = resolveCanonicalPropositionRelationship(input.propositionRelationship);
-      const selectedCanonical = findCanonicalPropositionRelationship({
-        kalshiTicker: input.kalshiTicker,
-        pmConditionId: input.pmConditionId,
-        pmTokenId: input.pmEntryTokenId,
-        kalshiSide: input.kalshiSide,
-        pmSide: input.pmSide,
-      });
-      if (!canonicalRelationship || canonicalRelationship !== selectedCanonical) {
-        throw new Error('Bot position relationship is not canonically bound to the exact selected contracts');
+      canonicalRelationship = input.propositionRelationship ?? null;
+      if (!canonicalRelationship
+        || canonicalRelationship.legs.kalshi.platformMarketId.trim().toLowerCase() !== input.kalshiTicker?.trim().toLowerCase()
+        || canonicalRelationship.legs.polymarket.platformMarketId.trim().toLowerCase() !== input.pmConditionId?.trim().toLowerCase()
+        || canonicalRelationship.legs.polymarket.tokenId !== input.pmEntryTokenId
+        || canonicalRelationship.legs.kalshi.contractSide !== input.kalshiSide
+        || canonicalRelationship.legs.polymarket.contractSide !== input.pmSide) {
+        throw new Error('Bot position relationship is not bound to the exact Matched Market selected contracts');
       }
     }
     if (input.outcomeIdentityStatus === 'verified') {
@@ -3103,13 +3098,22 @@ export async function recordBotPosition(
   if (!propositionValidation.valid) {
     throw new Error(`Refusing to persist unverified cross-platform position: ${propositionValidation.reason}`);
   }
-  const canonicalRelationship = resolveCanonicalPropositionRelationship(input.propositionRelationship);
-  if (!canonicalRelationship) {
-    throw new Error('Refusing to persist cross-platform position absent from the server-owned canonical proposition registry');
+  if (!input.kalshiTicker || !input.pmConditionId) throw new Error('Missing venue identifiers for Matched Market mapping');
+  const resolvedMapping = await resolveMatchedMarketMapping({
+    matchedMarketId: input.pairId,
+    kalshiTicker: input.kalshiTicker,
+    pmConditionId: input.pmConditionId,
+    pmTokenId: feeAuthority.polymarket.tokenId,
+    kalshiSide: input.kalshiSide,
+    pmSide: input.pmSide,
+  });
+  if (resolvedMapping.state !== 'verified') {
+    throw new Error(`Refusing to persist cross-platform position: ${resolvedMapping.reason}`);
   }
+  const canonicalRelationship = resolvedMapping.relationship;
   assertPolymarketEconomicFeeAuthority(feeAuthority);
   if (!input.category?.trim()) throw new Error('Missing authoritative market category for Polymarket fee calculation');
-  if (!input.kalshiTicker || !input.pmConditionId) throw new Error('Missing venue identifiers for authoritative fee lookup');
+
   const openedAt = new Date().toISOString();
   assertCurrentFeeAuthority({
     id: 0,

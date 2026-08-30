@@ -9,6 +9,7 @@ import {
 
 const position = {
   id: 180,
+  matchedMarketId: 'matched-ny21',
   status: 'open',
   openedAt: '2026-08-14T14:05:02.511Z',
   kalshiTicker: 'KX-NY21-R',
@@ -47,35 +48,37 @@ function relationship(): PropositionRelationship {
 }
 
 describe('planBotOutcomeIdentityReconciliation', () => {
-  it('records the held payout outcome rather than the affirmative proposition label', () => {
-    const plan = planBotOutcomeIdentityReconciliation([position], () => relationship());
+  it('records the held payout outcome rather than the affirmative proposition label', async () => {
+    const resolver = vi.fn(async () => relationship());
+    const plan = await planBotOutcomeIdentityReconciliation([position], resolver);
+    expect(resolver).toHaveBeenCalledWith(expect.objectContaining({ matchedMarketId: 'matched-ny21' }));
     expect(plan).toEqual({
       corrections: [expect.objectContaining({
         id: 180,
         kalshiOutcomeLabel: 'Republicans',
         pmOutcomeLabel: 'Republicans',
         pmMarketQuestion: 'Will Democrats win NY-21?',
-        outcomeIdentitySource: 'canonical_proposition_relationship_v1',
+        outcomeIdentitySource: 'matched_market_mapping_v1',
       })],
       unresolved: [],
     });
   });
 
-  it('fails closed without the immutable entry token and never substitutes an exit token', () => {
-    const resolver = vi.fn(() => relationship());
-    const plan = planBotOutcomeIdentityReconciliation([{ ...position, pmEntryTokenId: null }], resolver);
+  it('fails closed without the immutable entry token and never substitutes an exit token', async () => {
+    const resolver = vi.fn(async () => relationship());
+    const plan = await planBotOutcomeIdentityReconciliation([{ ...position, pmEntryTokenId: null }], resolver);
     expect(resolver).not.toHaveBeenCalled();
     expect(plan.corrections).toEqual([]);
     expect(plan.unresolved[0]?.reason).toMatch(/entry-token identity is missing/i);
   });
 
-  it('does not infer identity from mutable labels when the exact canonical relationship is absent', () => {
-    const plan = planBotOutcomeIdentityReconciliation([position], () => null);
+  it('does not infer identity from mutable labels when the exact canonical relationship is absent', async () => {
+    const plan = await planBotOutcomeIdentityReconciliation([position], async () => null);
     expect(plan.corrections).toEqual([]);
-    expect(plan.unresolved[0]?.reason).toMatch(/canonical relationship/i);
+    expect(plan.unresolved[0]?.reason).toMatch(/Matched Market mapping/i);
   });
 
-  it('downgrades a raw verified row whose labels are no longer canonically bound', () => {
+  it('downgrades a raw verified row whose labels are no longer canonically bound', async () => {
     const forged = {
       ...position,
       outcomeIdentityStatus: 'verified' as const,
@@ -84,16 +87,16 @@ describe('planBotOutcomeIdentityReconciliation', () => {
       kalshiOutcomeLabel: 'Democrats',
       pmOutcomeLabel: 'Democrats',
     };
-    const plan = planBotOutcomeIdentityReconciliation([forged], () => null);
+    const plan = await planBotOutcomeIdentityReconciliation([forged], async () => null);
     expect(plan.corrections).toEqual([]);
     expect(plan.unresolved).toEqual([expect.objectContaining({
       id: 180,
       previousOutcomeIdentityStatus: 'verified',
-      reason: expect.stringContaining('canonical relationship'),
+      reason: expect.stringContaining('Matched Market mapping'),
     })]);
   });
 
-  it('leaves a raw verified row unchanged only when all canonical labels still match', () => {
+  it('leaves a raw verified row unchanged only when all canonical labels still match', async () => {
     const canonical = relationship();
     const verified = {
       ...position,
@@ -103,7 +106,7 @@ describe('planBotOutcomeIdentityReconciliation', () => {
       kalshiOutcomeLabel: canonical.legs.kalshi.payoutState,
       pmOutcomeLabel: canonical.legs.polymarket.payoutState,
     };
-    expect(planBotOutcomeIdentityReconciliation([verified], () => canonical)).toEqual({
+    await expect(planBotOutcomeIdentityReconciliation([verified], async () => canonical)).resolves.toEqual({
       corrections: [], unresolved: [],
     });
   });
@@ -116,7 +119,7 @@ describe('planBotOutcomeIdentityReconciliation', () => {
   });
 
   it('rejects an unresolved audit write when the planned identity changed concurrently', async () => {
-    const plan = planBotOutcomeIdentityReconciliation([position], () => null);
+    const plan = await planBotOutcomeIdentityReconciliation([position], async () => null);
     const transaction = { execute: vi.fn().mockResolvedValue({ rowsAffected: 0 }) };
 
     await expect(applyBotOutcomeIdentityReconciliation(
@@ -127,7 +130,7 @@ describe('planBotOutcomeIdentityReconciliation', () => {
   });
 
   it('CAS-fences and counts every unresolved audit write', async () => {
-    const plan = planBotOutcomeIdentityReconciliation([position], () => null);
+    const plan = await planBotOutcomeIdentityReconciliation([position], async () => null);
     const transaction = { execute: vi.fn().mockResolvedValue({ rowsAffected: 1 }) };
 
     await expect(applyBotOutcomeIdentityReconciliation(

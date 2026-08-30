@@ -1,6 +1,6 @@
 import { createClient } from '@libsql/client';
 import path from 'path';
-import { evaluateBotTrade, getBotExecutionReadiness, getBotSettings, maybeExecuteBotTrade, resolveBotExecutionMode, sendBotOperationalAlert, type BotExecutionResult, type BotSettings, type BotTradeInput } from './bot-trader';
+import { authorizeBotTradeInput, evaluateBotTrade, getBotExecutionReadiness, getBotSettings, maybeExecuteBotTrade, resolveBotExecutionMode, sendBotOperationalAlert, type BotExecutionResult, type BotSettings, type BotTradeInput } from './bot-trader';
 import type { BotPositionExecutionMode } from './bot-positions';
 import logger from './logger';
 import { auditArbClassification } from './arb-types';
@@ -283,6 +283,7 @@ export interface BotScanConsumerDeps {
   recordReplay(scanId: number, source: BotScanSource): Promise<void>;
   advanceCursor(scanId: number): Promise<void>;
   revalidate(scan: PersistedBotScan): Promise<BotScanCandidate[]>;
+  authorize(input: BotTradeInput): Promise<BotTradeInput | { reason: string }>;
   execute(input: BotTradeInput): Promise<BotExecutionResult>;
   reserveOpportunity?(candidate: BotScanCandidate, executionMode: BotPositionExecutionMode): Promise<boolean>;
   releaseOpportunity?(candidate: BotScanCandidate, executionMode: BotPositionExecutionMode): Promise<void>;
@@ -708,6 +709,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
     }
 
     const initiallyEligible: BotScanCandidate[] = [];
+
     const candidateRejections: Array<{ candidateIndex: number; outcome: string; code: string; reason: string }> = [];
     for (const [parsedIndex, item] of scan.candidates.entries()) {
       const candidateIndex = item.candidateIndex ?? parsedIndex;
@@ -716,7 +718,10 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
       // and execution request re-check matched depth at the effective quantity.
       const unavailable = executionMode !== 'paper'
         && (item.executionStatus === 'non_executable' || item.executionStatus === 'unavailable');
-      const evaluation = evaluateBotTrade(candidateToInput(scan, item, settings), settings);
+      const authorization = await deps.authorize(candidateToInput(scan, item, settings));
+      const evaluation = 'pairId' in authorization
+        ? evaluateBotTrade(authorization, settings)
+        : { shouldTrade: false, reason: authorization.reason, criteria: evaluateBotTrade(candidateToInput(scan, item, settings), { ...settings, enabled: false }).criteria };
       const eligible = !unavailable && validFees(item.fees) && evaluation.shouldTrade;
       const reasonCode = unavailable ? 'execution_unavailable' : !validFees(item.fees) ? 'fees_unavailable' : eligible ? 'scan_eligible' : 'scan_criteria_rejected';
       const reason = unavailable
@@ -735,6 +740,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
       );
       if (eligible) {
         initiallyEligible.push(item);
+
       } else {
         candidateRejections.push({ candidateIndex, outcome: item.outcome, code: reasonCode, reason });
       }
@@ -762,10 +768,10 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
         aggregateReason = 'No scan-time candidate satisfies the active BotTrader criteria with complete fee and depth data';
       } else {
         const distinctReasons = [...new Set(candidateRejections.map((r) => r.reason))];
-        const registryOnly = distinctReasons.length === 1
-          && distinctReasons[0]?.includes('canonical proposition registry');
-        if (registryOnly) {
-          aggregateReason = `${candidateRejections.length} candidate(s) rejected: exact selected contract pair(s) are absent from the canonical proposition registry`;
+        const mappingOnly = distinctReasons.length === 1
+          && distinctReasons[0]?.includes('exact outcome mapping is missing/unverified');
+        if (mappingOnly) {
+          aggregateReason = `${candidateRejections.length} candidate(s) rejected: Matched market exists, but exact outcome mapping is missing/unverified`;
         } else {
           aggregateReason = `${candidateRejections.length} candidate(s) evaluated; 0 eligible — ${distinctReasons.join('; ')}`;
         }
@@ -791,6 +797,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
     }
 
     const executable: BotScanCandidate[] = [];
+    const currentAuthorized = new Map<number, BotTradeInput>();
     const rejections: Array<{ outcome: string; code: string; reason: string; candidateIndex: number; candidate: BotScanCandidate }> = [];
     for (const original of initiallyEligible) {
       const candidateIndex = sourceCandidateIndex(scan, original);
@@ -816,12 +823,18 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
         rejections.push({ outcome: original.outcome, code: 'fees_unavailable', reason: 'Authoritative current fee values are unavailable for one or both legs', candidateIndex, candidate: current });
         continue;
       }
-      const evaluation = evaluateBotTrade(candidateToInput(scan, current, settings), settings);
+      const authorization = await deps.authorize(candidateToInput(scan, current, settings));
+      if (!('pairId' in authorization)) {
+        rejections.push({ outcome: original.outcome, code: 'matched_market_mapping_rejected', reason: authorization.reason, candidateIndex, candidate: current });
+        continue;
+      }
+      const evaluation = evaluateBotTrade(authorization, settings);
       if (!evaluation.shouldTrade) {
         rejections.push({ outcome: original.outcome, code: 'current_criteria_rejected', reason: evaluation.reason, candidateIndex, candidate: current });
         continue;
       }
       executable.push(current);
+      currentAuthorized.set(candidateIndex, authorization);
     }
 
     for (const rejected of rejections) {
@@ -884,7 +897,9 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
     for (let index = 0; index < reserved.length; index++) {
       const item = reserved[index];
       try {
-        const result = await deps.execute(candidateToInput(scan, item, settings, executionMode));
+        const authorized = currentAuthorized.get(sourceCandidateIndex(scan, item));
+        if (!authorized) throw new Error('Matched market exact outcome mapping authorization was lost before placement');
+        const result = await deps.execute({ ...authorized, reservationMode: executionMode });
         results.push({ outcome: item.outcome, result });
         await deps.recordCandidateDecision?.(
           scan,
@@ -899,6 +914,14 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
             executionMode,
             positionPersisted: result.positionPersisted ?? null,
             unhedged: result.executionResult?.unhedged ?? null,
+            matchedMarketMapping: authorized.matchedMarketMapping,
+            authorizedLegs: {
+              kalshiTicker: authorized.propositionRelationship?.legs.kalshi.platformMarketId ?? authorized.kalshiTicker,
+              pmConditionId: authorized.propositionRelationship?.legs.polymarket.platformMarketId ?? authorized.pmConditionId,
+              pmTokenId: authorized.propositionRelationship?.legs.polymarket.tokenId ?? null,
+              kalshiSide: authorized.propositionRelationship?.legs.kalshi.contractSide ?? null,
+              pmSide: authorized.propositionRelationship?.legs.polymarket.contractSide ?? null,
+            },
           }),
         );
         if (result.executionResult?.unhedged === true
@@ -978,7 +1001,7 @@ export function createBotScanConsumer(deps: BotScanConsumerDeps): BotScanConsume
   return { consume, processBacklog };
 }
 
-const DB_PATH = path.join(process.cwd(), 'data', 'edgefinder.db');
+const DB_PATH = process.env.H2H_SQLITE_PATH || path.join(process.cwd(), 'data', 'edgefinder.db');
 let schemaReady = false;
 
 async function dbClient() {
@@ -1705,7 +1728,7 @@ const productionDeps: BotScanConsumerDeps = {
   now: () => new Date(), getSettings: getBotSettings, resolveExecutionMode: resolveBotExecutionMode, loadScan, listBacklog, acquire,
   transition: (id, owner, update) => updateDecision(id, owner, update, false),
   finish: (id, owner, update) => updateDecision(id, owner, update, true),
-  recordReplay, advanceCursor, revalidate, execute: maybeExecuteBotTrade,
+  recordReplay, advanceCursor, revalidate, authorize: authorizeBotTradeInput, execute: maybeExecuteBotTrade,
   reserveOpportunity, releaseOpportunity, retainOpportunityForExposure, recordCandidateDecision,
   reportModeBlock: async (scan, settings) => {
     const readiness = await getBotExecutionReadiness(settings);

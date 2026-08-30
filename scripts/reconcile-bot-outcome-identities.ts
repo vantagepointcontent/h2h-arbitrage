@@ -8,7 +8,7 @@ import {
   planBotOutcomeIdentityReconciliation,
   prepareBotOutcomeIdentitySchema,
 } from '../src/lib/bot-outcome-identity-reconciliation';
-import { findCanonicalPropositionRelationship } from '../src/lib/proposition-registry';
+import { createMatchedMarketMappingStore } from '../src/lib/matched-market-mapping';
 
 function argValue(prefix: string): string | null {
   const arg = process.argv.slice(2).find((value) => value.startsWith(prefix));
@@ -28,7 +28,7 @@ try {
   const outcomeIdentityStatusExpression = apply || existing.has('outcome_identity_status')
     ? 'outcome_identity_status'
     : "'unresolved' AS outcome_identity_status";
-  const rows = await client.execute(`SELECT id, status, opened_at, kalshi_ticker, pm_condition_id,
+  const rows = await client.execute(`SELECT id, market_id, status, opened_at, kalshi_ticker, pm_condition_id,
     pm_entry_token_id, kalshi_side, pm_side, ${outcomeIdentityStatusExpression},
     ${apply || existing.has('kalshi_market_question') ? 'kalshi_market_question' : 'NULL AS kalshi_market_question'},
     ${apply || existing.has('pm_market_question') ? 'pm_market_question' : 'NULL AS pm_market_question'},
@@ -37,6 +37,7 @@ try {
     FROM bot_positions WHERE status = 'open' ORDER BY id`);
   const positions = rows.rows.map((row) => ({
     id: Number(row.id), status: String(row.status), openedAt: String(row.opened_at),
+    matchedMarketId: row.market_id == null ? null : String(row.market_id),
     kalshiTicker: row.kalshi_ticker == null ? null : String(row.kalshi_ticker),
     pmConditionId: row.pm_condition_id == null ? null : String(row.pm_condition_id),
     pmEntryTokenId: row.pm_entry_token_id == null ? null : String(row.pm_entry_token_id),
@@ -48,7 +49,19 @@ try {
     kalshiOutcomeLabel: row.kalshi_outcome_label == null ? null : String(row.kalshi_outcome_label),
     pmOutcomeLabel: row.pm_outcome_label == null ? null : String(row.pm_outcome_label),
   }));
-  const plan = planBotOutcomeIdentityReconciliation(positions, findCanonicalPropositionRelationship);
+  const mappingStore = createMatchedMarketMappingStore(client);
+  const plan = await planBotOutcomeIdentityReconciliation(positions, async (input) => {
+    if (!input.kalshiTicker || !input.pmConditionId || !input.pmTokenId) return null;
+    const resolved = await mappingStore.resolve({
+      matchedMarketId: input.matchedMarketId,
+      kalshiTicker: input.kalshiTicker,
+      pmConditionId: input.pmConditionId,
+      pmTokenId: input.pmTokenId,
+      kalshiSide: input.kalshiSide,
+      pmSide: input.pmSide,
+    });
+    return resolved.state === 'verified' ? resolved.relationship : null;
+  });
 
   if (apply) {
     const transaction = await client.transaction('write');

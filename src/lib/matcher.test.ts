@@ -1210,7 +1210,7 @@ describe('calculateBestArbitrageForOutcome — cross-outcome', () => {
 });
 
 describe('calculateAllArbitrages — cross-outcome guard', () => {
-  it('binds an exact server-registry relationship to the strategy-selected persisted Logs legs', () => {
+  it('does not promote the retired static registry into executable relationship authority', () => {
     const base = makeOutcome();
     const registered = makeOutcome({
       artist: 'Franco Colapinto',
@@ -1234,17 +1234,7 @@ describe('calculateAllArbitrages — cross-outcome guard', () => {
     const [result] = calculateAllArbitrages([registered], 'world');
 
     expect(result.arbitrage.strategy).toBe('Buy YES Kalshi + NO PM');
-    expect(result.propositionRelationship).toMatchObject({
-      state: 'verified_complementary',
-      legs: {
-        kalshi: { platformMarketId: 'KXF1ACTION-2026-COL', contractSide: 'yes' },
-        polymarket: {
-          platformMarketId: '0xf700d212b47dbd6f262c41bb464e458458d7e8b97569eda06f74fd3f4133b961',
-          tokenId: '38424385756462253442221613485727105608987714090195314133724025202573806948368',
-          contractSide: 'no',
-        },
-      },
-    });
+    expect(result.propositionRelationship).toBeNull();
   });
 
   it('does NOT create cross-outcome arbs when market has more than two outcomes', () => {

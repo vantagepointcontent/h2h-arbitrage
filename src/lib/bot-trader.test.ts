@@ -129,6 +129,7 @@ function makeInput(overrides?: Partial<BotTradeInput>): BotTradeInput {
     expiryDate: farFuture,
     category: 'Politics',
     propositionRelationship: verifiedRelationship(),
+    matchedMarketMapping: { matchedMarketId: 'pair-1', mappingId: 'test-mapping', revision: 'test-revision' },
     ...overrides,
   };
   const quote = (price: number | null | undefined, depth: number | undefined) => {
@@ -597,7 +598,7 @@ describe('buildExecutionRequest', () => {
   it('fails closed when canonical relationship metadata is missing', () => {
     const input = makeInput();
     delete input.propositionRelationship;
-    expect(evaluateBotTrade(input, baseSettings()).reason).toContain('server-owned canonical proposition registry');
+    expect(evaluateBotTrade(input, baseSettings()).reason).toContain('Matched market exists, but exact outcome mapping is missing/unverified');
     expect(buildExecutionRequest(input)).toBeNull();
   });
 
@@ -763,6 +764,16 @@ describe('maybeExecuteBotTrade safety', () => {
       }),
       recordBotPosition: vi.fn().mockResolvedValue(undefined),
     }));
+    vi.doMock('./matched-market-mapping', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('./matched-market-mapping')>()),
+      resolveMatchedMarketMapping: vi.fn(async (tuple) => ({
+        state: 'verified' as const,
+        matchedMarketId: tuple.matchedMarketId,
+        mappingId: 'test-mapping',
+        revision: 'test-revision',
+        relationship: verifiedRelationship(tuple.pmSide),
+      })),
+    }));
   });
 
   afterEach(() => {
@@ -772,6 +783,7 @@ describe('maybeExecuteBotTrade safety', () => {
     vi.doUnmock('./persistence');
     vi.doUnmock('./settings');
     vi.doUnmock('./bot-positions');
+    vi.doUnmock('./matched-market-mapping');
   });
 
   it('simulates in paper mode even when production requested', async () => {
@@ -915,6 +927,10 @@ describe('maybeExecuteBotTrade safety', () => {
       recordReplay: async () => undefined,
       advanceCursor: async () => undefined,
       revalidate: async () => scan.candidates,
+      authorize: async (candidateInput) => ({
+        ...candidateInput,
+        matchedMarketMapping: { matchedMarketId: candidateInput.pairId, mappingId: 'test-mapping', revision: 'test-revision' },
+      }),
       execute: maybeExecuteBotTrade,
       reserveOpportunity: async () => true,
       releaseOpportunity: async () => undefined,
@@ -994,6 +1010,14 @@ describe('maybeExecuteBotTrade safety', () => {
       ...(await importOriginal<typeof import('./auto-execute')>()),
       executeArb,
     }));
+    vi.doMock('./matched-market-mapping', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('./matched-market-mapping')>()),
+      resolveMatchedMarketMapping: vi.fn(async (tuple) => ({
+        state: 'missing' as const,
+        matchedMarketId: tuple.matchedMarketId,
+        reason: 'Matched market exists, but exact outcome mapping is missing/unverified',
+      })),
+    }));
     const { maybeExecuteBotTrade } = await import('./bot-trader');
     const input = makeInput({
       kalshiTicker: 'KXARREST-27JAN-THOM',
@@ -1005,11 +1029,44 @@ describe('maybeExecuteBotTrade safety', () => {
     const result = await maybeExecuteBotTrade(input);
 
     expect(result).toMatchObject({ executed: false });
-    expect(result.reason).toMatch(/server-owned canonical proposition registry/i);
+    expect(result.reason).toMatch(/Matched market exists, but exact outcome mapping is missing\/unverified/i);
     expect(executeArb).not.toHaveBeenCalled();
   });
 
-  it('preserves a registry-resolved canonical relationship through the execution alert path', async () => {
+  it('does not call the placement adapter when caller-supplied Matched Market authority is fabricated or stale', async () => {
+    const executeArb = vi.fn();
+    vi.doMock('./auto-execute', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('./auto-execute')>()),
+      executeArb,
+    }));
+    const mapping = await import('./matched-market-mapping');
+    vi.mocked(mapping.resolveMatchedMarketMapping).mockResolvedValueOnce({
+      state: 'verified' as const,
+      matchedMarketId: 'pair-1',
+      mappingId: 'persisted-mapping',
+      revision: 'persisted-revision',
+      relationship: verifiedRelationship(),
+    });
+    const { maybeExecuteBotTrade } = await import('./bot-trader');
+    const input = makeInput({
+      propositionRelationship: verifiedRelationship(),
+      matchedMarketMapping: {
+        matchedMarketId: 'pair-1',
+        mappingId: 'fabricated-mapping',
+        revision: 'fabricated-revision',
+      },
+    });
+
+    const result = await maybeExecuteBotTrade(input);
+
+    expect(result).toMatchObject({ executed: false });
+    expect(result.reason).toContain('Matched market mapping authority changed before execution');
+    expect(result.reason).toContain('mappingId expected fabricated-mapping, persisted persisted-mapping');
+    expect(result.reason).toContain('revision expected fabricated-revision, persisted persisted-revision');
+    expect(executeArb).not.toHaveBeenCalled();
+  });
+
+  it('preserves a Matched Market-resolved exact relationship through the execution alert path', async () => {
     const canonicalRelationship = verifiedRelationship();
     vi.doMock('./proposition-registry', () => ({
       resolveCanonicalPropositionRelationship: (relationship: PropositionRelationship | null | undefined) => relationship ?? null,
@@ -1018,7 +1075,7 @@ describe('maybeExecuteBotTrade safety', () => {
     const messages = await import('./bot-trader-messages');
     const { maybeExecuteBotTrade } = await import('./bot-trader');
     const input = makeInput();
-    delete input.propositionRelationship;
+    input.propositionRelationship = canonicalRelationship;
     const runtimeState = (await import('./orderbook-state')).orderbookState;
     runtimeState.setBook(input.kalshiTicker!, [{ price: 0.45, quantity: 1 }], [], 0, {
       tickSizeCents: 1,
