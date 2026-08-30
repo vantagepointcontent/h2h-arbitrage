@@ -585,8 +585,11 @@ function executableBookUnavailableReason(
 ): string {
   const label = `${venue} ${side.toUpperCase()}`;
   const observed = quote.depthTimestamp ? ` (observed ${quote.depthTimestamp})` : '';
-  if (quote.reason === 'authoritative_empty' || quote.reason === 'empty_book') {
+  if (quote.reason === 'authoritative_empty') {
     return `${label} authoritative book is empty${observed}`;
+  }
+  if (quote.reason === 'empty_book') {
+    return `${label} legacy empty-book evidence is non-authoritative${observed}`;
   }
   if (quote.reason === 'missing_depth') return `${label} ask depth is missing${observed}`;
   if (quote.reason === 'malformed_depth' || quote.reason === 'malformed_level') {
@@ -680,8 +683,10 @@ export function evaluateBotTrade(
     : 0;
 
   const selectedQuotes = pickLegQuotes(input.strategy, input);
-  const kalshiUnavailable = selectedQuotes.kalshiQuote?.status === 'unavailable';
-  const pmUnavailable = selectedQuotes.pmQuote?.status === 'unavailable';
+  const kalshiUnavailable = !selectedQuotes.kalshiQuote
+    || selectedQuotes.kalshiQuote.status === 'unavailable';
+  const pmUnavailable = !selectedQuotes.pmQuote
+    || selectedQuotes.pmQuote.status === 'unavailable';
   if (!selectedQuotes.kalshiQuote) {
     reasons.push(`Kalshi ${legs.kalshiOutcome.toUpperCase()} executable quote is unavailable`);
   } else if (kalshiUnavailable) {

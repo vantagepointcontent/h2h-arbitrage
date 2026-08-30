@@ -273,7 +273,7 @@ export function isExecutableQuoteConsistent(
 /** Preserve a fail-closed unavailable quote across persistence without trusting arbitrary JSON. */
 export function isUnavailableQuoteConsistent(candidate: ExecutableBookQuote | undefined): candidate is ExecutableBookQuote {
   const reasons: ExecutableBookReason[] = [
-    'empty_book', 'authoritative_empty', 'missing_depth', 'malformed_depth',
+    'authoritative_empty', 'missing_depth', 'malformed_depth',
     'inactive_market', 'source_unavailable', 'stale_book', 'malformed_level',
     'missing_depth_timestamp',
   ];

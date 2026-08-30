@@ -454,6 +454,30 @@ describe('evaluateBotTrade', () => {
     const ev = evaluateBotTrade(input, baseSettings());
     expect(ev.shouldTrade).toBe(false);
     expect(ev.reason).toContain('Kalshi YES executable quote is unavailable');
+    expect(ev.reason).not.toContain('Kalshi 0.00');
+    expect(ev.reason).not.toContain('Kalshi $0.00');
+  });
+
+  it('labels legacy empty-book evidence as non-authoritative instead of authoritative venue zero', () => {
+    const legacyEmptyQuote = quoteOneShareFromTopAsk({
+      price: 0.45,
+      depthUsd: 0,
+      tickSize: 0.01,
+      minimumOrderSize: 1,
+      depthTimestamp: new Date().toISOString(),
+    });
+    expect(legacyEmptyQuote.reason).toBe('empty_book');
+
+    const ev = evaluateBotTrade(makeInput({
+      kalshiYesDepth: 0,
+      kalshiYesExecutableQuote: legacyEmptyQuote,
+    }), baseSettings());
+
+    expect(ev.shouldTrade).toBe(false);
+    expect(ev.reason).toContain('legacy empty-book evidence is non-authoritative');
+    expect(ev.reason).not.toContain('authoritative book is empty');
+    expect(ev.reason).not.toContain('Kalshi 0.00');
+    expect(ev.reason).not.toContain('Kalshi $0.00');
   });
 
   it('handles $1 placement: 0.5 share per leg at $0.50 ask → ~$0.50/leg depth satisfies per-leg $0.50 minimum', () => {

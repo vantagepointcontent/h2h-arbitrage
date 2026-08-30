@@ -288,6 +288,20 @@ describe('walkExecutableBook', () => {
 
     expect(isExecutableQuoteConsistent(forged, 'buy', ONE_SHARE)).toBe(false);
   });
+
+  it('rejects ambiguous legacy empty_book snapshots as authoritative persisted evidence', () => {
+    const legacyEmpty = walkExecutableBook({
+      side: 'buy',
+      levels: [],
+      requestedQuantityMicros: ONE_SHARE,
+      tickSizeCents: 1,
+      minimumOrderQuantityMicros: ONE_SHARE,
+      depthTimestamp: OBSERVED_AT,
+    });
+
+    expect(legacyEmpty.reason).toBe('empty_book');
+    expect(isUnavailableQuoteConsistent(legacyEmpty)).toBe(false);
+  });
 });
 
 describe('orderbookState executable quotes', () => {

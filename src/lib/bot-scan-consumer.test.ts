@@ -763,7 +763,17 @@ describe('durable BotTrader scan consumer', () => {
   });
 
   it('rejects insufficient current executable depth', async () => {
-    const h = harness({ current: [candidate({ kalshiYesDepth: 0 })] });
+    const h = harness({ current: [candidate({
+      kalshiYesDepth: 0,
+      kalshiYesExecutableQuote: quoteOneShareFromTopAsk({
+        price: 0.45,
+        depthUsd: 0,
+        tickSize: 0.01,
+        minimumOrderSize: 1,
+        depthTimestamp: '2026-08-11T12:00:10.000Z',
+        unavailableReason: 'authoritative_empty',
+      }),
+    })] });
     const result = await h.consumer.consume(41, 'scan_api');
     expect(result.state).toBe('revalidation_rejected');
     expect(result.reason).toContain('authoritative book is empty');

@@ -9,17 +9,43 @@ import {
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobAskDepths, getClobPrices } from '@/lib/polymarket-clob';
-import { matchOutcomes, calculateAllArbitrages, parseDepth, attachOutcomeContingentApy, applyManualMatches } from '@/lib/matcher';
+import { matchOutcomes, calculateAllArbitrages, parseDepth, attachOutcomeContingentApy, applyManualMatches, type KalshiAskDepthStatus, type UnifiedOutcome } from '@/lib/matcher';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { SavedMarket } from '@/lib/persistence';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import type { OutcomeContingentApy } from '@/lib/settlement-apy';
-import { quoteOneShareFromTopAsk } from '@/lib/executable-book';
+import { quoteOneShareFromTopAsk, type ExecutableBookQuote, type ExecutableBookReason } from '@/lib/executable-book';
 import { resolveCanonicalMarketExpiry } from '@/lib/canonical-market-expiry';
 
 const KALSHI_TIMEOUT_MS = 3000;
 const PM_TIMEOUT_MS = 3000;
 const CLOB_TIMEOUT_MS = 1500;
+
+function kalshiDepthUnavailableReason(status: KalshiAskDepthStatus | undefined): Extract<ExecutableBookReason,
+  'authoritative_empty' | 'missing_depth' | 'malformed_depth' | 'inactive_market'> | undefined {
+  if (status === 'authoritative_empty') return 'authoritative_empty';
+  if (status === 'missing') return 'missing_depth';
+  if (status === 'malformed') return 'malformed_depth';
+  if (status === 'inactive') return 'inactive_market';
+  return undefined;
+}
+
+export function buildRefreshKalshiExecutableQuote(
+  kalshi: NonNullable<UnifiedOutcome['kalshi']> | null | undefined,
+  side: 'yes' | 'no',
+  depthTimestamp: string,
+): ExecutableBookQuote {
+  return quoteOneShareFromTopAsk({
+    price: side === 'yes' ? kalshi?.yesAsk : kalshi?.noAsk,
+    depthUsd: side === 'yes' ? kalshi?.yesAskDepth : kalshi?.noAskDepth,
+    tickSize: side === 'yes' ? kalshi?.yesTickSize : kalshi?.noTickSize,
+    minimumOrderSize: 1,
+    depthTimestamp,
+    unavailableReason: kalshiDepthUnavailableReason(
+      side === 'yes' ? kalshi?.yesAskDepthStatus : kalshi?.noAskDepthStatus,
+    ),
+  });
+}
 
 export interface SingleRefreshResult {
   id: string;
@@ -300,14 +326,8 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       pmConditionId: selectedPmConditionId,
       pmYesTokenId: selectedPmLeg?.yesTokenId,
       pmNoTokenId: selectedPmLeg?.noTokenId,
-      kalshiYesExecutableQuote: quoteOneShareFromTopAsk({
-        price: o.kalshi?.yesAsk, depthUsd: o.kalshi?.yesAskDepth,
-        tickSize: 0.01, minimumOrderSize: 1, depthTimestamp: scannedAt,
-      }),
-      kalshiNoExecutableQuote: quoteOneShareFromTopAsk({
-        price: o.kalshi?.noAsk, depthUsd: o.kalshi?.noAskDepth,
-        tickSize: 0.01, minimumOrderSize: 1, depthTimestamp: scannedAt,
-      }),
+      kalshiYesExecutableQuote: buildRefreshKalshiExecutableQuote(o.kalshi, 'yes', scannedAt),
+      kalshiNoExecutableQuote: buildRefreshKalshiExecutableQuote(o.kalshi, 'no', scannedAt),
       pmYesExecutableQuote: quoteOneShareFromTopAsk({
         price: selectedPmLeg?.yesPrice, depthUsd: selectedPmLeg?.askDepth,
         tickSize: selectedPmLeg?.yesTickSize, minimumOrderSize: selectedPmLeg?.yesMinOrderSize,
