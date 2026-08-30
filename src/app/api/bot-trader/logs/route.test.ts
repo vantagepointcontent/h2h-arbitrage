@@ -1,18 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { getBotActionLogs, pruneBotActionLogs } from '@/lib/bot-action-log';
+import { getBotScanDecisions } from '@/lib/bot-scan-consumer';
+import { getScanAuditReferences } from '@/lib/persistence';
 import { GET } from './route';
 
 vi.mock('@/lib/bot-action-log', () => ({
   getBotActionLogs: vi.fn(),
   pruneBotActionLogs: vi.fn(),
 }));
+vi.mock('@/lib/bot-scan-consumer', () => ({ getBotScanDecisions: vi.fn() }));
+vi.mock('@/lib/persistence', () => ({ getScanAuditReferences: vi.fn() }));
 
 describe('GET /api/bot-trader/logs qualified filter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(pruneBotActionLogs).mockResolvedValue(0);
     vi.mocked(getBotActionLogs).mockResolvedValue({ rows: [], nextCursor: null });
+    vi.mocked(getBotScanDecisions).mockResolvedValue([]);
+    vi.mocked(getScanAuditReferences).mockResolvedValue(new Map());
   });
 
   it('passes qualified=true to persistence', async () => {
@@ -41,5 +47,25 @@ describe('GET /api/bot-trader/logs qualified filter', () => {
 
     expect(response.status).toBe(200);
     expect(getBotActionLogs).toHaveBeenCalledWith(expect.objectContaining({ cursor: Number.MAX_SAFE_INTEGER }));
+  });
+
+  it('correlates scan rows by the exact persisted scan id', async () => {
+    vi.mocked(getBotScanDecisions).mockResolvedValue([
+      { scanId: 41, state: 'daily_limit', reasonCode: 'no_positive_arb', reason: 'No positive arb', updatedAt: '2026-08-30T12:00:00.000Z' },
+      { scanId: 42, state: 'daily_limit', reasonCode: 'no_positive_arb', reason: 'No positive arb', updatedAt: '2026-08-30T12:01:00.000Z' },
+    ] as Awaited<ReturnType<typeof getBotScanDecisions>>);
+    vi.mocked(getScanAuditReferences).mockResolvedValue(new Map([
+      [41, { scanId: 41, logUuid: 'A1B2C3', marketId: 'same-market', marketName: 'Same Market' }],
+      [42, { scanId: 42, logUuid: 'D4E5F6', marketId: 'same-market', marketName: 'Same Market' }],
+    ]));
+
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/logs'));
+    const body = await response.json();
+
+    expect(getScanAuditReferences).toHaveBeenCalledWith([41, 42]);
+    expect(body.decisions).toEqual([
+      expect.objectContaining({ scanId: 41, logUuid: 'A1B2C3', marketId: 'same-market', marketName: 'Same Market' }),
+      expect.objectContaining({ scanId: 42, logUuid: 'D4E5F6', marketId: 'same-market', marketName: 'Same Market' }),
+    ]);
   });
 });

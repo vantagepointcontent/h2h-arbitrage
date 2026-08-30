@@ -22,6 +22,7 @@ import { GET as exportLogs, HEAD as headExportLogs } from './export/route';
 
 const persistedRow = {
   id: 7,
+  log_uuid: 'A1B2C3',
   market_id: 'market-7',
   market_title: 'Snapshot market',
   best_roi_pct: 2.5,
@@ -67,6 +68,7 @@ describe('Logs scan-time APY serialization', () => {
     const body = await response.json();
 
     expect(body.logs[0]).toMatchObject({
+      log_uuid: 'A1B2C3',
       apy_pct: 1825,
       days_to_expiry: 0.5,
       expiry_at: '2026-08-13T00:00:00.000Z',
@@ -105,6 +107,9 @@ describe('Logs scan-time APY serialization', () => {
   it('loads one immutable scan detail by numeric id', async () => {
     mocks.getScanHistoryDetail.mockResolvedValue({
       id: 7,
+      log_uuid: 'A1B2C3',
+      market_id: 'market-7',
+      market_title: 'Snapshot market',
       raw_result: '{"allArbs":[{"roiPct":2.5}]}',
     });
 
@@ -116,6 +121,9 @@ describe('Logs scan-time APY serialization', () => {
     expect(mocks.getScanHistoryDetail).toHaveBeenCalledWith(7);
     expect(await response.json()).toEqual({
       id: 7,
+      log_uuid: 'A1B2C3',
+      market_id: 'market-7',
+      market_title: 'Snapshot market',
       raw_result: '{"allArbs":[{"roiPct":2.5}]}',
     });
   });
@@ -174,6 +182,8 @@ describe('Logs scan-time APY serialization', () => {
     const values = row.split(',');
 
     expect(columns).toContain('Scan Status');
+    expect(columns[0]).toBe('Logs UUID');
+    expect(values[0]).toBe('A1B2C3');
     expect(columns).not.toContain('State');
     expect(values[columns.indexOf('Scan Status')]).toBe('completed');
     expect(values[columns.indexOf('Scan Status Explanation')]).toContain('market may still be open');

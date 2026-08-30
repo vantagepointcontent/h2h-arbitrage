@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getBotActionLogs, pruneBotActionLogs, type BotActionLogRow, type BotActionStatus } from '@/lib/bot-action-log';
 import { clientSafeError } from '@/lib/error-handler';
 import { getBotScanDecisions, type BotScanDecisionState } from '@/lib/bot-scan-consumer';
+import { getScanAuditReferences } from '@/lib/persistence';
 
 const VALID_STATUS = new Set<BotActionStatus>(['passed', 'failed', 'pending']);
 
@@ -82,7 +83,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       if (!baseline) return true;
       return d.updatedAt >= baseline.resetAt;
     });
-    return NextResponse.json({ success: true, trades: groupByTrade(result.rows), decisions: visibleDecisions, nextCursor: result.nextCursor });
+    const auditReferences = await getScanAuditReferences(visibleDecisions.map((decision) => decision.scanId));
+    const enrichedDecisions = visibleDecisions.map((decision) => ({
+      ...decision,
+      logUuid: auditReferences.get(decision.scanId)?.logUuid ?? null,
+      marketId: auditReferences.get(decision.scanId)?.marketId ?? null,
+      marketName: auditReferences.get(decision.scanId)?.marketName ?? null,
+    }));
+    return NextResponse.json({ success: true, trades: groupByTrade(result.rows), decisions: enrichedDecisions, nextCursor: result.nextCursor });
   } catch (error) {
     return NextResponse.json({ success: false, error: clientSafeError(error) }, { status: 500 });
   }
@@ -94,7 +102,8 @@ async function getResetBaseline(): Promise<ResetBaseline | null> {
   try {
     const { createClient } = await import('@libsql/client');
     const path = await import('path');
-    const db = createClient({ url: `file:${path.join(process.cwd(), 'data', 'edgefinder.db')}` });
+    const databasePath = process.env.H2H_SQLITE_PATH || path.join(process.cwd(), 'data', 'edgefinder.db');
+    const db = createClient({ url: `file:${databasePath}` });
     try {
       const r = await db.execute('SELECT reset_at FROM bot_trader_reset_baseline ORDER BY id DESC LIMIT 1');
       const row = (r.rows as unknown as Array<Record<string, unknown>>)[0];

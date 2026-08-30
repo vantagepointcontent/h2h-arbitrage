@@ -300,6 +300,7 @@ describe('LogsPanel', () => {
     const lowDisplayed = {
       ...comparisonLog(),
       id: 301,
+      log_uuid: 'A1B2C3',
       market_id: 'low-displayed',
       market_name: 'Low displayed ROI',
       best_roi_pct: null,
@@ -310,6 +311,7 @@ describe('LogsPanel', () => {
     const highDisplayed = {
       ...comparisonLog(),
       id: 302,
+      log_uuid: 'D4E5F6',
       market_id: 'high-displayed',
       market_name: 'High displayed ROI',
       best_roi_pct: null,
@@ -335,16 +337,19 @@ describe('LogsPanel', () => {
 
     render(createElement(LogsPanel));
     await waitFor(() => expect(screen.getByText('High displayed ROI')).toBeTruthy());
+    expect(Array.from(document.querySelectorAll('thead th')).slice(0, 2).map((header) => header.textContent?.trim()))
+      .toEqual(['Logs UUID', 'Category']);
+    expect(screen.getAllByText('A1B2C3').length).toBeGreaterThan(0);
     expect(document.querySelector('td[title="No authoritative scan-time APY value was persisted for this result."]')).toBeTruthy();
     await waitFor(() => expect(document.querySelector('td[title="No successfully completed scan exists for the exact linked market pair."]')).toBeTruthy());
 
     const roiHeader = Array.from(document.querySelectorAll('thead th'))
       .find((header) => header.textContent?.trim().startsWith('ROI %'))!;
     fireEvent.click(roiHeader);
-    const descendingNames = Array.from(document.querySelectorAll('tbody tr')).map((row) => row.children[2]?.textContent?.trim());
+    const descendingNames = Array.from(document.querySelectorAll('tbody tr')).map((row) => row.children[3]?.textContent?.trim());
     expect(descendingNames.slice(0, 2)).toEqual(['High displayed ROI', 'Low displayed ROI']);
     fireEvent.click(roiHeader);
-    const ascendingNames = Array.from(document.querySelectorAll('tbody tr')).map((row) => row.children[2]?.textContent?.trim());
+    const ascendingNames = Array.from(document.querySelectorAll('tbody tr')).map((row) => row.children[3]?.textContent?.trim());
     expect(ascendingNames.slice(0, 2)).toEqual(['Low displayed ROI', 'High displayed ROI']);
   });
 
@@ -1025,6 +1030,7 @@ function makePagedLog(index: number) {
 function comparisonLog() {
   return {
     id: 91,
+    log_uuid: 'A1B2C3',
     market_id: 'saved-1',
     market_name: 'Comparison market',
     best_roi_pct: 2.5,

@@ -25,6 +25,10 @@ import {
 } from './historical-scan-financials';
 import { recoverHistoricalScanFinancials } from './historical-scan-financial-recovery';
 import type { CanonicalMarketExpirySource } from './canonical-market-expiry';
+import {
+  insertWithUniqueLogUuid,
+  LOG_UUID_BACKFILL_CAPACITY,
+} from './log-uuid';
 
 const DATA_FILE = process.env.H2H_SAVED_MARKETS_FILE || path.join(process.cwd(), 'data', 'saved-markets.json');
 
@@ -203,6 +207,7 @@ async function initDb(): Promise<void> {
   await c.execute(`
     CREATE TABLE IF NOT EXISTS scan_results (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      log_uuid        TEXT    NOT NULL,
       market_id       TEXT    NOT NULL,
       best_roi_pct    REAL    NOT NULL DEFAULT 0,
       best_profit     REAL    NOT NULL DEFAULT 0,
@@ -233,6 +238,7 @@ async function initDb(): Promise<void> {
   `);
   // Migration: add columns if missing (existing DBs)
   for (const ddl of [
+    `ALTER TABLE scan_results ADD COLUMN log_uuid TEXT`,
     `ALTER TABLE scan_results ADD COLUMN market_title TEXT`,
     `ALTER TABLE scan_results ADD COLUMN kalshi_url TEXT`,
     `ALTER TABLE scan_results ADD COLUMN polymarket_url TEXT`,
@@ -250,6 +256,36 @@ async function initDb(): Promise<void> {
   ]) {
     try { await c.execute(ddl); } catch { /* column already exists */ }
   }
+  await c.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_scan_results_log_uuid ON scan_results(log_uuid) WHERE log_uuid IS NOT NULL`);
+  // Local-only, one-shot backfill. An affine permutation prevents sequential
+  // disclosure while assigning each historical row a collision-free mixed
+  // letter/digit reference without touching any scan facts.
+  const scrambledOrdinal = `(((id - 1) * 7919 + 104729) % ${LOG_UUID_BACKFILL_CAPACITY})`;
+  await c.execute(`UPDATE scan_results SET log_uuid =
+    substr('ABCDEFGHIJKLMNOPQRSTUVWXYZ', CAST((${scrambledOrdinal}) / 16796160 AS INTEGER) + 1, 1) ||
+    substr('0123456789', CAST(((${scrambledOrdinal}) / 1679616) % 10 AS INTEGER) + 1, 1) ||
+    substr('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', CAST(((${scrambledOrdinal}) / 46656) % 36 AS INTEGER) + 1, 1) ||
+    substr('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', CAST(((${scrambledOrdinal}) / 1296) % 36 AS INTEGER) + 1, 1) ||
+    substr('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', CAST(((${scrambledOrdinal}) / 36) % 36 AS INTEGER) + 1, 1) ||
+    substr('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', CAST((${scrambledOrdinal}) % 36 AS INTEGER) + 1, 1)
+    WHERE log_uuid IS NULL AND id <= ${LOG_UUID_BACKFILL_CAPACITY}`);
+  const overflowRows = await c.execute('SELECT id FROM scan_results WHERE log_uuid IS NULL ORDER BY id');
+  for (const row of overflowRows.rows) {
+    await insertWithUniqueLogUuid(async (logUuid) => c.execute({
+      sql: 'UPDATE scan_results SET log_uuid = ? WHERE id = ? AND log_uuid IS NULL',
+      args: [logUuid, Number(row.id)],
+    }));
+  }
+  await c.execute(`CREATE TRIGGER IF NOT EXISTS scan_results_log_uuid_insert_guard
+    BEFORE INSERT ON scan_results
+    WHEN NEW.log_uuid IS NULL OR length(NEW.log_uuid) <> 6
+      OR NEW.log_uuid GLOB '*[^A-Z0-9]*'
+      OR NEW.log_uuid NOT GLOB '*[A-Z]*' OR NEW.log_uuid NOT GLOB '*[0-9]*'
+    BEGIN SELECT RAISE(ABORT, 'invalid Logs UUID'); END`);
+  await c.execute(`CREATE TRIGGER IF NOT EXISTS scan_results_log_uuid_update_guard
+    BEFORE UPDATE OF log_uuid ON scan_results
+    WHEN OLD.log_uuid IS NOT NEW.log_uuid
+    BEGIN SELECT RAISE(ABORT, 'Logs UUID is immutable'); END`);
   await c.execute({
     sql: `UPDATE scan_results SET calculation_envelope = ? WHERE calculation_envelope IS NULL OR calculation_envelope = ''`,
     args: [JSON.stringify(legacyUnverifiableEnvelope('legacy scan result'))],
@@ -733,16 +769,17 @@ export async function saveScanResult(
   const calculationEnvelope = result.calculationEnvelope == null
     ? legacyUnverifiableEnvelope(`scan result ${marketId}`)
     : validateCalculationEnvelope(result.calculationEnvelope);
-  const row = await c.execute({
+  const row = await insertWithUniqueLogUuid((logUuid) => c.execute({
     sql: `INSERT INTO scan_results
-      (market_id, best_roi_pct, best_profit, strategy,
+      (log_uuid, market_id, best_roi_pct, best_profit, strategy,
        outcome_count, matched_count, kalshi_count, pm_count,
        positive_arb_count, total_stake, scanned_at, raw_result, market_title,
        kalshi_url, polymarket_url, arb_type, expiry_at, days_to_expiry,
        apy_pct, apy_unavailable_reason, arb_valid, arb_invalidation_reason, calculation_envelope,
        historical_financials_revision, historical_financials_provenance)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
+      logUuid,
       marketId,
       canonicalRoi ?? 0,
       canonicalProfit ?? 0,
@@ -782,7 +819,7 @@ export async function saveScanResult(
         ...(typeof result.totalStake === 'number' && Number.isFinite(result.totalStake) ? ['stakeUsd' as const] : []),
       ]),
     ],
-  });
+  }));
   const id = Number((row as any).insertId ?? row.lastInsertRowid ?? 0);
   const previous = await c.execute(`SELECT snapshot_json FROM logs_data_quality_batches ORDER BY observed_at DESC, scan_id DESC LIMIT 1`);
   let previousBatch: LogsDataQualitySnapshot | null = null;
@@ -1019,13 +1056,13 @@ function scanHistoryWhere(opts: ScanHistoryFilters) {
   if (opts.toDate) { where += ' AND scanned_at <= ?'; args.push(new Date(opts.toDate).toISOString()); }
   const search = opts.search?.trim();
   if (search) {
+    const literalLike = search.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
     if (Array.from(search).length >= 3) {
-      where += ` AND id IN (SELECT rowid FROM scan_results_search WHERE scan_results_search MATCH ?)`;
-      args.push(`"${search.replace(/"/g, '""')}"`);
+      where += ` AND (log_uuid LIKE ? ESCAPE '\\' OR id IN (SELECT rowid FROM scan_results_search WHERE scan_results_search MATCH ?))`;
+      args.push(`%${literalLike.toUpperCase()}%`, `"${search.replace(/"/g, '""')}"`);
     } else {
-      const literalLike = search.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
-      where += ` AND id IN (SELECT rowid FROM scan_results_search WHERE search_text LIKE ? ESCAPE '\\')`;
-      args.push(`%${literalLike}%`);
+      where += ` AND (log_uuid LIKE ? ESCAPE '\\' OR id IN (SELECT rowid FROM scan_results_search WHERE search_text LIKE ? ESCAPE '\\'))`;
+      args.push(`%${literalLike.toUpperCase()}%`, `%${literalLike}%`);
     }
   }
   if (opts.eventType === 'arb') where += ` AND (${scanHistoryCanonicalArbCountSql}) > 0`;
@@ -1084,7 +1121,7 @@ export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: numb
   if (opts.before) { pageWhere += ' AND (scanned_at < ? OR (scanned_at = ? AND id < ?))'; pageArgs.push(opts.before.scannedAt, opts.before.scannedAt, opts.before.id); }
 
   const rows = await c.execute({
-    sql: `SELECT id, market_id, market_title, best_roi_pct, best_profit, strategy,
+    sql: `SELECT id, log_uuid, market_id, market_title, best_roi_pct, best_profit, strategy,
                  outcome_count, matched_count, kalshi_count, pm_count,
                  positive_arb_count, total_stake, scanned_at,
                  expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason,
@@ -1106,14 +1143,51 @@ export async function queryScanHistory(opts: ScanHistoryFilters & { limit?: numb
 }
 
 /** Load the heavy immutable payload only when a Logs row is expanded. */
-export async function getScanHistoryDetail(id: number): Promise<{ id: number; raw_result: string | null } | null> {
+export async function getScanHistoryDetail(id: number): Promise<{ id: number; log_uuid: string; market_id: string; market_title: string | null; raw_result: string | null } | null> {
   await ensureDb();
   const result = await getClient().execute({
-    sql: 'SELECT id, raw_result FROM scan_results WHERE id = ? LIMIT 1',
+    sql: 'SELECT id, log_uuid, market_id, market_title, raw_result FROM scan_results WHERE id = ? LIMIT 1',
     args: [id],
   });
   const row = result.rows[0];
-  return row ? { id: Number(row.id), raw_result: typeof row.raw_result === 'string' ? row.raw_result : null } : null;
+  return row ? {
+    id: Number(row.id),
+    log_uuid: String(row.log_uuid),
+    market_id: String(row.market_id),
+    market_title: typeof row.market_title === 'string' ? row.market_title : null,
+    raw_result: typeof row.raw_result === 'string' ? row.raw_result : null,
+  } : null;
+}
+
+export interface ScanAuditReference {
+  scanId: number;
+  logUuid: string;
+  marketId: string;
+  marketName: string;
+}
+
+/** Exact BotTrader scan foreign-key to immutable Logs identity projection. */
+export async function getScanAuditReferences(scanIds: number[]): Promise<Map<number, ScanAuditReference>> {
+  await ensureDb();
+  const ids = [...new Set(scanIds)].filter((id) => Number.isSafeInteger(id) && id > 0).slice(0, 500);
+  if (ids.length === 0) return new Map();
+  const placeholders = ids.map(() => '?').join(',');
+  const result = await getClient().execute({
+    sql: `SELECT s.id, s.log_uuid, s.market_id,
+      COALESCE(NULLIF(s.market_title, ''), NULLIF(m.event_title, ''), s.market_id) AS market_name
+      FROM scan_results s LEFT JOIN saved_markets m ON m.id = s.market_id
+      WHERE s.id IN (${placeholders})`,
+    args: ids,
+  });
+  return new Map(result.rows.map((row) => {
+    const scanId = Number(row.id);
+    return [scanId, {
+      scanId,
+      logUuid: String(row.log_uuid),
+      marketId: String(row.market_id),
+      marketName: String(row.market_name),
+    }];
+  }));
 }
 
 export interface ScanValuationInput {
@@ -1353,7 +1427,7 @@ export async function* queryScanHistoryStream(opts: ScanHistoryFilters & {
     }
 
     const res = await c.execute({
-      sql: `SELECT id, market_id, market_title, best_roi_pct, best_profit, strategy,
+      sql: `SELECT id, log_uuid, market_id, market_title, best_roi_pct, best_profit, strategy,
                    outcome_count, matched_count, kalshi_count, pm_count,
                    positive_arb_count, total_stake, scanned_at,
                    expiry_at, days_to_expiry, apy_pct, apy_unavailable_reason,
@@ -1726,6 +1800,15 @@ export interface LastScanResult {
   matchedPairs?: { artist: string; kalshiTicker: string; pmConditionId: string }[];
   matchDependencies?: import('./coupling-store').CouplingDependency[];
   publicationGeneration?: number;
+  /** Quick-refresh lifecycle is persisted only on the fenced live channel. */
+  refreshStatus?: 'complete' | 'partial' | 'failed';
+  refreshLifecycle?: { requestedAt: string; structureFetchedAt: string | null; completedAt: string };
+  platformDiagnostics?: Record<'kalshi' | 'polymarket', {
+    status: 'fresh' | 'partial' | 'empty' | 'failed'; count: number; reason?: string;
+  }>;
+  _kalshiFetchedAt?: string | null;
+  _pmFetchedAt?: string | null;
+  _priceDataObservedAt?: string | null;
   category?: string;        // market domain classification (e.g. politics, sports)
   pmClosed?: boolean;       // UI-013: PM reports market closed (endDate may still be future)
   priceResolved?: boolean;  // BUG-05b: at least one outcome at 99/1 extremes (true market resolution)
@@ -1881,8 +1964,10 @@ function rowToMarket(r: any): SavedMarket {
   // recomputing it. If it's older than the TTL (watcher down, pair left HOT
   // tier), drop it so the UI falls back to the poller's lastScanResult.
   if (liveResult?.scannedAt) {
-    const age = Date.now() - new Date(liveResult.scannedAt).getTime();
-    if (!(age >= 0 && age <= LIVE_RESULT_TTL_MS)) liveResult = null;
+    if (liveResult.refreshStatus == null) {
+      const age = Date.now() - new Date(liveResult.scannedAt).getTime();
+      if (!(age >= 0 && age <= LIVE_RESULT_TTL_MS)) liveResult = null;
+    }
   } else {
     liveResult = null;
   }
@@ -2817,7 +2902,8 @@ export async function reconcileSavedMarketMatchSummary(
  * replace the authoritative full-scan economics or compact APY snapshot. */
 export async function reconcileSavedMarketLiveSummary(
   id: string,
-  summary: Pick<LastScanResult, 'matchedCount' | 'matchStatus' | 'matchError' | 'matchedPairs' | 'matchDependencies' | 'scannedAt' | 'publicationGeneration'>,
+  summary: Pick<LastScanResult, 'matchedCount' | 'matchStatus' | 'matchError' | 'matchedPairs' | 'matchDependencies' | 'scannedAt' | 'publicationGeneration'>
+    & Partial<Pick<LastScanResult, 'refreshStatus' | 'refreshLifecycle' | 'platformDiagnostics' | '_kalshiFetchedAt' | '_pmFetchedAt' | '_priceDataObservedAt' | 'venuePriceFreshness'>>,
 ): Promise<void> {
   const fallback: LastScanResult = {
     bestRoiPct: 0, bestProfit: 0, strategy: 'No arb', outcomeCount: summary.matchedCount,

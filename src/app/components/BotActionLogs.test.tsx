@@ -61,7 +61,9 @@ describe('BotActionLogs qualified-only filter', () => {
         trades: [],
         decisions: [{
           scanId: 41,
-          marketTitle: 'Test Market',
+          logUuid: 'A1B2C3',
+          marketId: 'market-41',
+          marketName: 'Test Market',
           state: 'revalidation_rejected',
           reasonCode: 'current_quote_stale',
           reason: 'Current executable quote is stale',
@@ -70,9 +72,13 @@ describe('BotActionLogs qualified-only filter', () => {
       }),
     } as Response);
     render(<BotActionLogs />);
-    expect(await screen.findByText('Scan #41')).toBeTruthy();
+    const scanId = await screen.findByText('Scan #41');
+    expect(scanId.parentElement?.textContent).toBe('Scan #41·A1B2C3·Test Market·current_quote_stale');
     expect(screen.getByText('Current executable quote is stale')).toBeTruthy();
-    expect(screen.getByText('current_quote_stale')).toBeTruthy();
+    expect(screen.getAllByText('current_quote_stale')).toHaveLength(2);
+    expect(screen.getByText('A1B2C3')).toBeTruthy();
+    expect(screen.getAllByText('Test Market')).toHaveLength(2);
+    expect(scanId.closest('button')?.getAttribute('aria-label')).toContain('reason code current_quote_stale');
   });
 
   it('restores separate scan-run, market, and stage hierarchy while preserving audit fields', async () => {
@@ -83,6 +89,9 @@ describe('BotActionLogs qualified-only filter', () => {
         trades: [firstTrade],
         decisions: [{
           scanId: 41,
+          logUuid: 'A1B2C3',
+          marketId: 'market-41',
+          marketName: 'Test Market',
           source: 'scan_api',
           state: 'revalidation_rejected',
           reasonCode: 'current_quote_stale',

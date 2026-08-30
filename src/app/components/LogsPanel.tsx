@@ -30,6 +30,7 @@ import { SCAN_STATUS_HEADER_EXPLANATION, scanStatusPresentation, type ScanStatus
 
 interface LogEntry {
   id: number;
+  log_uuid: string;
   market_id: string;
   best_roi_pct: number | null;
   best_profit: number | null;
@@ -872,6 +873,9 @@ export default function LogsPanel() {
               <thead>
                 <tr className="border-b border-[#182533] bg-[#0E1621]">
                   <th className="sticky left-0 z-20 bg-[#0E1621] px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
+                    Logs UUID
+                  </th>
+                  <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#8A9BA8] uppercase tracking-wide whitespace-nowrap">
                     Category
                   </th>
                   <th
@@ -971,13 +975,13 @@ export default function LogsPanel() {
               </thead>
               <tbody>
                 {visibleWindow.start > 0 && (
-                  <tr aria-hidden="true"><td colSpan={19} style={{ height: visibleWindow.start * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
+                  <tr aria-hidden="true"><td colSpan={20} style={{ height: visibleWindow.start * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
                 )}
                 {visibleWindow.rows.map((log, i) => (
                   <LogRow key={log.id ?? i} log={log} currentRoi={currentRoiById.get(log.id) ?? { status: 'loading' }} expanded={expandedId === log.id} onToggle={() => setExpandedId(expandedId === log.id ? null : log.id)} fmtPct={fmtPct} fmtUsd={fmtUsd} fmtTime={fmtTime} savedMarkets={savedMarkets} />
                 ))}
                 {visibleWindow.end < sorted.length && (
-                  <tr aria-hidden="true"><td colSpan={19} style={{ height: (sorted.length - visibleWindow.end) * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
+                  <tr aria-hidden="true"><td colSpan={20} style={{ height: (sorted.length - visibleWindow.end) * LOG_ROW_HEIGHT, padding: 0 }} /></tr>
                 )}
               </tbody>
             </table>
@@ -1274,7 +1278,10 @@ function LogRow({
         className={`border-b border-[#182533] hover:bg-[#0E1621]/50 cursor-pointer transition-colors ${expanded ? "bg-[#0E1621]/50" : ""}`}
         onClick={onToggle}
       >
-        <td className="sticky left-0 z-10 bg-[#17212B] px-3 py-2 text-xs text-[#8A9BA8] whitespace-nowrap truncate max-w-[120px]" title={log.category || undefined}>
+        <td className="sticky left-0 z-10 bg-[#17212B] px-3 py-2 font-mono text-xs font-semibold tracking-wider text-[#FFFFFF] whitespace-nowrap" data-testid={`log-uuid-${log.id}`}>
+          {log.log_uuid}
+        </td>
+        <td className="px-3 py-2 text-xs text-[#8A9BA8] whitespace-nowrap truncate max-w-[120px]" title={log.category || undefined}>
           {log.category || "\u2014"}
         </td>
         <td className="px-3 py-2 text-xs text-[#8A9BA8] whitespace-nowrap font-mono">{fmtTime(log.scanned_at)}</td>
@@ -1365,7 +1372,11 @@ function LogRow({
       </tr>
       {expanded && (
         <tr className="border-b border-[#182533] bg-[#0E1621]">
-          <td colSpan={19} className="px-4 py-3">
+          <td colSpan={20} className="px-4 py-3">
+            <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-[#8A9BA8]">
+              <span>Logs UUID: <strong className="font-mono tracking-wider text-[#FFFFFF]">{log.log_uuid}</strong></span>
+              <span>Market: <span className="text-[#D5DEE5]">{marketName ?? log.market_id}</span></span>
+            </div>
             {detailState === 'loading' || detailState === 'idle' ? (
               <div className="text-xs text-[#8A9BA8]" role="status">Loading scan details…</div>
             ) : detailState === 'error' ? (

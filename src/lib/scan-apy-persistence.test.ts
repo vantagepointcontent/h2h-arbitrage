@@ -108,6 +108,10 @@ describe('scan-time APY persistence', () => {
     const missing = rows.find((row) => row.market_id === `${prefix}-legacy-missing`);
     const immutable = rows.find((row) => row.market_id === `${prefix}-immutable`);
 
+    const legacyUuids = [valid, missing, immutable].map((row) => String(row?.log_uuid));
+    expect(legacyUuids).toHaveLength(new Set(legacyUuids).size);
+    for (const logUuid of legacyUuids) expect(logUuid).toMatch(/^(?=.*[A-Z])(?=.*\d)[A-Z0-9]{6}$/);
+
     expect(Number(valid!.apy_pct) / ((1.025 ** 730 - 1) * 100)).toBeCloseTo(1, 12);
     expect(valid!.days_to_expiry).toBe(0.5);
     expect(valid!.expiry_at).toBe('2026-08-13T00:00:00.000Z');

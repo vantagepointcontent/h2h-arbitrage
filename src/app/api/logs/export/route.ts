@@ -14,6 +14,7 @@ import { scanStatusPresentation } from '@/lib/scan-status';
 const CURRENT_ROI_BATCH_SIZE = 100;
 
 const headers = [
+  'Logs UUID',
   'Scan Time',
   'Market Name',
   'Category',
@@ -231,6 +232,7 @@ export async function GET(request: NextRequest) {
               if (envelopeSuffixCache.size < 1_000) envelopeSuffixCache.set(envelopeCacheKey, envelopeSuffix);
             }
             const line = [
+              r.log_uuid,
               r.scanned_at,
               r.market_title ?? nameMap.get(r.market_id) ?? '',
               categoryMap.get(r.market_id) ?? '',

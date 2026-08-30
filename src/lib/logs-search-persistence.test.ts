@@ -13,6 +13,54 @@ afterEach(() => {
 });
 
 describe('Logs FTS persistence', () => {
+  it('backfills, searches, and permanently enforces unique mixed six-character Logs UUIDs', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-uuid-'));
+    const databasePath = path.join(tempDir, 'logs.db');
+    process.env.H2H_SQLITE_PATH = databasePath;
+    vi.resetModules();
+    let persistence = await import('./persistence');
+    const first = await persistence.saveScanResult('uuid-market-1', {
+      bestRoiPct: 0, bestProfit: 0, strategy: 'No arb', outcomeCount: 0,
+      matchedCount: 1, kalshiCount: 1, pmCount: 1, positiveArbCount: 0,
+      scannedAt: '2026-08-30T12:00:00.000Z', marketTitle: 'Shared market title',
+    });
+    const second = await persistence.saveScanResult('uuid-market-2', {
+      bestRoiPct: 0, bestProfit: 0, strategy: 'No arb', outcomeCount: 0,
+      matchedCount: 1, kalshiCount: 1, pmCount: 1, positiveArbCount: 0,
+      scannedAt: '2026-08-30T12:01:00.000Z', marketTitle: 'Shared market title',
+    });
+    const initial = await persistence.queryScanHistory({ limit: 10 });
+    const firstRow = initial.rows.find((row) => row.id === first.id)!;
+    const secondRow = initial.rows.find((row) => row.id === second.id)!;
+    expect(firstRow.log_uuid).toMatch(/^(?=.*[A-Z])(?=.*\d)[A-Z0-9]{6}$/);
+    expect(secondRow.log_uuid).toMatch(/^(?=.*[A-Z])(?=.*\d)[A-Z0-9]{6}$/);
+    expect(firstRow.log_uuid).not.toBe(secondRow.log_uuid);
+    await expect(persistence.queryScanHistory({ search: String(firstRow.log_uuid).toLowerCase(), limit: 10 }))
+      .resolves.toMatchObject({ total: 1, rows: [expect.objectContaining({ id: first.id, log_uuid: firstRow.log_uuid })] });
+    expect(await persistence.getScanAuditReferences([first.id, second.id])).toEqual(new Map([
+      [first.id, { scanId: first.id, logUuid: firstRow.log_uuid, marketId: 'uuid-market-1', marketName: 'Shared market title' }],
+      [second.id, { scanId: second.id, logUuid: secondRow.log_uuid, marketId: 'uuid-market-2', marketName: 'Shared market title' }],
+    ]));
+
+    const client = createClient({ url: `file:${databasePath}` });
+    await expect(client.execute({ sql: 'UPDATE scan_results SET log_uuid = ? WHERE id = ?', args: ['Z9Y8X7', first.id] }))
+      .rejects.toThrow('Logs UUID is immutable');
+    await expect(client.execute({
+      sql: `INSERT INTO scan_results (log_uuid, market_id, scanned_at) VALUES (?, ?, ?)`,
+      args: [secondRow.log_uuid as string, 'duplicate-uuid', '2026-08-30T12:02:00.000Z'],
+    })).rejects.toThrow(/UNIQUE constraint failed/);
+    await expect(client.execute({
+      sql: `INSERT INTO scan_results (log_uuid, market_id, scanned_at) VALUES (?, ?, ?)`,
+      args: ['123456', 'invalid-uuid', '2026-08-30T12:03:00.000Z'],
+    })).rejects.toThrow('invalid Logs UUID');
+    client.close();
+
+    vi.resetModules();
+    persistence = await import('./persistence');
+    expect((await persistence.queryScanHistory({ search: String(firstRow.log_uuid), limit: 10 })).rows[0].log_uuid)
+      .toBe(firstRow.log_uuid);
+  });
+
   it('reconciles summary totals with every canonical row in the same filtered result set', async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logs-summary-reconciliation-'));
     process.env.H2H_SQLITE_PATH = path.join(tempDir, 'logs.db');

@@ -33,6 +33,9 @@ interface TradeChain {
 
 interface ScanDecision {
   scanId: number;
+  logUuid: string | null;
+  marketId: string | null;
+  marketName: string | null;
   source?: string;
   state: string;
   reasonCode: string;
@@ -305,17 +308,33 @@ export default function BotActionLogs({ selectionMethod }: { selectionMethod?: S
               const decisionElapsed = elapsed(decision.receivedAt, decision.updatedAt);
               return (
                 <article key={decision.scanId} className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] shadow-sm">
-                  <button type="button" aria-expanded={open} aria-controls={`scan-details-${decision.scanId}`} aria-label={`${open ? 'Collapse' : 'Expand'} scan ${decision.scanId}, ${titleCase(decision.state)}, ${decision.reason}`} onClick={() => toggleScan(decision.scanId)} className="grid min-h-14 w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-2 px-3 py-2 text-left hover:bg-[var(--surface-workspace)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--status-info)] sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+                  <button type="button" aria-expanded={open} aria-controls={`scan-details-${decision.scanId}`} aria-label={`${open ? 'Collapse' : 'Expand'} scan ${decision.scanId}, Logs UUID ${decision.logUuid ?? 'unavailable'}, market ${decision.marketName ?? 'unavailable'}, reason code ${decision.reasonCode}, ${titleCase(decision.state)}, ${decision.reason}`} onClick={() => toggleScan(decision.scanId)} className="grid min-h-14 w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-2 px-3 py-2 text-left hover:bg-[var(--surface-workspace)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--status-info)] sm:grid-cols-[auto_minmax(0,1fr)_auto]">
                     {open ? <ChevronDown className="h-4 w-4 text-[var(--text-secondary)]" /> : <ChevronRight className="h-4 w-4 text-[var(--text-secondary)]" />}
                     <span className="min-w-0">
-                      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"><strong className="text-xs text-[var(--text-primary)]">Scan #{decision.scanId}</strong><span className="font-mono text-[10px] text-[var(--text-secondary)]">{decision.reasonCode}</span></span>
+                      <span className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--text-primary)]">
+                        <strong className="shrink-0">Scan #{decision.scanId}</strong>
+                        <span aria-hidden="true" className="text-[var(--text-secondary)]">·</span>
+                        <span className="shrink-0 font-mono font-semibold tracking-wider">{decision.logUuid ?? '—'}</span>
+                        <span aria-hidden="true" className="hidden text-[var(--text-secondary)] sm:inline">·</span>
+                        <span className="hidden min-w-0 truncate sm:inline" title={decision.marketName ?? undefined}>{decision.marketName ?? decision.marketId ?? 'Unknown market'}</span>
+                        <span aria-hidden="true" className="hidden shrink-0 text-[var(--text-secondary)] sm:inline">·</span>
+                        <span className="hidden shrink-0 font-mono text-[10px] text-[var(--text-secondary)] sm:inline">{decision.reasonCode}</span>
+                      </span>
+                      <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] sm:hidden">
+                        <span className="min-w-0 truncate font-medium text-[var(--text-primary)]" title={decision.marketName ?? undefined}>{decision.marketName ?? decision.marketId ?? 'Unknown market'}</span>
+                        <span aria-hidden="true" className="shrink-0 text-[var(--text-secondary)]">·</span>
+                        <span className="shrink-0 font-mono text-[10px] text-[var(--text-secondary)]">{decision.reasonCode}</span>
+                      </span>
                       <span className="mt-0.5 block truncate text-[11px] text-[var(--text-secondary)]">{decision.reason}</span>
+                      <span className="mt-1 flex flex-wrap items-center gap-2 sm:hidden"><StatusBadge status={visualStatus} label={titleCase(decision.state)} /><span className="whitespace-nowrap text-[10px] tabular-nums text-[var(--text-secondary)]">{formatDateTime(decision.updatedAt)}{decisionElapsed ? ` · ${decisionElapsed}` : ''}</span></span>
                     </span>
-                    <span className="col-start-2 flex flex-wrap items-center gap-2 sm:col-start-3 sm:row-start-1 sm:justify-end"><StatusBadge status={visualStatus} label={titleCase(decision.state)} /><span className="whitespace-nowrap text-[10px] tabular-nums text-[var(--text-secondary)]">{formatDateTime(decision.updatedAt)}{decisionElapsed ? ` · ${decisionElapsed}` : ''}</span></span>
+                    <span className="hidden items-center gap-2 sm:col-start-3 sm:row-start-1 sm:flex sm:justify-end"><StatusBadge status={visualStatus} label={titleCase(decision.state)} /><span className="whitespace-nowrap text-[10px] tabular-nums text-[var(--text-secondary)]">{formatDateTime(decision.updatedAt)}{decisionElapsed ? ` · ${decisionElapsed}` : ''}</span></span>
                   </button>
                   {open && (
                     <div id={`scan-details-${decision.scanId}`} data-testid={`scan-details-${decision.scanId}`} className="border-t border-[var(--border-subtle)] bg-[var(--surface-workspace)]/35 p-3 sm:ml-8 sm:p-4">
                       <div className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                        <div><div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Logs UUID</div><div className="mt-1 font-mono font-semibold tracking-wider text-[var(--text-primary)]">{decision.logUuid ?? '—'}</div></div>
+                        <div><div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Market</div><div className="mt-1 text-[var(--text-primary)]">{decision.marketName ?? decision.marketId ?? '—'}</div></div>
                         <div><div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Source</div><div className="mt-1 font-mono text-[var(--text-primary)]">{decision.source ?? '—'}</div></div>
                         <div><div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Received</div><div className="mt-1 tabular-nums text-[var(--text-primary)]">{formatDateTime(decision.receivedAt)}</div></div>
                         <div><div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Attempts</div><div className="mt-1 text-[var(--text-primary)]">{decision.attempts ?? 0} {(decision.attempts ?? 0) === 1 ? 'attempt' : 'attempts'}</div></div>
