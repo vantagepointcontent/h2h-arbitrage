@@ -34,6 +34,7 @@ import { selectMatchedClobConditionIds } from '@/lib/scan-clob-selection';
 import { withSqliteBusyRetry } from '@/lib/sqlite-write-retry';
 import { persistPlatformPriceSnapshots, snapshotInputsFromOutcomes } from '@/lib/current-price-snapshots';
 import { resolveCanonicalMarketExpiry } from '@/lib/canonical-market-expiry';
+import { venuePriceFreshnessFromScan } from '@/app/lib/venue-price-freshness';
 import {
   acquireSavedMarketScanLock,
   releaseSavedMarketScanLock,
@@ -465,6 +466,16 @@ export async function executeFullScan(request: NextRequest) {
       scanObservedAt,
       expiryDate,
     );
+    const newestVenueObservation = (platform: 'kalshi' | 'polymarket'): string => {
+      if (platform === 'kalshi') return scanObservedAt;
+      const newest = withArbitrage
+        .map((outcome) => outcome.polymarket?.quoteObservedAt)
+        .filter((observedAt): observedAt is string => Boolean(observedAt) && Number.isFinite(Date.parse(observedAt!)))
+        .sort((left, right) => Date.parse(right) - Date.parse(left))[0];
+      return newest ?? scanObservedAt;
+    };
+    const kalshiPriceObservedAt = newestVenueObservation('kalshi');
+    const polymarketPriceObservedAt = newestVenueObservation('polymarket');
 
     // BUG-05b2: Smart expiry — compute priceResolved once, reuse for DB save + response.
     // In-play markets (trading at 68/32 etc) are NOT expired even if closeTime passed.
@@ -562,6 +573,14 @@ export async function executeFullScan(request: NextRequest) {
         const bestNetArb = positiveArbs.length > 0
           ? positiveArbs.reduce((best, o) => o.arbitrage!.roiPct > best.arbitrage!.roiPct ? o : best)
           : null;
+        const venuePriceFreshness = venuePriceFreshnessFromScan({
+          _kalshiFetchedAt: kalshiPriceObservedAt,
+          _pmFetchedAt: polymarketPriceObservedAt,
+          platformDiagnostics: {
+            kalshi: { status: 'fresh', count: kalshiCount },
+            polymarket: { status: 'fresh', count: pmCount },
+          },
+        }, 'saved-market-full-scan');
         const scanResult = {
           bestRoiPct: bestNetArb ? bestNetArb.arbitrage!.roiPct : 0,
           bestProfit: bestNetArb ? bestNetArb.arbitrage!.expectedProfit : 0,
@@ -575,6 +594,9 @@ export async function executeFullScan(request: NextRequest) {
           kalshiCount,
           pmCount,
           scannedAt: scanObservedAt,
+          venuePriceFreshness,
+          _kalshiFetchedAt: kalshiPriceObservedAt,
+          _pmFetchedAt: polymarketPriceObservedAt,
           publicationGeneration: publicationGeneration ?? undefined,
           category: scanCategory,
           // UI-013: PM often keeps endDate far in the future even after a market
@@ -671,7 +693,7 @@ export async function executeFullScan(request: NextRequest) {
         try {
           await withSqliteBusyRetry(() => persistPlatformPriceSnapshots(snapshotInputsFromOutcomes(
             withArbitrage,
-            { kalshi: scanObservedAt, polymarket: scanObservedAt },
+            { kalshi: kalshiPriceObservedAt, polymarket: polymarketPriceObservedAt },
             'saved-market-full-scan',
             {
               attemptedAt: scanAttemptedAt,
@@ -814,8 +836,16 @@ export async function executeFullScan(request: NextRequest) {
       expired,
       priceResolved,
       _ts: Date.now(),
-      _kalshiFetchedAt: new Date().toISOString(),
-      _pmFetchedAt: new Date().toISOString(),
+      _kalshiFetchedAt: kalshiPriceObservedAt,
+      _pmFetchedAt: polymarketPriceObservedAt,
+      venuePriceFreshness: venuePriceFreshnessFromScan({
+        _kalshiFetchedAt: kalshiPriceObservedAt,
+        _pmFetchedAt: polymarketPriceObservedAt,
+        platformDiagnostics: {
+          kalshi: { status: 'fresh', count: kalshiCount },
+          polymarket: { status: 'fresh', count: pmCount },
+        },
+      }, 'saved-market-full-scan'),
       fullScanPersisted,
       publicationGeneration: fullScanPersisted ? publicationGeneration : null,
     }, {

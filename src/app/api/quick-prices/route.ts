@@ -8,6 +8,7 @@ import { correlationId, CORRELATION_ID_HEADER } from '@/lib/correlation';
 import { reconcileSavedMarketLiveSummary, reserveSavedMarketPublication } from '@/lib/persistence';
 import { persistPlatformPriceSnapshots, snapshotInputsFromOutcomes } from '@/lib/current-price-snapshots';
 import { QuickPricesCoordinatorError, quickPricesCoordinator } from '@/lib/quick-prices-coordinator';
+import { venuePriceFreshnessFromScan } from '@/app/lib/venue-price-freshness';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const requestCorrelationId = request.headers.get(CORRELATION_ID_HEADER) || correlationId.generate();
@@ -79,8 +80,13 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
           matchStatus: 'refreshing',
           matchError: undefined,
           matchedPairs: undefined,
-          scannedAt: new Date().toISOString(),
+          scannedAt: taskAttemptedAt,
           publicationGeneration: taskPublicationGeneration,
+          refreshLifecycle: {
+            requestedAt: taskAttemptedAt,
+            structureFetchedAt: null,
+            completedAt: null,
+          },
         });
       } catch (error: unknown) {
         const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : null;
@@ -100,6 +106,12 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
             matchedPairs: undefined,
             scannedAt: new Date().toISOString(),
             publicationGeneration: taskPublicationGeneration,
+            refreshStatus: 'failed',
+            refreshLifecycle: {
+              requestedAt: taskAttemptedAt,
+              structureFetchedAt: null,
+              completedAt: new Date().toISOString(),
+            },
           }).catch(() => {});
         }
         throw scanError;
@@ -110,7 +122,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
       const freshPmConditions = new Set((result.pmRefresh?.outcomes ?? [])
         .filter((outcome) => outcome.status === 'refreshed')
         .map((outcome) => outcome.conditionId.toLowerCase()));
-      await persistPlatformPriceSnapshots(snapshotInputsFromOutcomes(result.outcomes ?? [], {
+      const snapshotInputs = snapshotInputsFromOutcomes(result.outcomes ?? [], {
         kalshi: result._kalshiFetchedAt,
         polymarket: result._pmFetchedAt,
       }, 'saved-market-quick-refresh', {
@@ -119,21 +131,57 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
         scope: marketId,
       }).filter((snapshot) =>
         freshPlatforms.has(snapshot.platform)
-        || (snapshot.platform === 'polymarket' && freshPmConditions.has(snapshot.marketId.toLowerCase()))));
+        || (snapshot.platform === 'polymarket' && freshPmConditions.has(snapshot.marketId.toLowerCase())));
+      await persistPlatformPriceSnapshots(snapshotInputs);
+      const newestPersistedObservation = (platform: 'kalshi' | 'polymarket'): string | null => {
+        const newest = snapshotInputs
+          .filter((snapshot) => snapshot.platform === platform && snapshot.priceMicrocents != null)
+          .map((snapshot) => snapshot.observedAt)
+          .filter((observedAt) => Number.isFinite(Date.parse(observedAt)))
+          .sort((left, right) => Date.parse(right) - Date.parse(left))[0];
+        return newest ?? null;
+      };
+      const venuePriceFreshness = venuePriceFreshnessFromScan({
+        ...result,
+        _kalshiFetchedAt: newestPersistedObservation('kalshi'),
+        _pmFetchedAt: newestPersistedObservation('polymarket'),
+      }, 'saved-market-quick-refresh');
       if (taskPublicationGeneration != null) {
         await reconcileSavedMarketLiveSummary(marketId!, {
           matchedCount: result.matchedCount,
           matchStatus: result.matchStatus,
           matchError: result.matchError,
           matchedPairs: result.matchedPairs,
-          scannedAt: result._pmFetchedAt,
+          // This timestamps the live refresh publication, not either venue's
+          // price. Per-venue price ages remain exclusively in
+          // venuePriceFreshness so a one-venue success cannot leak its clock
+          // into the failed venue after restart.
+          scannedAt: result.refreshLifecycle?.completedAt
+            ?? result._priceDataObservedAt
+            ?? result._pmFetchedAt
+            ?? result._kalshiFetchedAt
+            ?? taskAttemptedAt,
           publicationGeneration: taskPublicationGeneration,
+          ...(result.refreshStatus !== undefined ? { refreshStatus: result.refreshStatus } : {}),
+          ...(result.refreshLifecycle !== undefined ? { refreshLifecycle: result.refreshLifecycle } : {}),
+          ...(result.platformDiagnostics !== undefined ? { platformDiagnostics: result.platformDiagnostics } : {}),
+          ...(result._kalshiFetchedAt !== undefined ? { _kalshiFetchedAt: result._kalshiFetchedAt } : {}),
+          ...(result._pmFetchedAt !== undefined ? { _pmFetchedAt: result._pmFetchedAt } : {}),
+          ...(result._priceDataObservedAt !== undefined ? { _priceDataObservedAt: result._priceDataObservedAt } : {}),
+          venuePriceFreshness,
         }).catch((error: unknown) => {
           taskPersistenceWarning = 'Saved-market status persistence is temporarily unavailable; live linked-event prices were still refreshed.';
           console.error('[api/quick-prices] result persistence failed', error);
         });
       }
-      return { result, persistenceWarning: taskPersistenceWarning, publicationGeneration: taskPublicationGeneration };
+      return {
+        result: {
+          ...result,
+          venuePriceFreshness,
+        },
+        persistenceWarning: taskPersistenceWarning,
+        publicationGeneration: taskPublicationGeneration,
+      };
     });
 
     publicationGeneration = coordinated.value.publicationGeneration ?? null;

@@ -162,3 +162,58 @@ describe('OutcomeTableBody outcome-contingent APY', () => {
     expect(unavailable.closest('td')?.className).not.toContain('text-[var(--status-positive)]');
   });
 });
+
+describe('OutcomeTableBody ROI sorting', () => {
+  const pricedOutcome = (artist: string, roiPct: number) => ({
+    artist,
+    kalshi: { ticker: `K-${artist}`, yesAsk: 0.45, noAsk: 0.55 },
+    polymarket: { conditionId: `P-${artist}`, yesPrice: 0.46, noPrice: 0.54 },
+    arbitrage: { expectedProfit: roiPct / 100, roiPct, strategy: roiPct > 0 ? 'Buy YES Kalshi + NO PM' : 'No arb' },
+  });
+  const rowNames = () => screen.getAllByTestId('outcome-name-cell').map((cell) => cell.textContent?.replace('▶', ''));
+  const props = {
+    expandedArtist: null,
+    setExpandedArtist: () => {},
+    formatCurrency: (value: number) => `$${value.toFixed(2)}`,
+    formatPercent: (value: number) => `${value.toFixed(2)}%`,
+  };
+
+  it('defaults to full-precision ROI descending across positive, zero, and negative values', () => {
+    render(createElement('table', null, createElement(OutcomeTableBody, {
+      ...props,
+      outcomes: [
+        pricedOutcome('Rounded lower', 1.0041),
+        pricedOutcome('Negative', -0.5),
+        pricedOutcome('Rounded higher', 1.0049),
+        pricedOutcome('Zero', 0),
+      ],
+    })));
+
+    expect(rowNames()).toEqual(['Rounded higher', 'Rounded lower', 'Zero', 'Negative']);
+  });
+
+  it.each(['asc', 'desc'] as const)('keeps unavailable ROI rows last when sorting %s', (sortDir) => {
+    render(createElement('table', null, createElement(OutcomeTableBody, {
+      ...props,
+      outcomes: [
+        { ...pricedOutcome('Unavailable', 999), polymarket: null },
+        pricedOutcome('Positive', 2),
+        pricedOutcome('Negative', -2),
+      ],
+      sortField: 'roi',
+      sortDir,
+    })));
+
+    expect(rowNames().at(-1)).toBe('Unavailable');
+  });
+
+  it('uses deterministic market identity tie-breakers when equal-ROI input order changes on refresh', () => {
+    const alpha = pricedOutcome('Alpha', 1.23456);
+    const beta = pricedOutcome('Beta', 1.23456);
+    const { rerender } = render(createElement('table', null, createElement(OutcomeTableBody, { ...props, outcomes: [beta, alpha] })));
+    expect(rowNames()).toEqual(['Alpha', 'Beta']);
+
+    rerender(createElement('table', null, createElement(OutcomeTableBody, { ...props, outcomes: [alpha, beta] })));
+    expect(rowNames()).toEqual(['Alpha', 'Beta']);
+  });
+});

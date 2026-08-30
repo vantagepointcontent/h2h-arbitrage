@@ -80,6 +80,23 @@ interface OutcomeTableBodyProps {
   scanTime?: string;
 }
 
+function hasCurrentPrices(outcome: Outcome): boolean {
+  return !outcome.kalshiStale
+    && !outcome.polymarketStale
+    && outcome.kalshi?.yesAsk != null
+    && outcome.polymarket?.yesPrice != null;
+}
+
+function outcomeIdentity(outcome: Outcome): string {
+  return [outcome.artist, outcome.kalshi?.ticker ?? '', outcome.polymarket?.conditionId ?? ''].join('\u0000');
+}
+
+function compareOutcomeIdentity(a: Outcome, b: Outcome): number {
+  const aIdentity = outcomeIdentity(a);
+  const bIdentity = outcomeIdentity(b);
+  return aIdentity < bIdentity ? -1 : aIdentity > bIdentity ? 1 : 0;
+}
+
 /** Format days-to-expiry as human-readable string:
  *  >1 day → "X days", <1 day → "X hours" or "X min", expired → "Expired" */
 function formatTimeToExpiry(days?: number | null): string {
@@ -111,8 +128,8 @@ function OutcomeTableBodyInner({
   filterMode,
   marketTitle,
   marketId,
-  sortField,
-  sortDir,
+  sortField = 'roi',
+  sortDir = 'desc',
   marketExpiryDate,
   scanTime: scanTimeProp,
 }: OutcomeTableBodyProps) {
@@ -238,18 +255,29 @@ function OutcomeTableBodyInner({
       : filterMode === "matched"
         ? safeOutcomes.filter(o => o.kalshi && o.polymarket)
         : safeOutcomes;
-    if (sortField) {
-      const mul = sortDir === "asc" ? 1 : -1;
-      arr = [...arr].sort((a, b) => {
-        // UI-08: quoted cross-platform price difference, signed PM YES − Kalshi YES.
-        // Positive values rank first; fee-aware ROI remains the profitability signal.
-        const spread = (outcome: Outcome) => ((outcome.polymarket?.yesPrice ?? 0) - (outcome.kalshi?.yesAsk ?? 0)) * 100;
-        const sortableApy = (outcome: Outcome) => outcome.arbitrage.apyPct ?? Number.NEGATIVE_INFINITY;
-        const va = sortField === "roi" ? a.arbitrage.roiPct : sortField === "apy" ? sortableApy(a) : sortField === "profit" ? a.arbitrage.expectedProfit : spread(a);
-        const vb = sortField === "roi" ? b.arbitrage.roiPct : sortField === "apy" ? sortableApy(b) : sortField === "profit" ? b.arbitrage.expectedProfit : spread(b);
-        return mul * (va - vb);
-      });
-    }
+    const mul = sortDir === "asc" ? 1 : -1;
+    arr = [...arr].sort((a, b) => {
+      if (sortField === 'roi') {
+        const va = hasCurrentPrices(a) && Number.isFinite(a.arbitrage.roiPct) ? a.arbitrage.roiPct : null;
+        const vb = hasCurrentPrices(b) && Number.isFinite(b.arbitrage.roiPct) ? b.arbitrage.roiPct : null;
+        // Missing ROI is not zero and always remains below numeric values.
+        if (va == null || vb == null) {
+          if (va == null && vb == null) return compareOutcomeIdentity(a, b);
+          return va == null ? 1 : -1;
+        }
+        if (va !== vb) return mul * (va - vb);
+        return compareOutcomeIdentity(a, b);
+      }
+
+      // UI-08: quoted cross-platform price difference, signed PM YES − Kalshi YES.
+      // Positive values rank first; fee-aware ROI remains the profitability signal.
+      const spread = (outcome: Outcome) => ((outcome.polymarket?.yesPrice ?? 0) - (outcome.kalshi?.yesAsk ?? 0)) * 100;
+      const sortableApy = (outcome: Outcome) => outcome.arbitrage.apyPct ?? Number.NEGATIVE_INFINITY;
+      const va = sortField === "apy" ? sortableApy(a) : sortField === "profit" ? a.arbitrage.expectedProfit : spread(a);
+      const vb = sortField === "apy" ? sortableApy(b) : sortField === "profit" ? b.arbitrage.expectedProfit : spread(b);
+      const valueOrder = mul * (va - vb);
+      return valueOrder || compareOutcomeIdentity(a, b);
+    });
     return arr;
   }, [safeOutcomes, filterMode, sortField, sortDir]);
 
@@ -271,13 +299,14 @@ function OutcomeTableBodyInner({
           </td>
         </tr>
       )}
-      {displayOutcomes.map((o, idx) => {
+      {displayOutcomes.map((o) => {
         const k = o.kalshi;
         const p = o.polymarket;
         const stale = o.kalshiStale || o.polymarketStale;
-        const hasPrices = !!(!stale && k && p && k.yesAsk != null && p.yesPrice != null);
+        const hasPrices = hasCurrentPrices(o);
+        const hasRoi = hasPrices && Number.isFinite(o.arbitrage.roiPct);
         const profit = hasPrices ? o.arbitrage.expectedProfit : 0;
-        const roiColor = !hasPrices ? "text-[var(--text-secondary)]" : o.arbitrage.roiPct > 0 ? "text-[var(--status-positive)]" : o.arbitrage.roiPct < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]";
+        const roiColor = !hasRoi ? "text-[var(--text-secondary)]" : o.arbitrage.roiPct > 0 ? "text-[var(--status-positive)]" : o.arbitrage.roiPct < 0 ? "text-[var(--status-negative)]" : "text-[var(--text-secondary)]";
         // Canonical APY alone controls compact-row tone; venue APYs are detail-only provenance.
         const hasPositiveApy = o.arbitrage.apyPct != null && o.arbitrage.apyPct > 0;
         const apyColor = !hasPrices || o.arbitrage.roiPct <= 0 || !hasPositiveApy ? "text-[var(--text-secondary)]" : "text-[var(--status-positive)]";
@@ -289,7 +318,7 @@ function OutcomeTableBodyInner({
         const isBalanced = totalStake > 0 && stakeRatio <= 1.25;
 
         return (
-          <React.Fragment key={`${idx}-${o.artist}`}>
+          <React.Fragment key={outcomeIdentity(o)}>
             <tr
               className={`hover:bg-[var(--surface-hover)]/50 transition-colors cursor-pointer ${isExpanded ? "bg-[var(--surface-hover)]/30" : ""}`}
               onClick={() => setExpandedArtist(isExpanded ? null : o.artist)}
@@ -320,7 +349,7 @@ function OutcomeTableBodyInner({
                 {priceChanges?.get(o.artist) === "down" && <span className="ml-1 animate-pulse text-[var(--status-negative)]">▼</span>}
               </td>
               <td className="px-4 py-3 text-right text-[var(--text-secondary)]">{formatPrice(o.polymarket?.noPrice)}</td>
-              <td className={`px-4 py-3 text-right font-bold ${roiColor}`}>{hasPrices ? formatPercent(o.arbitrage.roiPct) : "—"}</td>
+              <td className={`px-4 py-3 text-right font-bold ${roiColor}`}>{hasRoi ? formatPercent(o.arbitrage.roiPct) : "—"}</td>
               <td className={`px-4 py-3 text-right font-medium ${apyColor}`}>
                 {hasPrices && o.arbitrage.apyPct != null ? (
                   <ApyValueTooltip apy={o.arbitrage.apyPct} roi={o.arbitrage.roiPct} daysToExpiry={o.arbitrage.daysToExpiry ?? null}>

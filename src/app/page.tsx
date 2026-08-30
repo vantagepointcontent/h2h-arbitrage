@@ -106,6 +106,7 @@ import {
   createQuickPricesRequestOwner, createSavedMarketsListRequestOwner, createSavedMarketHydrationOwner, restoreSavedMarketPopNavigation,
   mergeQuickPricesResult, mergeSavedMarketMatchRefresh, markSavedMarketMatchRefreshing,
   selectSavedMarketPriceCache, normalizeSavedMarketsList, mergeSavedMarketHydration, buildSavedMarketsListFailureState,
+  venuePriceFreshnessFromScan,
 } from "@/app/lib/page-shared";
 import type {
   ArbitrageInfo, UnifiedOutcome, UnmatchedKalshi, UnmatchedPolymarket,
@@ -114,6 +115,7 @@ import type {
 import type { SyncProgress } from "@/lib/catalog-progress";
 import { refreshSavedMarketPrices } from "@/app/actions/quick-prices";
 import { refreshSavedMarketsList } from "@/app/actions/saved-markets-list";
+import { outcomeTableSortScope, useOutcomeTableSort } from "@/app/hooks/useOutcomeTableSort";
 
 
 /* ── Swipe gesture hook (Home-only) ── */
@@ -515,9 +517,10 @@ export default function Home() {
               })),
               unmatchedKalshi: [],
               unmatchedPolymarket: [],
+              venuePriceFreshness: cached.venuePriceFreshness,
             };
             setResult(cachedResult);
-            setLastUpdated(new Date(cached.scannedAt));
+            setLastUpdated(cached.scannedAt ? new Date(cached.scannedAt) : null);
             setLastScanTimestamp(cached.scannedAt ?? null);
           }
           // Background refresh (silent) — skip for expired markets
@@ -1083,9 +1086,10 @@ export default function Home() {
         })),
         unmatchedKalshi: [],
         unmatchedPolymarket: [],
+        venuePriceFreshness: cached.venuePriceFreshness,
       };
       setResult(cachedResult);
-      setLastUpdated(new Date(cached.scannedAt));
+      setLastUpdated(cached.scannedAt ? new Date(cached.scannedAt) : null);
       setLastScanTimestamp(cached.scannedAt ?? null);
     } else {
       // Expired market: show empty result with clear state
@@ -1312,9 +1316,14 @@ export default function Home() {
   const [sidebarSort, setSidebarSort] = useState<"name" | "roi" | "expiry" | "apy" | "scanned">("apy");
   const [sidebarSortDir, setSidebarSortDir] = useState<"asc" | "desc">("desc");
 
-  // Outcome table sort — default largest quoted cross-platform spread first
-  const [outcomeSort, setOutcomeSort] = useState<"roi" | "apy" | "profit" | "spread">("spread");
-  const [outcomeSortDir, setOutcomeSortDir] = useState<"asc" | "desc">("desc");
+  // Outcome sort is scoped to the selected market so switching markets cannot
+  // briefly reuse a manual sort from the previous market.
+  const {
+    field: outcomeSort,
+    direction: outcomeSortDir,
+    toggle: toggleOutcomeSort,
+    reset: resetOutcomeSort,
+  } = useOutcomeTableSort(outcomeTableSortScope(activeMarketId, kalshiUrl, pmUrl));
 
   // Load saved markets on mount
   useEffect(() => { loadSavedMarkets(); }, []);
@@ -1649,17 +1658,6 @@ export default function Home() {
       const textFields: ("name" | "roi" | "expiry" | "apy" | "scanned")[] = ["name"];
       if (textFields.includes(field)) setSidebarSortDir("asc");
       else setSidebarSortDir("desc");
-    }
-  };
-
-  // Toggle outcome table sort
-  const toggleOutcomeSort = (field: "roi" | "apy" | "profit" | "spread") => {
-    if (outcomeSort === field) {
-      setOutcomeSortDir(d => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setOutcomeSort(field);
-      // All outcome-table numeric columns default to desc (high→low)
-      setOutcomeSortDir("desc");
     }
   };
 
@@ -2004,8 +2002,13 @@ export default function Home() {
                       return <MarketWorkspaceHeader
                         market={{ ...market, eventTitle: result.eventTitle, expiryDate: market.expiryDate ?? undefined }}
                         outcomes={(result.outcomes ?? []) as Array<Record<string, any>>}
-                        scannedAt={lastScanTimestamp ?? lastUpdated?.toISOString()}
-                        refreshStatus={result.refreshStatus}
+                        lifecycle={market.lifecycle}
+                        priceFreshness={result.venuePriceFreshness ?? venuePriceFreshnessFromScan({
+                          platformDiagnostics: {
+                            kalshi: { status: 'empty', count: 0, reason: 'Displayed persisted Kalshi prices have no trustworthy per-venue timestamp' },
+                            polymarket: { status: 'empty', count: 0, reason: 'Displayed persisted Polymarket prices have no trustworthy per-venue timestamp' },
+                          },
+                        }, 'saved-market-full-scan')}
                         loading={loading}
                         refreshing={bgRefreshing}
                         favorite={favoriteIds.has(activeMarketId)}
@@ -2177,6 +2180,14 @@ export default function Home() {
                               {mode === "all" ? "Show All" : mode === "matched" ? "Matched Only" : "Arb Only"}
                             </button>
                           ))}
+                          <button
+                            type="button"
+                            onClick={resetOutcomeSort}
+                            disabled={outcomeSort === "roi" && outcomeSortDir === "desc"}
+                            className="ml-auto px-2 py-1 rounded text-[10px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-default"
+                          >
+                            Reset sort
+                          </button>
                         </div>
                         <table className="w-full min-w-[1100px] text-sm">
                           <thead className="bg-[var(--surface-panel)] border-b border-[var(--border-subtle)]">
@@ -2210,7 +2221,7 @@ export default function Home() {
                                   No <HeaderInfo text="Polymarket No price — current best ask for a No share on Polymarket. Lower = cheaper to buy No." />
                                 </span>
                               </th>
-                              <th onClick={() => toggleOutcomeSort("roi")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors">
+                              <th aria-sort={outcomeSort === "roi" ? (outcomeSortDir === "asc" ? "ascending" : "descending") : "none"} onClick={() => toggleOutcomeSort("roi")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors">
                                 <span className="inline-flex items-center gap-1 flex-row-reverse">
                                   ROI <HeaderInfo text="Return on Investment — net profit as a percentage of total stake, after Kalshi and Polymarket trading fees.\nExample: $2 profit on $100 stake = 2% ROI." />
                                   <span className={`text-[8px] transition-opacity ${outcomeSort === "roi" ? "opacity-100 text-[var(--status-positive)]" : "opacity-0"}`}>
@@ -2218,7 +2229,7 @@ export default function Home() {
                                   </span>
                                 </span>
                               </th>
-                              <th onClick={() => toggleOutcomeSort("apy")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors">
+                              <th aria-sort={outcomeSort === "apy" ? (outcomeSortDir === "asc" ? "ascending" : "descending") : "none"} onClick={() => toggleOutcomeSort("apy")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors">
                                 <span className="inline-flex items-center gap-1 flex-row-reverse">
                                   APY <ApyHeaderInfo />
                                   <span className={`text-[8px] transition-opacity ${outcomeSort === "apy" ? "opacity-100 text-[var(--status-positive)]" : "opacity-0"}`}>
@@ -2226,7 +2237,7 @@ export default function Home() {
                                   </span>
                                 </span>
                               </th>
-                              <th onClick={() => toggleOutcomeSort("profit")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors">
+                              <th aria-sort={outcomeSort === "profit" ? (outcomeSortDir === "asc" ? "ascending" : "descending") : "none"} onClick={() => toggleOutcomeSort("profit")} className="text-right px-4 py-3.5 font-medium cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors">
                                 <span className="inline-flex items-center gap-1 flex-row-reverse">
                                   Profit <HeaderInfo text="Net profit in dollars for this arbitrage opportunity, after all trading fees on both Kalshi and Polymarket.\nThis is the absolute dollar amount you'd earn from the arb trade at the current prices and stake." />
                                   <span className={`text-[8px] transition-opacity ${outcomeSort === "profit" ? "opacity-100 text-[var(--status-positive)]" : "opacity-0"}`}>

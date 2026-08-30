@@ -25,6 +25,7 @@ import {
 } from './historical-scan-financials';
 import { recoverHistoricalScanFinancials } from './historical-scan-financial-recovery';
 import type { CanonicalMarketExpirySource } from './canonical-market-expiry';
+import type { VenuePriceFreshnessMap } from '../app/lib/venue-price-freshness';
 import {
   insertWithUniqueLogUuid,
   LOG_UUID_BACKFILL_CAPACITY,
@@ -1802,13 +1803,14 @@ export interface LastScanResult {
   publicationGeneration?: number;
   /** Quick-refresh lifecycle is persisted only on the fenced live channel. */
   refreshStatus?: 'complete' | 'partial' | 'failed';
-  refreshLifecycle?: { requestedAt: string; structureFetchedAt: string | null; completedAt: string };
+  refreshLifecycle?: { requestedAt: string; structureFetchedAt: string | null; completedAt: string | null };
   platformDiagnostics?: Record<'kalshi' | 'polymarket', {
     status: 'fresh' | 'partial' | 'empty' | 'failed'; count: number; reason?: string;
   }>;
   _kalshiFetchedAt?: string | null;
   _pmFetchedAt?: string | null;
   _priceDataObservedAt?: string | null;
+  venuePriceFreshness?: VenuePriceFreshnessMap;
   category?: string;        // market domain classification (e.g. politics, sports)
   pmClosed?: boolean;       // UI-013: PM reports market closed (endDate may still be future)
   priceResolved?: boolean;  // BUG-05b: at least one outcome at 99/1 extremes (true market resolution)
