@@ -62,7 +62,8 @@ vi.mock('@/lib/decoupled-pairs', () => ({
   getDecoupledPairs: vi.fn(async () => []),
   applyDecoupledPairs: (outcomes: unknown[]) => outcomes,
 }));
-vi.mock('@/lib/bot-scan-consumer', () => ({ persistAndConsumeBotScan: vi.fn(async () => undefined) }));
+vi.mock('@/lib/bot-scan-consumer', () => ({ persistAndConsumeBotScan: vi.fn(async () => ({ id: 1, decision: null, backlogProcessed: 0 })) }));
+import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
 vi.mock('@/lib/arb-lifecycle', () => ({ recordArbObservations: vi.fn(async () => ({ opened: 0, extended: 0, closed: 0 })) }));
 vi.mock('@/lib/telegram-alerts', () => ({ sendBatchAlerts: vi.fn(async () => undefined) }));
 vi.mock('@/lib/saved-market-scan-lock', () => ({
@@ -202,6 +203,56 @@ describe('BUG-182 real scan to persistence fencing', () => {
   it('preserves the seeded canonical revision when a selected CLOB book is empty', async () => {
     state.getClobPrices.mockResolvedValueOnce(null);
     await expectCanonicalRevisionPreserved('clob_book_empty');
+  });
+
+  it('counts positive but non-executable candidates in scan history and hands them to BotTrader', async () => {
+    const appendSpy = vi.spyOn(persistence, 'appendScanHistory');
+    state.calculateAllArbitrages.mockReturnValue([{
+      artist: 'Yes',
+      kalshi: { ticker: 'KXBUG182-YES', yesAsk: 0.4, noAsk: 0.6, yesAskDepth: 0, noAskDepth: 0 },
+      polymarket: { conditionId: 'pm-condition', yesPrice: 0.42, noPrice: 0.58, askDepth: 0, noAskDepth: 0 },
+      arbitrage: {
+        roiPct: 12.5, expectedProfit: 5, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',
+        kalshiStake: 50, pmStake: 50, executionStatus: 'non_executable',
+        executionBlocker: 'polymarket minimum order size 5 shares, requested 1',
+      },
+    }]);
+    const response = await executeFullScan(request());
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ fullScanPersisted: true, matchedCount: 1 });
+
+    // Logs/history must record the positive economic candidate even though it
+    // is not currently executable.
+    expect(appendSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ marketId, positiveArbCount: 1, bestRoiPct: 12.5, totalProfit: 5 }),
+    );
+
+    // BotTrader should receive the scan with positiveArbCount > 0 so it can
+    // evaluate the candidate and decide/skip with an explicit reason.
+    expect(persistAndConsumeBotScan).toHaveBeenCalledWith(
+      marketId,
+      expect.objectContaining({ positiveArbCount: 1, bestRoiPct: 12.5, strategy: 'Buy YES Kalshi + NO PM' }),
+      'scan_api',
+    );
+
+    // The saved-market canonical metrics must still be anchored to the prior
+    // executable observation, not promoted from the non_executable candidate.
+    const persisted = await persistence.getSavedMarketById(marketId);
+    expect(persisted).toMatchObject({
+      canonicalCurrentRoiPct: canonicalRoiPct,
+      canonicalCurrentProfit: canonicalProfit,
+      canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
+      canonicalApyUnavailableReason: null,
+      lastScanResult: {
+        matchStatus: 'confirmed_zero',
+        bestRoiPct: 12.5,
+        strategy: 'Buy YES Kalshi + NO PM',
+        matchError: expect.stringContaining('completed_with_non_executable_candidates'),
+      },
+    });
+    expect(persisted?.canonicalApyPct).toBeCloseTo(canonicalApyPct, 12);
+    appendSpy.mockRestore();
   });
 
   it('persists a completed no-arbitrage revision when every selected candidate is confirmed non-executable', async () => {

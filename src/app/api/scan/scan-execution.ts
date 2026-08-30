@@ -49,12 +49,12 @@ export async function executeFullScan(request: NextRequest) {
   let publicationGeneration: number | null = null;
   let fullScanPersisted = false;
   let scanLock: SavedMarketScanLock | null = null;
-  const failIncompleteScan = async (reasonCode: string, detail: string) => {
+  const failIncompleteScan = async (reasonCode: string, detail: string, options?: { retainedCanonical?: boolean }) => {
     const error = `${reasonCode}: ${detail} The prior completed scan remains canonical.`;
     if (savedMarketId && publicationGeneration != null) {
       await reconcileSavedMarketMatchSummary(savedMarketId, {
         matchedCount: 0,
-        matchStatus: 'unavailable',
+        matchStatus: options?.retainedCanonical ? 'confirmed_zero' : 'unavailable',
         matchError: error,
         matchedPairs: undefined,
         scannedAt: new Date().toISOString(),
@@ -491,35 +491,46 @@ export async function executeFullScan(request: NextRequest) {
       // PERF-P1: targeted single-market lookup instead of loading all markets
       const market = savedMarket;
       if (market) {
-        // Sanity guard: exclude suspicious phantoms (huge ROI + unknown depth)
-        // from stats, history, lifecycle, and alerts. They stay visible in the
-        // scan payload itself (flagged) so the UI can grey them out.
-        const positiveArbs = withArbitrage.filter(o => o.arbitrage
-          && auditArbClassification(o.arbitrage.strategy, o.arbitrage.arbType).valid
-          && o.arbitrage.arbType !== null
-          && o.arbitrage.executionStatus === 'executable'
-          && o.arbitrage.roiPct > 0
-          && o.arbitrage.expectedProfit > 0
-          && (o.arbitrage.kalshiStake + o.arbitrage.pmStake) > 0
-          && !o.arbitrage.suspicious);
+        // Sanity guard: exclude suspicious phantoms (huge ROI + unknown depth).
+        // They stay visible in the scan payload itself (flagged) so the UI can
+        // grey them out, but they must not drive history, lifecycle, or alerts.
         const suspiciousCount = withArbitrage.filter(o => o.arbitrage?.suspicious).length;
         if (suspiciousCount > 0) {
           console.log(`[scan] ${market.eventTitle}: ${suspiciousCount} suspicious arb(s) excluded from stats (ROI > threshold with unknown depth)`);
         }
+        // Economic positive candidates: the canonical "Positive Arb" set that
+        // /logs counts and BotTrader evaluates. They must have valid
+        // classification, positive ROI/profit, and positive stake regardless of
+        // current executability. Separating this from executable-only filtering
+        // is what lets non_executable candidates (e.g., Polymarket min order
+        // size > 1 share) appear in logs and be evaluated by BotTrader while
+        // still failing alerts/execution until they become executable.
+        const positiveArbs = withArbitrage.filter(o => o.arbitrage
+          && auditArbClassification(o.arbitrage.strategy, o.arbitrage.arbType).valid
+          && o.arbitrage.arbType !== null
+          && o.arbitrage.roiPct > 0
+          && o.arbitrage.expectedProfit > 0
+          && (o.arbitrage.kalshiStake + o.arbitrage.pmStake) > 0
+          && !o.arbitrage.suspicious);
+        // Lifecycle and Telegram alerts only fire for currently executable
+        // positive arbs to avoid noise on size-limited or otherwise
+        // non-tradeable opportunities.
+        const executablePositiveArbs = positiveArbs.filter(o =>
+          o.arbitrage!.executionStatus === 'executable');
         // UI-03: Track best net arb (positive OR negative) for display.
-        // positiveArbs still used for alerts/lifecycle — we don't want to trigger
-        // alerts on negative arbs. netArbs includes the best candidate even when
-        // negative, so the UI shows how close a pair is to profitability.
+        // netArbs includes the best candidate even when negative, so the UI
+        // shows how close a pair is to profitability.
         const netArbs = withArbitrage.filter(o => o.arbitrage
           && auditArbClassification(o.arbitrage.strategy, o.arbitrage.arbType).valid
           && o.arbitrage.arbType !== null
           && o.arbitrage.strategy !== 'No arb' && !o.arbitrage.suspicious);
         const hasUnavailablePositiveCandidate = netArbs.some(o => o.arbitrage!.roiPct > 0
           && (o.arbitrage?.executionStatus == null || o.arbitrage.executionStatus === 'unavailable'));
-        if (positiveArbs.length === 0 && hasUnavailablePositiveCandidate) {
+        if (executablePositiveArbs.length === 0 && hasUnavailablePositiveCandidate) {
           return failIncompleteScan(
             'executable_candidate_unavailable',
             `All ${netArbs.length} selected candidate(s) lacked complete executable price evidence.`,
+            { retainedCanonical: positiveArbs.length > 0 },
           );
         }
         const bestNetArb = positiveArbs.length > 0
@@ -697,13 +708,14 @@ export async function executeFullScan(request: NextRequest) {
         }
 
         // ── Arb lifecycle tracking: open/extend/close episodes ──
-        // Non-fatal: lifecycle data must never break a scan.
+        // Non-fatal: lifecycle data must never break a scan. Only executable
+        // positive arbs should open/extend/close episodes.
         try {
           const lifecycle = await recordArbObservations(
             market.id,
             pmEvent.title || market.eventTitle,
             (market as { category?: string }).category,
-            positiveArbs.map(o => ({
+            executablePositiveArbs.map(o => ({
               outcome: o.artist,
               strategy: o.arbitrage!.strategy,
               roiPct: o.arbitrage!.roiPct,
@@ -718,9 +730,9 @@ export async function executeFullScan(request: NextRequest) {
           console.warn('[arb-lifecycle] tracking failed (scan unaffected):', lcErr instanceof Error ? lcErr.message : lcErr);
         }
 
-        // ── Telegram alerts: fire if positive arbs found ──
-        if (positiveArbs.length > 0) {
-          const alertArbs: ArbAlertInput[] = positiveArbs.map(o => ({
+        // ── Telegram alerts: fire if executable positive arbs found ──
+        if (executablePositiveArbs.length > 0) {
+          const alertArbs: ArbAlertInput[] = executablePositiveArbs.map(o => ({
             marketTitle: pmEvent.title,
             marketId: market.id,
             outcome: o.artist,

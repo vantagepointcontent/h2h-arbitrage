@@ -2338,6 +2338,26 @@ export async function updateSavedMarketScanResult(
       ? JSON.parse(previousRaw) as LastScanResult
       : null;
 
+  const previousCanonicalApy = {
+    pct: current.rows[0].canonical_apy_pct == null ? null : Number(current.rows[0].canonical_apy_pct),
+    unavailableReason: current.rows[0].canonical_apy_unavailable_reason == null
+      ? null : String(current.rows[0].canonical_apy_unavailable_reason),
+    outcome: current.rows[0].canonical_apy_outcome == null ? null : String(current.rows[0].canonical_apy_outcome),
+    observedAt: current.rows[0].canonical_apy_observed_at == null
+      ? null : String(current.rows[0].canonical_apy_observed_at),
+    source: current.rows[0].canonical_apy_source == null ? null : String(current.rows[0].canonical_apy_source),
+    revision: current.rows[0].canonical_apy_revision == null ? null : Number(current.rows[0].canonical_apy_revision),
+  };
+  const previousCurrent = {
+    roiPct: current.rows[0].canonical_current_roi_pct == null ? null : Number(current.rows[0].canonical_current_roi_pct),
+    profit: current.rows[0].canonical_current_profit == null ? null : Number(current.rows[0].canonical_current_profit),
+    strategy: current.rows[0].canonical_current_strategy == null ? null : String(current.rows[0].canonical_current_strategy),
+    daysToExpiry: current.rows[0].canonical_current_days_to_expiry == null
+      ? null : Number(current.rows[0].canonical_current_days_to_expiry),
+    expiryAt: current.rows[0].canonical_current_expiry_at == null
+      ? null : String(current.rows[0].canonical_current_expiry_at),
+    revision: current.rows[0].canonical_current_revision == null ? null : Number(current.rows[0].canonical_current_revision),
+  };
   const generation = Number(current.rows[0].scan_publication_generation);
   if (result.publicationGeneration != null && result.publicationGeneration !== generation) return false;
   if (isStaleMatchPublication(previous, result)) return false;
@@ -2347,8 +2367,17 @@ export async function updateSavedMarketScanResult(
     const declared = candidate.arbType === 'cross' || candidate.arbType === 'direct' || candidate.arbType === 'internal'
       ? candidate.arbType : null;
     const classification = auditArbClassification(candidate.strategy, declared);
+    const isExecutable = candidate.executionStatus == null || candidate.executionStatus === 'executable';
+    const hasPositiveProfit = typeof candidate.expectedProfit === 'number'
+      && Number.isFinite(candidate.expectedProfit) && candidate.expectedProfit > 0;
+    const totalStake = Number.isFinite(candidate.totalStake) ? candidate.totalStake! : 0;
     return classification.valid && classification.canonicalType !== null
-      && Number.isFinite(candidate.roiPct) && candidate.roiPct > 0;
+      && Number.isFinite(candidate.roiPct) && candidate.roiPct > 0
+      // Executable candidates count as positive even when stake fields are
+      // sparse, because executability is the authoritative gate. Non-executable
+      // candidates must also show positive profit and stake to avoid counting
+      // indicative-only size gaps.
+      && (isExecutable || (hasPositiveProfit && totalStake > 0));
   });
   const hasExecutableCandidate = economicCandidates.some(candidate => candidate.executionStatus == null
     || candidate.executionStatus === 'executable');
@@ -2368,22 +2397,57 @@ export async function updateSavedMarketScanResult(
   const confirmedNonExecutable = prepared.matchStatus === 'matched'
     && fullScanFinancialObservation && !hasExecutableCandidate && !hasUnavailableCandidate;
   if (confirmedNonExecutable) {
+    // The scan completed with valid price evidence but every positive candidate
+    // is currently non_executable (e.g., venue minimum order size too large).
+    // Keep the raw positive evidence visible (bestRoiPct/strategy in last_scan_result)
+    // so logs/UI can drill into it, but downgrade the match status so the
+    // canonical APY block below knows this is not a new executable observation.
     prepared = {
       ...prepared,
-      bestRoiPct: 0,
-      bestProfit: 0,
-      strategy: 'No arb',
-      arbType: null,
       matchStatus: 'confirmed_zero',
-      matchError: undefined,
+      matchError: `completed_with_non_executable_candidates: ${economicCandidates.length} positive candidate(s) found but none executable (e.g., venue minimum order size). The prior completed scan remains canonical.`,
     };
   }
   const successfulFullScan = prepared.matchStatus === 'matched' || prepared.matchStatus === 'confirmed_zero';
-  const canonicalApy = successfulFullScan
+  let canonicalApy = successfulFullScan
     ? canonicalSavedMarketApy(prepared.matchStatus === 'confirmed_zero'
       ? { ...prepared, allArbs: [] }
       : prepared)
     : null;
+  // BUG-857 fix: if the new full scan is not a valid executable observation
+  // and a prior valid canonical observation exists, retain the prior canonical
+  // metrics rather than erasing them with a non_executable or zero-candidate
+  // result. This keeps the Markets page tied to the most recent actually
+  // executable positive scan instead of flashing to no-arb on every depth gap.
+  const hasValidPreviousCanonical = previousCanonicalApy.pct != null
+    && Number.isFinite(previousCanonicalApy.pct)
+    && previousCurrent.roiPct != null && Number.isFinite(previousCurrent.roiPct)
+    && previousCurrent.revision != null;
+  const newCanonicalUnavailable = canonicalApy?.value == null || canonicalApy?.roiPct == null;
+  const nonExecutableRetainedObservation = successfulFullScan && !hasExecutableCandidate
+    && economicCandidates.length > 0 && hasValidPreviousCanonical && newCanonicalUnavailable;
+  if (nonExecutableRetainedObservation) {
+    const retainedApy = calculateScanApy(
+      previousCurrent.roiPct!,
+      previousCanonicalApy.observedAt ?? '',
+      expiryDate ?? previousCurrent.expiryAt ?? null,
+    );
+    canonicalApy = {
+      value: retainedApy.apyPct,
+      unavailableReason: retainedApy.unavailableReason,
+      outcome: previousCanonicalApy.outcome,
+      observedAt: previousCanonicalApy.observedAt,
+      roiPct: previousCurrent.roiPct,
+      roiStatus: 'available',
+      roiUnavailableReason: null,
+      profit: previousCurrent.profit,
+      profitStatus: previousCurrent.profit == null ? 'unavailable' : 'available',
+      profitUnavailableReason: previousCurrent.profit == null ? 'canonical_profit_not_persisted_for_retained_revision' : null,
+      strategy: previousCurrent.strategy ?? 'No arb',
+      daysToExpiry: retainedApy.daysToExpiry,
+      expiryAt: expiryDate ?? previousCurrent.expiryAt ?? null,
+    };
+  }
   const matchedNow = prepared.matchedCount > 0 ? new Date().toISOString() : null;
   const dependencies = prepared.matchDependencies ?? [];
   const dependencyGuard = dependencies.length > 0
@@ -2586,7 +2650,19 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
     const retainedRoi = row.canonical_current_roi_pct == null ? null : Number(row.canonical_current_roi_pct);
     const retainedObservation = row.canonical_apy_observed_at == null ? null : String(row.canonical_apy_observed_at);
     const retainedRevision = row.canonical_current_revision == null ? null : Number(row.canonical_current_revision);
-    const retainedProjection = (result?.matchStatus === 'unavailable' || result?.matchStatus === 'refreshing')
+    const hasPositiveNonExecutableCandidate = result?.allArbs?.some((candidate) => {
+      const declared = candidate.arbType === 'cross' || candidate.arbType === 'direct' || candidate.arbType === 'internal'
+        ? candidate.arbType : null;
+      const classification = auditArbClassification(candidate.strategy, declared);
+      const totalStake = Number.isFinite(candidate.totalStake) ? candidate.totalStake! : 0;
+      return classification.valid && classification.canonicalType !== null
+        && Number.isFinite(candidate.roiPct) && candidate.roiPct > 0
+        && typeof candidate.expectedProfit === 'number' && Number.isFinite(candidate.expectedProfit) && candidate.expectedProfit > 0
+        && totalStake > 0
+        && candidate.executionStatus === 'non_executable';
+    });
+    const retainedProjection = ((result?.matchStatus === 'unavailable' || result?.matchStatus === 'refreshing')
+      || (result?.matchStatus === 'confirmed_zero' && hasPositiveNonExecutableCandidate))
       && retainedRoi != null && Number.isFinite(retainedRoi);
     const retainedApy = retainedProjection
       ? calculateScanApy(retainedRoi!, retainedObservation ?? '', row.expiry_date == null ? null : String(row.expiry_date))
