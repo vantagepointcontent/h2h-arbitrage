@@ -1039,16 +1039,14 @@ describe('maybeExecuteBotTrade safety', () => {
       ...(await importOriginal<typeof import('./auto-execute')>()),
       executeArb,
     }));
-    vi.doMock('./matched-market-mapping', async (importOriginal) => ({
-      ...(await importOriginal<typeof import('./matched-market-mapping')>()),
-      resolveMatchedMarketMapping: vi.fn(async () => ({
-        state: 'verified' as const,
-        matchedMarketId: 'pair-1',
-        mappingId: 'persisted-mapping',
-        revision: 'persisted-revision',
-        relationship: verifiedRelationship(),
-      })),
-    }));
+    const mapping = await import('./matched-market-mapping');
+    vi.mocked(mapping.resolveMatchedMarketMapping).mockResolvedValueOnce({
+      state: 'verified' as const,
+      matchedMarketId: 'pair-1',
+      mappingId: 'persisted-mapping',
+      revision: 'persisted-revision',
+      relationship: verifiedRelationship(),
+    });
     const { maybeExecuteBotTrade } = await import('./bot-trader');
     const input = makeInput({
       propositionRelationship: verifiedRelationship(),
