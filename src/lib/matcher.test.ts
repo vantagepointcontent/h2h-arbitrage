@@ -183,6 +183,21 @@ describe('calculateArbitrageMax', () => {
     expect(Number.isFinite(r.expectedProfit)).toBe(true);
   });
 
+  it('prices a non_executable minimum-order candidate at the venue minimum with positive profit/stake', () => {
+    const r = calculateArbitrageMax(
+      kalshi,
+      { ...pm, noMinOrderSize: 5, askDepth: 5000 },
+      5000, 0, 5000, 0,
+      'Sports',
+    );
+    expect(r.strategy).toBe('Buy YES Kalshi + NO PM');
+    expect(r.executionStatus).toBe('non_executable');
+    expect(r.executionBlocker).toMatch(/minimum order is 5 shares/);
+    expect(r.requestedContracts).toBe(5);
+    expect(r.expectedProfit).toBeGreaterThan(0);
+    expect(r.kalshiStake + r.pmStake).toBeGreaterThan(0);
+  });
+
   it('returns no executable arb when all required depth is missing', () => {
     const r = calculateArbitrageMax(
       { ...kalshi, yesAsk: 0.60, noAsk: 0.45, yesAskDepth: '0', noAskDepth: '0' },

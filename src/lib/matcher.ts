@@ -608,15 +608,32 @@ export function calculateArbitrageMax(
     blocker: string,
     authoritativeContracts: number,
   ) => {
-    // Preserve the established display normalization for depth/tick blockers,
-    // but price venue-minimum evidence at the exact quantity BotTrader will use.
-    const quoteCapital = authoritativeContracts > 1 ? authoritativeContracts : 100;
+    // OPS-864: price non_executable candidates at the actual minimum order size
+    // so expectedProfit, stake, and requestedContracts reflect the real economic
+    // opportunity. Other blockers (missing depth, tick misalignment) keep stakes
+    // at 0 because we cannot claim a fillable quantity.
+    const isMinimumBlocker = /minimum order/i.test(blocker);
+    const displayCapital = isMinimumBlocker && authoritativeContracts > 1
+      ? authoritativeContracts : 100;
+    const quoteCapital = isMinimumBlocker && authoritativeContracts > 1
+      ? authoritativeContracts : 0;
     const fees = computeArbitrageFees(
-      quoteStrategy, quoteCapital, quoteCapital * kalshiPrice, quoteCapital * pmPrice,
+      quoteStrategy, displayCapital, displayCapital * kalshiPrice, displayCapital * pmPrice,
       kYes, kNo, pYes, pNo, category, kalshi.feeAuthority,
       pmFeeRateBps,
     );
-    const roiPct = (fees.worstCaseNetProfit / quoteCapital) * 100;
+    const roiPct = displayCapital > 0 ? (fees.worstCaseNetProfit / displayCapital) * 100 : 0;
+    const kalshiStake = quoteCapital > 0
+      ? (quoteBuyPlatform === 'kalshi' ? quoteCapital * kalshiPrice
+        : quoteSellPlatform === 'kalshi' ? quoteCapital * (quoteStrategy.includes('NO Kalshi') ? kNo : kYes)
+        : 0)
+      : 0;
+    const pmStake = quoteCapital > 0
+      ? (quoteBuyPlatform === 'polymarket' ? quoteCapital * pmPrice
+        : quoteSellPlatform === 'polymarket' ? quoteCapital * (quoteStrategy.includes('NO PM') ? pNo : pYes)
+        : 0)
+      : 0;
+    const expectedProfit = quoteCapital > 0 ? fees.worstCaseNetProfit : 0;
     if (roiPct > 0 && (!bestUnexecutableQuote || roiPct > bestUnexecutableQuote.roiPct)) {
       bestUnexecutableQuote = {
         strategy: quoteStrategy, roiPct,
@@ -634,6 +651,10 @@ export function calculateArbitrageMax(
           netProfitIfPmWins: fees.netProfitIfPmWins,
           worstCaseNetProfit: fees.worstCaseNetProfit,
         },
+        requestedContracts: quoteCapital,
+        kalshiStake,
+        pmStake,
+        expectedProfit,
       };
     }
   };
@@ -790,14 +811,14 @@ export function calculateArbitrageMax(
         buyPrice: quote.buyPrice,
         sellPlatform: quote.sellPlatform,
         sellPrice: quote.sellPrice,
-        kalshiStake: 0,
-        pmStake: 0,
-        expectedProfit: 0,
+        kalshiStake: quote.kalshiStake ?? 0,
+        pmStake: quote.pmStake ?? 0,
+        expectedProfit: quote.expectedProfit ?? 0,
         maxCapital: 0,
         fees: quote.fees,
         arbType: 'direct',
         depthVerified: false,
-        requestedContracts,
+        requestedContracts: quote.requestedContracts ?? requestedContracts,
         executionStatus: 'non_executable',
         executionBlocker: quote.blocker,
       };
