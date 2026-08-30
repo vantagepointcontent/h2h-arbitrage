@@ -39,6 +39,7 @@ describe('saved-market scanner lifecycle supervision', () => {
       overdueCount: 2,
       failedCount: 1,
       inProgressCount: 1,
+      dormantCount: 0,
       oldestSuccessAgeMs: 7_200_000,
     });
   });

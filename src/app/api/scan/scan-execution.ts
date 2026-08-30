@@ -16,7 +16,7 @@ import { resolveKalshiFeeAuthoritiesForMarkets } from '@/lib/kalshi-fee-quote';
 import { getSetting } from '@/lib/settings';
 import { getManualMatches } from '@/lib/manual-matches';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
-import { findSavedMarketByUrls, reconcileSavedMarketMatchSummary, reserveSavedMarketPublication, updateSavedMarketScanResult, appendScanHistory } from '@/lib/persistence';
+import { findSavedMarketByUrls, reconcileSavedMarketMatchSummary, reserveSavedMarketPublication, updateSavedMarketScanResult, appendScanHistory, isDormantMarketResult } from '@/lib/persistence';
 import { persistAndConsumeBotScan } from '@/lib/bot-scan-consumer';
 import { recordArbObservations } from '@/lib/arb-lifecycle';
 import { sendBatchAlerts, ArbAlertInput } from '@/lib/telegram-alerts';
@@ -43,6 +43,8 @@ const API_TIMEOUT_MS = 5000; // OPS-011: 5s timeout — was 15s, caused 17-29s t
 const KALSHI_MULTI_TIMEOUT_MS = 8000; // multi-series gets a bit more headroom
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
 
+const DORMANT_REASON_CODES = new Set(['clob_book_empty', 'clob_metadata_incomplete']);
+
 export async function executeFullScan(request: NextRequest) {
   const scanAttemptedAt = new Date().toISOString();
   let savedMarketId: string | null = null;
@@ -51,17 +53,19 @@ export async function executeFullScan(request: NextRequest) {
   let scanLock: SavedMarketScanLock | null = null;
   const failIncompleteScan = async (reasonCode: string, detail: string, options?: { retainedCanonical?: boolean }) => {
     const error = `${reasonCode}: ${detail} The prior completed scan remains canonical.`;
+    const dormant = DORMANT_REASON_CODES.has(reasonCode);
     if (savedMarketId && publicationGeneration != null) {
-      await reconcileSavedMarketMatchSummary(savedMarketId, {
+      const summary: Parameters<typeof reconcileSavedMarketMatchSummary>[1] = {
         matchedCount: 0,
         matchStatus: options?.retainedCanonical ? 'confirmed_zero' : 'unavailable',
         matchError: error,
         matchedPairs: undefined,
         scannedAt: new Date().toISOString(),
         publicationGeneration,
-      }).catch(() => {});
+      };
+      await reconcileSavedMarketMatchSummary(savedMarketId, summary).catch(() => {});
     }
-    return NextResponse.json({ error, reasonCode, fullScanPersisted: false }, { status: 503 });
+    return NextResponse.json({ error, reasonCode, dormant, fullScanPersisted: false }, { status: 503 });
   };
   try {
     const parsed = await parseJsonObject(request);

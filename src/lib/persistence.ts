@@ -2286,8 +2286,20 @@ function isStaleMatchPublication(previous: LastScanResult | null, incoming: Last
 /** Derive the compact scalar from the same full-scan candidate that owns the
  * persisted current ROI, using its scan timestamp and expiry rather than an
  * optional precomputed APY/TTE field or wall-clock time. */
-export function canonicalSavedMarketApy(result: LastScanResult): CanonicalSavedMarketMetrics {
-  return selectCanonicalSavedMarketMetrics(result.allArbs ?? [], result.scannedAt);
+export function canonicalSavedMarketApy(result: LastScanResult, options?: { allowNonExecutable?: boolean }): CanonicalSavedMarketMetrics {
+  return selectCanonicalSavedMarketMetrics(result.allArbs ?? [], result.scannedAt, options);
+}
+
+/** A dormant market has a structurally empty CLOB book (or equivalent external
+ *  unavailability). Its prior canonical observation is retained and it is
+ *  excluded from global scanner-death / overdue SLA while the condition holds. */
+export function isDormantMarketResult(result: LastScanResult | null): boolean {
+  if (!result) return false;
+  if (result.matchStatus !== 'unavailable' && result.matchStatus !== 'refreshing') return false;
+  const error = typeof result.matchError === 'string' ? result.matchError : '';
+  return /clob_book_empty|source order book empty|empty executable book|no executable book/i.test(error)
+    || (result.calculationEnvelope?.status === 'legacy_unverifiable'
+      && (result.calculationEnvelope?.blocker?.code ?? '').includes('missing_calculation_authority'));
 }
 
 export type SavedMarketPublicationChannel = 'scan' | 'live';
@@ -2409,45 +2421,28 @@ export async function updateSavedMarketScanResult(
     };
   }
   const successfulFullScan = prepared.matchStatus === 'matched' || prepared.matchStatus === 'confirmed_zero';
-  let canonicalApy = successfulFullScan
-    ? canonicalSavedMarketApy(prepared.matchStatus === 'confirmed_zero'
+  // OPS-864: list and detail must share one canonical source. When a full scan
+  // completes with no executable candidates but positive non_executable ones,
+  // the detail still renders those rows. The canonical summary used by the list
+  // should project from the same best positive candidate so ARB/ROI/PROFIT/APY/
+  // STRATEGY stay consistent with the detail, while executionStatus stays
+  // non_executable. We therefore relax the canonical selector for this exact
+  // non_executable retained-observation case rather than splitting state across
+  // two calculations.
+  const nonExecutablePositiveScan = successfulFullScan && !hasExecutableCandidate
+    && economicCandidates.length > 0 && !hasUnavailableCandidate;
+  // OPS-864: list and detail must share one canonical source. When a full scan
+  // completes with no executable candidates but positive non_executable ones,
+  // the detail still renders those rows. The canonical summary used by the list
+  // should project from the same best positive candidate so ARB/ROI/PROFIT/APY/
+  // STRATEGY stay consistent with the detail. We do NOT retain an older
+  // executable observation, because that would make the list disagree with the
+  // detail and with the current scan result.
+  const canonicalApy = successfulFullScan
+    ? canonicalSavedMarketApy(prepared.matchStatus === 'confirmed_zero' && !nonExecutablePositiveScan
       ? { ...prepared, allArbs: [] }
-      : prepared)
+      : prepared, nonExecutablePositiveScan ? { allowNonExecutable: true } : undefined)
     : null;
-  // BUG-857 fix: if the new full scan is not a valid executable observation
-  // and a prior valid canonical observation exists, retain the prior canonical
-  // metrics rather than erasing them with a non_executable or zero-candidate
-  // result. This keeps the Markets page tied to the most recent actually
-  // executable positive scan instead of flashing to no-arb on every depth gap.
-  const hasValidPreviousCanonical = previousCanonicalApy.pct != null
-    && Number.isFinite(previousCanonicalApy.pct)
-    && previousCurrent.roiPct != null && Number.isFinite(previousCurrent.roiPct)
-    && previousCurrent.revision != null;
-  const newCanonicalUnavailable = canonicalApy?.value == null || canonicalApy?.roiPct == null;
-  const nonExecutableRetainedObservation = successfulFullScan && !hasExecutableCandidate
-    && economicCandidates.length > 0 && hasValidPreviousCanonical && newCanonicalUnavailable;
-  if (nonExecutableRetainedObservation) {
-    const retainedApy = calculateScanApy(
-      previousCurrent.roiPct!,
-      previousCanonicalApy.observedAt ?? '',
-      expiryDate ?? previousCurrent.expiryAt ?? null,
-    );
-    canonicalApy = {
-      value: retainedApy.apyPct,
-      unavailableReason: retainedApy.unavailableReason,
-      outcome: previousCanonicalApy.outcome,
-      observedAt: previousCanonicalApy.observedAt,
-      roiPct: previousCurrent.roiPct,
-      roiStatus: 'available',
-      roiUnavailableReason: null,
-      profit: previousCurrent.profit,
-      profitStatus: previousCurrent.profit == null ? 'unavailable' : 'available',
-      profitUnavailableReason: previousCurrent.profit == null ? 'canonical_profit_not_persisted_for_retained_revision' : null,
-      strategy: previousCurrent.strategy ?? 'No arb',
-      daysToExpiry: retainedApy.daysToExpiry,
-      expiryAt: expiryDate ?? previousCurrent.expiryAt ?? null,
-    };
-  }
   const matchedNow = prepared.matchedCount > 0 ? new Date().toISOString() : null;
   const dependencies = prepared.matchDependencies ?? [];
   const dependencyGuard = dependencies.length > 0
@@ -2661,9 +2656,14 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
         && totalStake > 0
         && candidate.executionStatus === 'non_executable';
     });
-    const retainedProjection = ((result?.matchStatus === 'unavailable' || result?.matchStatus === 'refreshing')
-      || (result?.matchStatus === 'confirmed_zero' && hasPositiveNonExecutableCandidate))
-      && retainedRoi != null && Number.isFinite(retainedRoi);
+    // OPS-864: explicit externally-unavailable (dormant) markets retain their
+    // prior canonical observation because the failure is structural (empty CLOB
+    // book), not a regression in our scanner. Non-dormant unavailable scans
+    // still clear canonical values so the list stays consistent with the detail.
+    const isDormant = isDormantMarketResult(result);
+    const retainedProjection = isDormant
+      && retainedRoi != null && Number.isFinite(retainedRoi)
+      && retainedRevision != null;
     const retainedApy = retainedProjection
       ? calculateScanApy(retainedRoi!, retainedObservation ?? '', row.expiry_date == null ? null : String(row.expiry_date))
       : null;
@@ -2690,7 +2690,7 @@ export async function reconcileSavedMarketMatchSummaries(): Promise<number> {
       roiPct: null, roiStatus: 'unavailable', roiUnavailableReason: 'current_scan_unavailable',
       profit: null, profitStatus: 'unavailable', profitUnavailableReason: 'current_scan_unavailable',
       strategy: 'Unavailable', daysToExpiry: null, expiryAt: null,
-    } : result ? canonicalSavedMarketApy(result) : {
+    } : result ? canonicalSavedMarketApy(result, { allowNonExecutable: true }) : {
       value: null, unavailableReason: 'current_scan_revision_unavailable', outcome: null, observedAt: null,
       roiPct: null, roiStatus: 'unavailable', roiUnavailableReason: 'current_scan_revision_unavailable',
       profit: null, profitStatus: 'unavailable', profitUnavailableReason: 'current_scan_revision_unavailable',

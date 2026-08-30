@@ -24,20 +24,28 @@ function failureSummary(entries) {
     .join('; ');
 }
 
+function isDormantEntry(entry) {
+  return entry?.dormant === true
+    || /clob_book_empty|clob_metadata_incomplete|dormant/i.test(entry?.failureReason ?? '');
+}
+
 export function deriveScannerQueue(entries, now = Date.now(), freshnessSlaMs = 60 * 60_000) {
   let dueCount = 0;
   let overdueCount = 0;
   let failedCount = 0;
   let inProgressCount = 0;
+  let dormantCount = 0;
   let oldestSuccessAgeMs = 0;
   for (const entry of entries) {
     const inProgress = entry?.inProgress === true;
+    const dormant = isDormantEntry(entry);
+    if (dormant) dormantCount += 1;
     if (inProgress) inProgressCount += 1;
     else if (Date.parse(entry?.nextDueAt ?? '') <= now) dueCount += 1;
     if (entry?.failureReason) failedCount += 1;
     const successAt = Date.parse(entry?.lastSuccessAt ?? '');
     const age = Number.isFinite(successAt) ? Math.max(0, now - successAt) : freshnessSlaMs + 1;
-    if (age > freshnessSlaMs) overdueCount += 1;
+    if (!dormant && age > freshnessSlaMs) overdueCount += 1;
     oldestSuccessAgeMs = Math.max(oldestSuccessAgeMs, age);
   }
   return {
@@ -46,6 +54,7 @@ export function deriveScannerQueue(entries, now = Date.now(), freshnessSlaMs = 6
     overdueCount,
     failedCount,
     inProgressCount,
+    dormantCount,
     oldestSuccessAgeMs,
   };
 }

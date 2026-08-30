@@ -43,6 +43,7 @@ describe('BUG-150 recurring saved-market fairness', () => {
     expect(classifyScanHttpFailure(503, { code: 'DISK_CAPACITY' }, '60', 1_000)).toEqual({
       error: 'HTTP 503 (DISK_CAPACITY)',
       errorCode: 'DISK_CAPACITY',
+      dormant: false,
       countsTowardBreaker: false,
       retryAt: 61_000,
     });

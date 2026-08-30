@@ -392,8 +392,10 @@ describe('BUG-179 canonical current-market metric projection', () => {
     })).toBe(true);
 
     const persisted = await persistence.getSavedMarketById(market.id);
+    // OPS-864: non-dormant non-executable positive candidates still publish their
+    // own canonical metrics so the list agrees with the detail rows.
     expect(persisted).toMatchObject({
-      canonicalCurrentRoiPct: roiPct,
+      canonicalCurrentRoiPct: 12.5,
       canonicalCurrentProfit: 1,
       canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
       canonicalCurrentRevision: failedRevision,
@@ -405,6 +407,60 @@ describe('BUG-179 canonical current-market metric projection', () => {
         strategy: 'Buy YES Kalshi + NO PM',
         scannedAt: '2026-08-20T13:05:00.000Z',
         publicationGeneration: failedRevision,
+        matchError: expect.stringContaining('completed_with_non_executable_candidates'),
+      },
+    });
+    expect(persisted?.canonicalApyPct).toBeGreaterThan(0);
+    expect(persisted?.canonicalApyPct).toBeLessThan(100);
+  });
+
+  it('projects current canonical metrics from non_executable candidates when no prior executable observation exists', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-non-exec-projection-'));
+    process.env.H2H_SQLITE_PATH = path.join(tempDir, 'edgefinder.db');
+    process.env.H2H_SAVED_MARKETS_FILE = path.join(tempDir, 'saved-markets.json');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const market = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/non-exec-projection',
+      polymarketUrl: 'https://polymarket.com/event/non-exec-projection',
+      eventTitle: 'OPS-864 non-executable projection fixture',
+      expiryDate: '2026-11-28T00:00:00.000Z',
+    });
+    const revision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
+    const roiPct = 0.9;
+    const expectedProfit = 0.05;
+    const totalStake = 5;
+    const daysToExpiry = (
+      Date.parse('2026-11-28T00:00:00.000Z') - Date.parse('2026-08-30T14:00:00.000Z')
+    ) / 86_400_000;
+    const apyPct = calculateApyPctFromDays(roiPct, daysToExpiry)!;
+    expect(await persistence.updateSavedMarketScanResult(market.id, {
+      bestRoiPct: roiPct, bestProfit: expectedProfit, strategy: 'No arb', arbType: null,
+      outcomeCount: 4, matchedCount: 4, matchStatus: 'matched', kalshiCount: 4, pmCount: 4,
+      scannedAt: '2026-08-30T14:00:00.000Z', publicationGeneration: revision,
+      allArbs: [
+        { artist: 'Manchester United', roiPct, expectedProfit, strategy: 'Buy YES PM + NO Kalshi',
+          arbType: 'direct', totalStake, executionStatus: 'non_executable',
+          executionBlocker: 'Polymarket minimum order is 5 shares; requested 1 share',
+          apyPct, daysToExpiry, expiryAt: '2026-11-28T00:00:00.000Z', kalshiStake: 1, pmStake: 4 },
+        { artist: 'Real Madrid', roiPct: 0.7, expectedProfit: 0.04, strategy: 'Buy YES PM + NO Kalshi',
+          arbType: 'direct', totalStake, executionStatus: 'non_executable',
+          executionBlocker: 'Polymarket minimum order is 5 shares; requested 1 share',
+          apyPct: calculateApyPctFromDays(0.7, daysToExpiry)!, daysToExpiry,
+          expiryAt: '2026-11-28T00:00:00.000Z', kalshiStake: 1, pmStake: 4 },
+      ],
+    })).toBe(true);
+
+    const persisted = await persistence.getSavedMarketById(market.id);
+    expect(persisted).toMatchObject({
+      canonicalCurrentRoiPct: roiPct,
+      canonicalCurrentProfit: expectedProfit,
+      canonicalCurrentStrategy: 'Buy YES PM + NO Kalshi',
+      canonicalCurrentRevision: revision,
+      canonicalApyUnavailableReason: null,
+      canonicalApyRevision: revision,
+      lastScanResult: {
+        matchStatus: 'confirmed_zero',
         matchError: expect.stringContaining('completed_with_non_executable_candidates'),
       },
     });
@@ -786,5 +842,52 @@ describe('BUG-179 canonical current-market metric projection', () => {
       canonicalCurrentStrategy: 'No arb',
     });
     expect(alert.rows[0]).toMatchObject({ reason: 'no_canonical_arbitrage', reconciled: 1 });
+  });
+
+  it('retains prior canonical metrics for dormant (structurally empty CLOB) markets', async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'current-market-dormant-'));
+    const dbPath = path.join(tempDir, 'edgefinder.db');
+    process.env.H2H_SQLITE_PATH = dbPath;
+    process.env.H2H_SAVED_MARKETS_FILE = path.join(tempDir, 'saved-markets.json');
+    vi.resetModules();
+    const persistence = await import('./persistence');
+    const expiryAt = '2026-11-28T00:00:00.000Z';
+    const observedAt = '2026-08-20T13:00:00.000Z';
+    const roiPct = 2;
+    const market = await persistence.addSavedMarket({
+      kalshiUrl: 'https://kalshi.com/markets/dormant',
+      polymarketUrl: 'https://polymarket.com/event/dormant',
+      eventTitle: 'OPS-864 dormant fixture',
+      expiryDate: expiryAt,
+    });
+    const revision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
+    await persistence.updateSavedMarketScanResult(market.id, {
+      bestRoiPct: roiPct, bestProfit: 1, strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct',
+      outcomeCount: 1, matchedCount: 1, matchStatus: 'matched', kalshiCount: 1, pmCount: 1,
+      scannedAt: observedAt, publicationGeneration: revision,
+      allArbs: [{ artist: 'Yes', roiPct, expectedProfit: 1, strategy: 'Buy YES Kalshi + NO PM',
+        arbType: 'direct', executionStatus: 'executable', expiryAt }],
+    });
+
+    const failedRevision = await persistence.reserveSavedMarketPublication(market.id, 'scan');
+    await persistence.updateSavedMarketScanResult(market.id, {
+      bestRoiPct: 0, bestProfit: 0, strategy: 'Unavailable', arbType: null,
+      outcomeCount: 0, matchedCount: 0, matchStatus: 'unavailable',
+      matchError: 'clob_book_empty: source order book empty. The prior completed scan remains canonical.',
+      kalshiCount: 0, pmCount: 0, scannedAt: '2026-08-20T14:00:00.000Z',
+      publicationGeneration: failedRevision, allArbs: [],
+    });
+
+    const persisted = await persistence.getSavedMarketById(market.id);
+    expect(persisted).toMatchObject({
+      canonicalCurrentRoiPct: roiPct,
+      canonicalCurrentStrategy: 'Buy YES Kalshi + NO PM',
+      canonicalCurrentRevision: revision,
+      lastScanResult: {
+        matchStatus: 'unavailable',
+        matchError: expect.stringContaining('clob_book_empty'),
+      },
+    });
+    expect(persisted?.canonicalApyPct).toBeGreaterThan(0);
   });
 });

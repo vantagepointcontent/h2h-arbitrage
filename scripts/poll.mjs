@@ -714,6 +714,7 @@ async function pollOnce() {
           error: scan.error || 'Scan completed but durable saved-market publication failed',
           retryAt: breakerRetryAt,
           retryWithoutPenalty: scan.countsTowardBreaker === false,
+          dormant: scan.dormant === true,
         }, Date.now(), FRESHNESS_SLA_MS);
         const saved = await saveMarketSchedulerState(market.id, { phase: 'terminal', leaseToken: lease.token });
         if (!saved) {
@@ -723,6 +724,10 @@ async function pollOnce() {
         }
         health.failureCount += 1;
         if (scan.countsTowardBreaker !== false) recordScanOutcome(market.id, false, scan.durationMs);
+        if (scan.dormant === true) {
+          resetBreakerAfterExternalSuccess(scanStats.get(market.id));
+          dirtyBreakerIds.add(market.id);
+        }
         const err = { market: market.eventTitle, error: scan.error || 'Unknown scan error', durationMs: scan.durationMs };
         health.errors.push(err);
         console.log(`[${new Date().toISOString()}] Scan failed for ${market.eventTitle}: ${err.error}`);

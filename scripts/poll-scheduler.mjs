@@ -44,11 +44,13 @@ export function classifyScanHttpFailure(status, body = {}, retryAfter = null, no
     : status === 503 && /scanner is at capacity/i.test(text)
       ? 'SCAN_CAPACITY'
       : null;
+  const dormant = body?.dormant === true;
   const retrySeconds = Number(retryAfter);
   return {
     error: `HTTP ${status}${errorCode ? ` (${errorCode})` : text ? `: ${text.slice(0, 240)}` : ''}`,
     errorCode,
-    countsTowardBreaker: errorCode === null,
+    dormant,
+    countsTowardBreaker: errorCode === null && !dormant,
     retryAt: Number.isFinite(retrySeconds) && retrySeconds >= 0 ? now + retrySeconds * 1_000 : null,
   };
 }
@@ -170,6 +172,7 @@ export function completeAttempt(item, outcome, now = Date.now(), freshnessSlaMs 
 
   if (outcome.retryWithoutPenalty) {
     item.failureReason = outcome.error || 'Scheduled scan paused by a global scanner dependency.';
+    item.dormant = outcome.dormant || false;
     item.nextDueAt = iso(Math.max(now + 1_000, positiveFinite(outcome.retryAt, now + RETRY_BASE_MS)));
     return;
   }
