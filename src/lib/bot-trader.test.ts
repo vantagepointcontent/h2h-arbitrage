@@ -1010,14 +1010,12 @@ describe('maybeExecuteBotTrade safety', () => {
       ...(await importOriginal<typeof import('./auto-execute')>()),
       executeArb,
     }));
-    vi.doMock('./matched-market-mapping', async (importOriginal) => ({
-      ...(await importOriginal<typeof import('./matched-market-mapping')>()),
-      resolveMatchedMarketMapping: vi.fn(async (tuple) => ({
-        state: 'missing' as const,
-        matchedMarketId: tuple.matchedMarketId,
-        reason: 'Matched market exists, but exact outcome mapping is missing/unverified',
-      })),
-    }));
+    const mapping = await import('./matched-market-mapping');
+    vi.mocked(mapping.resolveMatchedMarketMapping).mockResolvedValueOnce({
+      state: 'missing' as const,
+      matchedMarketId: 'pair-1',
+      reason: 'Matched market exists, but exact outcome mapping is missing/unverified',
+    });
     const { maybeExecuteBotTrade } = await import('./bot-trader');
     const input = makeInput({
       kalshiTicker: 'KXARREST-27JAN-THOM',
