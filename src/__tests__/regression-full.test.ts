@@ -168,16 +168,19 @@ describe('REGRESSION: buildKalshiArbShape', () => {
     expect(shape.yesAsk).toBe(0.55);
   });
 
-  it('R15: depth parsing från yes_ask_size_fp', () => {
+  it('R15: contract depth is converted to selected-ask USD notional', () => {
     const km: KalshiMarket = {
       ticker: 'KX-TEST-001',
       event_ticker: 'KX-TEST',
-      yes_ask_size_fp: '$1.2K',
-      no_ask_size_fp: '$500',
+      yes_ask_dollars: '0.20',
+      yes_ask_size_fp: '1200',
+      yes_bid_dollars: '0.50',
+      yes_bid_size_fp: '500',
+      no_ask_dollars: '0.50',
     };
     const shape = buildKalshiArbShape(km);
-    expect(shape.yesAskDepth).toBe('$1.2K');
-    expect(shape.noAskDepth).toBe('$500');
+    expect(shape.yesAskDepth).toBe('240.000000');
+    expect(shape.noAskDepth).toBe('250.000000');
   });
 
   it('R16: missing Kalshi quotes are unavailable, never synthetic $1 asks', () => {
@@ -204,7 +207,7 @@ describe('REGRESSION: buildKalshiArbShape', () => {
       ticker: 'KXLIVTOUR-YOR26-ZERO',
       event_ticker: 'KXLIVTOUR-YOR26',
       no_ask_dollars: '1.0000',
-      no_ask_size_fp: '0',
+      yes_bid_size_fp: '0',
     });
 
     expect(missingSize.yesAsk).toBe(0.01);

@@ -11,7 +11,7 @@ import {
 } from './bot-trader';
 import type { UnifiedOutcome } from './matcher';
 import type { BotScanCandidate, PersistedBotScan } from './bot-scan-consumer';
-import { walkExecutableBook } from './executable-book';
+import { quoteOneShareFromTopAsk, walkExecutableBook } from './executable-book';
 import { orderbookState } from './orderbook-state';
 import type { PropositionRelationship } from './proposition-identity';
 
@@ -366,6 +366,94 @@ describe('evaluateBotTrade', () => {
     const ev = evaluateBotTrade(makeInput({ kalshiYesDepth: 0.2, pmNoDepth: 0.2 }), baseSettings({ minSharesPerLeg: 10 }));
     expect(ev.shouldTrade).toBe(false);
     expect(ev.reason).toContain('shares');
+  });
+
+  it('labels venue-minimum pricing as evaluation-only without implying a five-share order', () => {
+    const ev = evaluateBotTrade(makeInput({
+      pmNoMinOrderSize: 5,
+      kalshiYesDepth: 5,
+      pmNoDepth: 5,
+    }), baseSettings());
+
+    expect(ev.shouldTrade).toBe(false);
+    expect(ev.reason).toContain('evaluation quantity 5');
+    expect(ev.reason).toContain('canonical executable quantity 1');
+    expect(ev.reason).not.toContain('(requested 5)');
+  });
+
+  it('renders an authoritative empty selected book explicitly instead of coercing it to numeric zero liquidity', () => {
+    const emptyQuote = quoteOneShareFromTopAsk({
+      price: 0.45,
+      depthUsd: 0,
+      tickSize: 0.01,
+      minimumOrderSize: 1,
+      depthTimestamp: new Date().toISOString(),
+      unavailableReason: 'authoritative_empty',
+    });
+    const ev = evaluateBotTrade(makeInput({
+      kalshiYesDepth: 0,
+      kalshiYesExecutableQuote: emptyQuote,
+    }), baseSettings());
+
+    expect(ev.shouldTrade).toBe(false);
+    expect(ev.reason).toContain('Kalshi YES authoritative book is empty');
+    expect(ev.reason).not.toContain('Kalshi 0.00');
+    expect(ev.reason).not.toContain('Kalshi $0.00');
+  });
+
+  it.each([
+    ['missing_depth', 'ask depth is missing'],
+    ['malformed_depth', 'ask depth is malformed'],
+    ['inactive_market', 'market is inactive'],
+    ['source_unavailable', 'venue response is unavailable'],
+    ['stale_book', 'order book is stale'],
+  ] as const)('fails closed with a distinct %s reason and no numeric zero rendering', (reason, expected) => {
+    const unavailableQuote = quoteOneShareFromTopAsk({
+      price: 0.45,
+      depthUsd: null,
+      tickSize: 0.01,
+      minimumOrderSize: 1,
+      depthTimestamp: new Date().toISOString(),
+      unavailableReason: reason,
+    });
+    const ev = evaluateBotTrade(makeInput({
+      kalshiYesDepth: 0,
+      kalshiYesExecutableQuote: unavailableQuote,
+    }), baseSettings());
+
+    expect(ev.shouldTrade).toBe(false);
+    expect(ev.reason).toContain(expected);
+    expect(ev.reason).not.toContain('Kalshi 0.00');
+    expect(ev.reason).not.toContain('Kalshi $0.00');
+  });
+
+  it('keeps a tapered sub-cent Kalshi quote visible but non-executable at the cent-only adapter boundary', () => {
+    const subCentQuote = quoteOneShareFromTopAsk({
+      price: 0.055,
+      depthUsd: 0.055,
+      tickSize: 0.001,
+      minimumOrderSize: 1,
+      depthTimestamp: new Date().toISOString(),
+    });
+    const input = makeInput({
+      kalshiYesAsk: 0.055,
+      kalshiYesDepth: 0.055,
+      kalshiYesExecutableQuote: subCentQuote,
+    });
+
+    const ev = evaluateBotTrade(input, baseSettings());
+    expect(ev.shouldTrade).toBe(false);
+    expect(ev.reason).toContain('unsupported by the cent-only execution adapter');
+    expect(buildExecutionRequest(input)).toBeNull();
+  });
+
+  it('fails evaluation closed when a selected executable quote is absent', () => {
+    const input = makeInput();
+    delete input.kalshiYesExecutableQuote;
+
+    const ev = evaluateBotTrade(input, baseSettings());
+    expect(ev.shouldTrade).toBe(false);
+    expect(ev.reason).toContain('Kalshi YES executable quote is unavailable');
   });
 
   it('handles $1 placement: 0.5 share per leg at $0.50 ask → ~$0.50/leg depth satisfies per-leg $0.50 minimum', () => {

@@ -578,6 +578,26 @@ export function getAuthoritativeMatchedFill(result: {
   return { kalshiContracts: Number(kalshiContracts), pmContracts: Number(pmContracts), kalshiPrice, pmPrice };
 }
 
+function executableBookUnavailableReason(
+  venue: 'Kalshi' | 'Polymarket',
+  side: 'yes' | 'no',
+  quote: ExecutableBookQuote,
+): string {
+  const label = `${venue} ${side.toUpperCase()}`;
+  const observed = quote.depthTimestamp ? ` (observed ${quote.depthTimestamp})` : '';
+  if (quote.reason === 'authoritative_empty' || quote.reason === 'empty_book') {
+    return `${label} authoritative book is empty${observed}`;
+  }
+  if (quote.reason === 'missing_depth') return `${label} ask depth is missing${observed}`;
+  if (quote.reason === 'malformed_depth' || quote.reason === 'malformed_level') {
+    return `${label} ask depth is malformed${observed}`;
+  }
+  if (quote.reason === 'inactive_market') return `${label} market is inactive${observed}`;
+  if (quote.reason === 'stale_book') return `${label} order book is stale${observed}`;
+  if (quote.reason === 'source_unavailable') return `${label} venue response is unavailable${observed}`;
+  return `${label} executable book is unavailable: ${quote.reason ?? 'unknown_reason'}${observed}`;
+}
+
 export function evaluateBotTrade(
   input: BotTradeInput,
   settings: BotSettings,
@@ -635,6 +655,15 @@ export function evaluateBotTrade(
   if (!Number.isFinite(pmMinimumOrderSize) || pmMinimumOrderSize! <= 0) {
     reasons.push(`Polymarket ${legs.pmOutcome.toUpperCase()} minimum order is unavailable`);
   }
+  const canonicalExecutableQuantity = 1;
+  const evaluationQuantity = Math.ceil(Math.max(
+    canonicalExecutableQuantity,
+    settings.minSharesPerLeg,
+    pmMinimumOrderSize ?? 0,
+  ));
+  if (Number.isFinite(pmMinimumOrderSize) && pmMinimumOrderSize! > canonicalExecutableQuantity) {
+    reasons.push(`Polymarket ${legs.pmOutcome.toUpperCase()} minimum order ${pmMinimumOrderSize} exceeds canonical executable quantity 1; evaluation quantity ${evaluationQuantity} is pricing-only and no ${evaluationQuantity}-share order can be placed`);
+  }
   if (!Number.isFinite(pmTickSize) || pmTickSize! <= 0) {
     reasons.push(`Polymarket ${legs.pmOutcome.toUpperCase()} tick size is unavailable`);
   } else if (legs.pmPrice != null
@@ -650,20 +679,40 @@ export function evaluateBotTrade(
     ? depthPUsd / legs.pmPrice
     : 0;
 
-  const requestedShares = Math.ceil(Math.max(1, settings.minSharesPerLeg, pmMinimumOrderSize ?? 0));
-  if (sharesK < requestedShares || sharesP < requestedShares) {
+  const selectedQuotes = pickLegQuotes(input.strategy, input);
+  const kalshiUnavailable = selectedQuotes.kalshiQuote?.status === 'unavailable';
+  const pmUnavailable = selectedQuotes.pmQuote?.status === 'unavailable';
+  if (!selectedQuotes.kalshiQuote) {
+    reasons.push(`Kalshi ${legs.kalshiOutcome.toUpperCase()} executable quote is unavailable`);
+  } else if (kalshiUnavailable) {
+    reasons.push(executableBookUnavailableReason('Kalshi', legs.kalshiOutcome, selectedQuotes.kalshiQuote!));
+  }
+  if (!selectedQuotes.pmQuote) {
+    reasons.push(`Polymarket ${legs.pmOutcome.toUpperCase()} executable quote is unavailable`);
+  } else if (pmUnavailable) {
+    reasons.push(executableBookUnavailableReason('Polymarket', legs.pmOutcome, selectedQuotes.pmQuote!));
+  }
+  if (selectedQuotes.kalshiQuote?.status === 'executable') {
+    const kalshiTickMicroCents = selectedQuotes.kalshiQuote.tickSizeMicroCents;
+    if (!Number.isSafeInteger(kalshiTickMicroCents) || kalshiTickMicroCents <= 0) {
+      reasons.push(`Kalshi ${legs.kalshiOutcome.toUpperCase()} tick size is unavailable`);
+    } else if (kalshiTickMicroCents !== 1_000_000) {
+      reasons.push(`Kalshi ${legs.kalshiOutcome.toUpperCase()} tick size $${(kalshiTickMicroCents / 100_000_000).toFixed(6)} is unsupported by the cent-only execution adapter`);
+    }
+  }
+  if ((!kalshiUnavailable && sharesK < evaluationQuantity) || (!pmUnavailable && sharesP < evaluationQuantity)) {
     reasons.push(
-      `Insufficient shares at best ask: Kalshi ${sharesK.toFixed(2)} / PM ${sharesP.toFixed(2)} (requested ${requestedShares})`,
+      `Insufficient shares at best ask for evaluation quantity ${evaluationQuantity}: ${kalshiUnavailable ? 'Kalshi unavailable' : `Kalshi ${sharesK.toFixed(2)}`} / ${pmUnavailable ? 'PM unavailable' : `PM ${sharesP.toFixed(2)}`}; canonical executable quantity remains 1`,
     );
   }
 
   // Executability is price-relative: N shares at a 24c ask require $0.24 × N,
   // not a fixed $0.50 on every leg. Depth values are best-ask dollar depth.
-  const requiredDepthKUsd = (legs.kalshiPrice ?? 0) * requestedShares;
-  const requiredDepthPUsd = (legs.pmPrice ?? 0) * requestedShares;
-  if (depthKUsd < requiredDepthKUsd || depthPUsd < requiredDepthPUsd) {
+  const requiredDepthKUsd = (legs.kalshiPrice ?? 0) * evaluationQuantity;
+  const requiredDepthPUsd = (legs.pmPrice ?? 0) * evaluationQuantity;
+  if ((!kalshiUnavailable && depthKUsd < requiredDepthKUsd) || (!pmUnavailable && depthPUsd < requiredDepthPUsd)) {
     reasons.push(
-      `Insufficient executable depth at quoted ask: Kalshi $${depthKUsd.toFixed(2)} / $${requiredDepthKUsd.toFixed(2)} required; PM $${depthPUsd.toFixed(2)} / $${requiredDepthPUsd.toFixed(2)} required`,
+      `Insufficient executable depth for evaluation quantity ${evaluationQuantity}: ${kalshiUnavailable ? 'Kalshi unavailable' : `Kalshi $${depthKUsd.toFixed(2)} / $${requiredDepthKUsd.toFixed(2)} required`}; ${pmUnavailable ? 'PM unavailable' : `PM $${depthPUsd.toFixed(2)} / $${requiredDepthPUsd.toFixed(2)} required`}; canonical executable quantity remains 1`,
     );
   }
 
@@ -772,25 +821,25 @@ export function buildExecutionRequest(input: BotTradeInput, _configuredMinShares
   if (pmMinimumOrderSize! > 1) return null;
   const contracts = 1;
   const requestedQuantityMicros = contracts * 1_000_000;
-  const { depthKUsd, depthPUsd } = legDepths(legs, input);
+  const { depthPUsd } = legDepths(legs, input);
   const depthTimestamp = explicitQuotes.pmQuote?.depthTimestamp ?? explicitQuotes.kalshiQuote?.depthTimestamp ?? null;
-  const rebuiltKalshiQuote = quoteOneShareFromTopAsk({
-    price: legs.kalshiPrice, depthUsd: depthKUsd, tickSize: 0.01, minimumOrderSize: 1,
-    requestedQuantity: contracts, depthTimestamp,
-  });
   const rebuiltPmQuote = quoteOneShareFromTopAsk({
     price: legs.pmPrice, depthUsd: depthPUsd, tickSize: pmTickSize, minimumOrderSize: pmMinimumOrderSize,
     requestedQuantity: contracts, depthTimestamp,
   });
   const kalshiQuote = isExecutableQuoteConsistent(explicitQuotes.kalshiQuote, 'buy', requestedQuantityMicros)
     ? explicitQuotes.kalshiQuote
-    : rebuiltKalshiQuote;
+    : null;
   const pmQuote = isExecutableQuoteConsistent(explicitQuotes.pmQuote, 'buy', requestedQuantityMicros)
     ? explicitQuotes.pmQuote
     : rebuiltPmQuote;
   if (kalshiQuote?.status !== 'executable' || pmQuote?.status !== 'executable'
     || kalshiQuote.vwapPriceMicroCents == null || pmQuote.vwapPriceMicroCents == null
     || kalshiQuote.limitPriceMicroCents == null || pmQuote.limitPriceMicroCents == null) return null;
+  // The installed Kalshi adapter submits integer cent prices. Until that
+  // boundary supports fixed-point dollar prices, sub-cent quotes must remain
+  // visible but non-executable rather than being rounded into another order.
+  if (kalshiQuote.tickSizeMicroCents !== 1_000_000) return null;
   const kalshiExecutionPrice = kalshiQuote.vwapPriceMicroCents / 100_000_000;
   const pmExecutionPrice = pmQuote.vwapPriceMicroCents / 100_000_000;
   const kalshiLimitPrice = kalshiQuote.limitPriceMicroCents / 100_000_000;
@@ -810,7 +859,7 @@ export function buildExecutionRequest(input: BotTradeInput, _configuredMinShares
     size: kalshiStake,
     contracts,
     minimumOrderSize: 1,
-    tickSize: 0.01,
+    tickSize: kalshiQuote.tickSizeMicroCents / 100_000_000,
     price: kalshiLimitPrice,
     orderType: 'limit',
     executableQuote: kalshiQuote,

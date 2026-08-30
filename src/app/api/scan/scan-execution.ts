@@ -11,7 +11,7 @@ import {
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl, parseOutcomePrices } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobAskDepths, getClobPrices } from '@/lib/polymarket-clob';
-import { buildKalshiArbShape, matchOutcomes, calculateAllArbitrages, parseDepth, attachOutcomeContingentApy, applyManualMatches, setSuspiciousRoiPct, UnifiedOutcome } from '@/lib/matcher';
+import { buildKalshiArbShape, matchOutcomes, calculateAllArbitrages, parseDepth, attachOutcomeContingentApy, applyManualMatches, setSuspiciousRoiPct, UnifiedOutcome, type KalshiAskDepthStatus } from '@/lib/matcher';
 import { resolveKalshiFeeAuthoritiesForMarkets } from '@/lib/kalshi-fee-quote';
 import { getSetting } from '@/lib/settings';
 import { getManualMatches } from '@/lib/manual-matches';
@@ -24,7 +24,7 @@ import { clientSafeError } from '@/lib/error-handler';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import { computePriceResolved } from '@/app/lib/page-shared';
 import { auditArbClassification } from '@/lib/arb-types';
-import { quoteOneShareFromTopAsk } from '@/lib/executable-book';
+import { quoteOneShareFromTopAsk, type ExecutableBookReason } from '@/lib/executable-book';
 import { getUnavailableScanPlatforms, resolveScanLinks } from '@/lib/scan-links';
 import { parseScanCapital } from '@/lib/scan-request';
 import { parseJsonObject } from '@/lib/request-json';
@@ -44,6 +44,15 @@ const KALSHI_MULTI_TIMEOUT_MS = 8000; // multi-series gets a bit more headroom
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
 
 const DORMANT_REASON_CODES = new Set(['clob_book_empty', 'clob_metadata_incomplete']);
+
+function kalshiDepthUnavailableReason(status: KalshiAskDepthStatus | undefined): Extract<ExecutableBookReason,
+  'authoritative_empty' | 'missing_depth' | 'malformed_depth' | 'inactive_market'> | undefined {
+  if (status === 'authoritative_empty') return 'authoritative_empty';
+  if (status === 'missing') return 'missing_depth';
+  if (status === 'malformed') return 'malformed_depth';
+  if (status === 'inactive') return 'inactive_market';
+  return undefined;
+}
 
 export async function executeFullScan(request: NextRequest) {
   const scanAttemptedAt = new Date().toISOString();
@@ -592,11 +601,13 @@ export async function executeFullScan(request: NextRequest) {
             pmNoTokenId: selectedPmLeg?.noTokenId,
             kalshiYesExecutableQuote: quoteOneShareFromTopAsk({
               price: o.kalshi?.yesAsk, depthUsd: o.kalshi?.yesAskDepth,
-              tickSize: 0.01, minimumOrderSize: 1, depthTimestamp: scanObservedAt,
+              tickSize: o.kalshi?.yesTickSize, minimumOrderSize: 1, depthTimestamp: scanObservedAt,
+              unavailableReason: kalshiDepthUnavailableReason(o.kalshi?.yesAskDepthStatus),
             }),
             kalshiNoExecutableQuote: quoteOneShareFromTopAsk({
               price: o.kalshi?.noAsk, depthUsd: o.kalshi?.noAskDepth,
-              tickSize: 0.01, minimumOrderSize: 1, depthTimestamp: scanObservedAt,
+              tickSize: o.kalshi?.noTickSize, minimumOrderSize: 1, depthTimestamp: scanObservedAt,
+              unavailableReason: kalshiDepthUnavailableReason(o.kalshi?.noAskDepthStatus),
             }),
             pmYesExecutableQuote: quoteOneShareFromTopAsk({
               price: selectedPmLeg?.yesPrice, depthUsd: selectedPmLeg?.askDepth,
@@ -621,6 +632,7 @@ export async function executeFullScan(request: NextRequest) {
             pmYesTickSize: selectedPmLeg?.yesTickSize ?? null,
             pmNoTickSize: selectedPmLeg?.noTickSize ?? null,
             requestedContracts: o.arbitrage!.requestedContracts ?? 1,
+            evaluationContracts: o.arbitrage!.evaluationContracts ?? o.arbitrage!.requestedContracts ?? 1,
             executionStatus: o.arbitrage!.executionStatus ?? 'unavailable',
             executionBlocker: o.arbitrage!.executionBlocker,
             kalshiStake: o.arbitrage!.kalshiStake,

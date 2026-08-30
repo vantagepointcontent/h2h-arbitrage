@@ -24,6 +24,8 @@ export interface KalshiMarket {
   no_bid_size_fp?: string;
   yes_ask_size_fp?: string;
   no_ask_size_fp?: string;
+  price_level_structure?: string;
+  price_ranges?: Array<{ start: string; end: string; step: string }>;
   yes_sub_title?: string;
   no_sub_title?: string;
   /** Venue timing fields used for outcome-contingent annualization. */

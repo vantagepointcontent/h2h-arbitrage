@@ -6,6 +6,12 @@ export type ExecutableBookStatus = 'executable' | 'non_executable' | 'unavailabl
 export type ExecutableBookReason =
   | 'below_minimum_order'
   | 'empty_book'
+  | 'authoritative_empty'
+  | 'missing_depth'
+  | 'malformed_depth'
+  | 'inactive_market'
+  | 'source_unavailable'
+  | 'stale_book'
   | 'insufficient_depth'
   | 'invalid_tick'
   | 'malformed_level'
@@ -60,6 +66,9 @@ export interface TopAskQuoteRequest {
   depthTimestamp: string | null;
   /** Matched quantity to quote. Defaults to one share for legacy callers. */
   requestedQuantity?: number;
+  /** Exact fail-closed source state when no authoritative level can be built. */
+  unavailableReason?: Extract<ExecutableBookReason,
+    'authoritative_empty' | 'missing_depth' | 'malformed_depth' | 'inactive_market' | 'source_unavailable' | 'stale_book'>;
 }
 
 function levelPriceMicroCents(level: ExecutableBookLevel): number {
@@ -197,7 +206,7 @@ export function quoteOneShareFromTopAsk(request: TopAskQuoteRequest): Executable
     && Number.isSafeInteger(depthMicroCents) && depthMicroCents > 0
     ? Number((BigInt(depthMicroCents) * BigInt(QUANTITY_SCALE)) / BigInt(priceMicroCents))
     : 0;
-  return walkExecutableBook({
+  const result = walkExecutableBook({
     side: 'buy',
     levels: quantityMicros > 0 ? [{ priceMicroCents, quantityMicros }] : [],
     requestedQuantityMicros,
@@ -205,6 +214,18 @@ export function quoteOneShareFromTopAsk(request: TopAskQuoteRequest): Executable
     minimumOrderQuantityMicros,
     depthTimestamp: request.depthTimestamp,
   });
+  return request.unavailableReason
+    ? {
+      ...result,
+      status: 'unavailable',
+      reason: request.unavailableReason,
+      filledQuantityMicros: 0,
+      totalCostMicroCents: 0,
+      vwapPriceMicroCents: null,
+      limitPriceMicroCents: null,
+      fills: [],
+    }
+    : result;
 }
 
 /** Validate an executable quote crossing an untrusted API/runtime boundary. */
@@ -247,4 +268,34 @@ export function isExecutableQuoteConsistent(
   return candidate.totalCostMicroCents === recomputedCost
     && candidate.vwapPriceMicroCents === recomputedVwap
     && candidate.limitPriceMicroCents === recomputedLimit;
+}
+
+/** Preserve a fail-closed unavailable quote across persistence without trusting arbitrary JSON. */
+export function isUnavailableQuoteConsistent(candidate: ExecutableBookQuote | undefined): candidate is ExecutableBookQuote {
+  const reasons: ExecutableBookReason[] = [
+    'empty_book', 'authoritative_empty', 'missing_depth', 'malformed_depth',
+    'inactive_market', 'source_unavailable', 'stale_book', 'malformed_level',
+    'missing_depth_timestamp',
+  ];
+  return candidate?.status === 'unavailable'
+    && candidate.reason != null
+    && reasons.includes(candidate.reason)
+    && Number.isSafeInteger(candidate.requestedQuantityMicros)
+    && candidate.requestedQuantityMicros > 0
+    && candidate.filledQuantityMicros === 0
+    && candidate.totalCostMicroCents === 0
+    && candidate.vwapPriceMicroCents === null
+    && candidate.limitPriceMicroCents === null
+    && Array.isArray(candidate.fills)
+    && candidate.fills.length === 0
+    && (candidate.reason === 'missing_depth_timestamp'
+      ? candidate.depthTimestamp === null
+      : typeof candidate.depthTimestamp === 'string' && Number.isFinite(Date.parse(candidate.depthTimestamp)))
+    // Tick metadata can itself be unavailable. Zero is safe here because an
+    // unavailable quote can never authorize a fill; retaining its exact source
+    // reason is more important than discarding the evidence at persistence.
+    && Number.isSafeInteger(candidate.tickSizeMicroCents)
+    && candidate.tickSizeMicroCents >= 0
+    && Number.isSafeInteger(candidate.minimumOrderQuantityMicros)
+    && candidate.minimumOrderQuantityMicros > 0;
 }

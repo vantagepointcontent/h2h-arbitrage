@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   quoteOneShareFromTopAsk,
   isExecutableQuoteConsistent,
+  isUnavailableQuoteConsistent,
   walkExecutableBook,
   type ExecutableBookFill,
 } from './executable-book';
@@ -34,6 +35,33 @@ describe('walkExecutableBook', () => {
       minimumOrderSize: 1,
       depthTimestamp: OBSERVED_AT,
     }).status).toBe('non_executable');
+  });
+
+  it('does not fabricate one share when floored dollar depth is one microunit short', () => {
+    expect(quoteOneShareFromTopAsk({
+      price: 0.333333,
+      depthUsd: '0.333332',
+      tickSize: 0.000001,
+      minimumOrderSize: 1,
+      depthTimestamp: OBSERVED_AT,
+    })).toMatchObject({
+      status: 'non_executable',
+      reason: 'insufficient_depth',
+      requestedQuantityMicros: ONE_SHARE,
+    });
+  });
+
+  it('preserves a genuine missing-timestamp state without inventing an observation time', () => {
+    const quote = quoteOneShareFromTopAsk({
+      price: 0.45,
+      depthUsd: 0.45,
+      tickSize: 0.01,
+      minimumOrderSize: 1,
+      depthTimestamp: null,
+    });
+
+    expect(quote).toMatchObject({ status: 'unavailable', reason: 'missing_depth_timestamp', depthTimestamp: null });
+    expect(isUnavailableQuoteConsistent(quote)).toBe(true);
   });
 
   it('sorts shuffled asks and fills one share entirely at the minimum ask', () => {

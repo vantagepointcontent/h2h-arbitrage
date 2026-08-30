@@ -52,6 +52,10 @@ export interface UnifiedOutcome {
     yesAskDepth?: string;
     noBidDepth?: string;
     noAskDepth?: string;
+    yesAskDepthStatus?: KalshiAskDepthStatus;
+    noAskDepthStatus?: KalshiAskDepthStatus;
+    yesTickSize?: number;
+    noTickSize?: number;
     eventId?: string;
     settlementTiming?: SettlementTiming;
     feeAuthority?: KalshiFeeAuthority;
@@ -137,6 +141,8 @@ export interface UnifiedOutcome {
     depthVerified?: boolean;
     /** Canonical opportunity sizing is always one contract/share per leg. */
     requestedContracts?: 1;
+    /** Venue-minimum quantity used only to compare non-executable candidate economics. */
+    evaluationContracts?: number;
     executionStatus?: 'executable' | 'non_executable' | 'unavailable';
     executionBlocker?: string;
     /** Versioned, integer-minor-unit calculation and provenance contract. */
@@ -168,6 +174,8 @@ export interface UnifiedOutcome {
    */
   platforms?: MatchedPlatformData[];
 }
+
+export type KalshiAskDepthStatus = 'available' | 'authoritative_empty' | 'missing' | 'malformed' | 'inactive';
 
 /** Normalized per-platform data for one matched outcome. */
 export interface MatchedPlatformData {
@@ -597,6 +605,11 @@ export function calculateArbitrageMax(
     sellPrice: number;
     blocker: string;
     fees: NonNullable<UnifiedOutcome['arbitrage']['fees']>;
+    requestedContracts: 1;
+    evaluationContracts: number;
+    kalshiStake: number;
+    pmStake: number;
+    expectedProfit: number;
   } | null = null;
 
   const considerUnexecutableQuote = (
@@ -608,10 +621,9 @@ export function calculateArbitrageMax(
     blocker: string,
     authoritativeContracts: number,
   ) => {
-    // OPS-864: price non_executable candidates at the actual minimum order size
-    // so expectedProfit, stake, and requestedContracts reflect the real economic
-    // opportunity. Other blockers (missing depth, tick misalignment) keep stakes
-    // at 0 because we cannot claim a fillable quantity.
+    // OPS-864/BUG-858: price non_executable candidates at the venue minimum only
+    // for economic comparison. The canonical requested execution remains one;
+    // other blockers keep comparison stakes at zero because no quantity is known.
     const isMinimumBlocker = /minimum order/i.test(blocker);
     const displayCapital = isMinimumBlocker && authoritativeContracts > 1
       ? authoritativeContracts : 100;
@@ -651,7 +663,8 @@ export function calculateArbitrageMax(
           netProfitIfPmWins: fees.netProfitIfPmWins,
           worstCaseNetProfit: fees.worstCaseNetProfit,
         },
-        requestedContracts: quoteCapital,
+        requestedContracts,
+        evaluationContracts: quoteCapital,
         kalshiStake,
         pmStake,
         expectedProfit,
@@ -802,6 +815,11 @@ export function calculateArbitrageMax(
       sellPrice: number;
       blocker: string;
       fees: NonNullable<UnifiedOutcome['arbitrage']['fees']>;
+      requestedContracts: 1;
+      evaluationContracts: number;
+      kalshiStake: number;
+      pmStake: number;
+      expectedProfit: number;
     } | null;
     if (quote) {
       return {
@@ -819,6 +837,7 @@ export function calculateArbitrageMax(
         arbType: 'direct',
         depthVerified: false,
         requestedContracts: quote.requestedContracts ?? requestedContracts,
+        evaluationContracts: quote.evaluationContracts,
         executionStatus: 'non_executable',
         executionBlocker: quote.blocker,
       };
@@ -851,6 +870,11 @@ export function calculateArbitrageMax(
     sellPrice: number;
     blocker: string;
     fees: NonNullable<UnifiedOutcome['arbitrage']['fees']>;
+    requestedContracts: 1;
+    evaluationContracts: number;
+    kalshiStake: number;
+    pmStake: number;
+    expectedProfit: number;
   } | null;
   const executableRoiPct = bestCapital > 0 ? (maxProfit / bestCapital) * 100 : 0;
   if (quote && quote.roiPct > executableRoiPct) {
@@ -869,6 +893,7 @@ export function calculateArbitrageMax(
       arbType: 'direct',
       depthVerified: false,
       requestedContracts,
+      evaluationContracts: quote.evaluationContracts,
       executionStatus: 'non_executable',
       executionBlocker: quote.blocker,
     };
@@ -1470,10 +1495,19 @@ export function buildPmArbShape(market: PMMarket, eventEndDate?: string) {
 }
 
 export function buildKalshiArbShape(km: KalshiMarket): NonNullable<UnifiedOutcome['kalshi']> {
-  // A quoted ask can be valid even when Kalshi omits the corresponding size.
-  // Preserve that price for display/matching, but keep explicit zero-size offers
-  // non-executable. Downstream depth remains zero when size is unknown, so this
-  // does not reintroduce BUG-101's synthetic infinite liquidity.
+  const askStatus = (
+    price: string | number | null | undefined,
+    size: string | number | null | undefined,
+  ): KalshiAskDepthStatus => {
+    if (km.status && km.status !== 'active' && km.status !== 'open') return 'inactive';
+    if (size == null) return 'missing';
+    const parsedSize = finiteDecimal(size);
+    if (parsedSize === null || parsedSize < 0) return 'malformed';
+    if (price == null) return 'missing';
+    const parsedPrice = finiteDecimal(price);
+    if (parsedPrice === null || parsedPrice <= 0 || parsedPrice > 1) return 'malformed';
+    return parsedSize === 0 ? 'authoritative_empty' : 'available';
+  };
   const executableAsk = (
     price: string | number | null | undefined,
     size: string | number | null | undefined,
@@ -1482,18 +1516,99 @@ export function buildKalshiArbShape(km: KalshiMarket): NonNullable<UnifiedOutcom
     return finiteMarketPrice(price);
   };
 
+  const decimalMicros = (value: string | number | null | undefined): bigint | null => {
+    if (value == null) return null;
+    const source = typeof value === 'number' && Number.isFinite(value)
+      ? value.toFixed(6)
+      : String(value).trim();
+    const match = source.match(/^(\d+)(?:\.(\d+))?$/);
+    if (!match) return null;
+    const fraction = `${match[2] ?? ''}000000`.slice(0, 6);
+    return BigInt(match[1]) * 1_000_000n + BigInt(fraction);
+  };
+  const dollarDepth = (
+    price: string | number | null | undefined,
+    shares: string | number | null | undefined,
+    status: KalshiAskDepthStatus,
+  ): string | undefined => {
+    if (status !== 'available') return status === 'authoritative_empty' ? '0' : undefined;
+    const priceMicros = decimalMicros(price);
+    const shareMicros = decimalMicros(shares);
+    if (priceMicros == null || shareMicros == null) return undefined;
+    // Floor rather than round: downstream quote construction divides this USD
+    // notional by price. Rounding up could fabricate a full share from a book
+    // that is one microunit short of the canonical quantity.
+    const usdMicros = (priceMicros * shareMicros) / 1_000_000n;
+    return `${usdMicros / 1_000_000n}.${String(usdMicros % 1_000_000n).padStart(6, '0')}`;
+  };
+  const tickAt = (price: string | number | null | undefined): number | undefined => {
+    const priceMicros = decimalMicros(price);
+    if (priceMicros == null || !Array.isArray(km.price_ranges)) return undefined;
+    for (const [index, range] of km.price_ranges.entries()) {
+      const start = decimalMicros(range.start);
+      const end = decimalMicros(range.end);
+      const step = decimalMicros(range.step);
+      if (start != null && end != null && step != null && step > 0n
+          && priceMicros >= start
+          && (priceMicros < end || (index === km.price_ranges.length - 1 && priceMicros === end))) {
+        return Number(step) / 1_000_000;
+      }
+    }
+    return undefined;
+  };
+  const selectedAskShares = (
+    direct: string | number | null | undefined,
+    reciprocal: string | number | null | undefined,
+  ): { shares: string | number | null | undefined; inconsistent: boolean } => {
+    const directMicros = decimalMicros(direct);
+    const reciprocalMicros = decimalMicros(reciprocal);
+    return {
+      shares: direct ?? reciprocal,
+      inconsistent: direct != null && reciprocal != null
+        && (directMicros == null || reciprocalMicros == null || directMicros !== reciprocalMicros),
+    };
+  };
+  // Kalshi's canonical order book publishes bids only. NO bids map to YES asks
+  // and YES bids map to NO asks at the reciprocal price with equal quantity.
+  // Market snapshots may also expose direct ask-size fields; when both forms
+  // exist they must agree or the selected depth fails closed as malformed.
+  const yesAskSelection = selectedAskShares(km.yes_ask_size_fp, km.no_bid_size_fp);
+  const noAskSelection = selectedAskShares(km.no_ask_size_fp, km.yes_bid_size_fp);
+  const yesAskShares = yesAskSelection.shares;
+  const noAskShares = noAskSelection.shares;
+  const reciprocalPriceInconsistent = (
+    ask: string | number | null | undefined,
+    oppositeBid: string | number | null | undefined,
+    oppositeBidSize: string | number | null | undefined,
+  ): boolean => {
+    if (oppositeBid == null || oppositeBidSize == null) return false;
+    const askMicros = decimalMicros(ask);
+    const bidMicros = decimalMicros(oppositeBid);
+    return askMicros == null || bidMicros == null || askMicros + bidMicros !== 1_000_000n;
+  };
+  const yesAskDepthStatus = yesAskSelection.inconsistent
+      || reciprocalPriceInconsistent(km.yes_ask_dollars, km.no_bid_dollars, km.no_bid_size_fp)
+    ? 'malformed' : askStatus(km.yes_ask_dollars, yesAskShares);
+  const noAskDepthStatus = noAskSelection.inconsistent
+      || reciprocalPriceInconsistent(km.no_ask_dollars, km.yes_bid_dollars, km.yes_bid_size_fp)
+    ? 'malformed' : askStatus(km.no_ask_dollars, noAskShares);
+
   return {
     ticker: km.ticker,
     yesBid: finiteMarketPrice(km.yes_bid_dollars),
-    yesAsk: executableAsk(km.yes_ask_dollars, km.yes_ask_size_fp),
+    yesAsk: executableAsk(km.yes_ask_dollars, yesAskShares),
     noBid: finiteMarketPrice(km.no_bid_dollars),
-    noAsk: executableAsk(km.no_ask_dollars, km.no_ask_size_fp),
+    noAsk: executableAsk(km.no_ask_dollars, noAskShares),
     lastPrice: finiteMarketPrice(km.last_price_dollars),
     volume24h: km.volume_24h_fp,
     yesBidDepth: km.yes_bid_size_fp,
-    yesAskDepth: km.yes_ask_size_fp,
+    yesAskDepth: dollarDepth(km.yes_ask_dollars, yesAskShares, yesAskDepthStatus),
     noBidDepth: km.no_bid_size_fp,
-    noAskDepth: km.no_ask_size_fp,
+    noAskDepth: dollarDepth(km.no_ask_dollars, noAskShares, noAskDepthStatus),
+    yesAskDepthStatus,
+    noAskDepthStatus,
+    yesTickSize: tickAt(km.yes_ask_dollars),
+    noTickSize: tickAt(km.no_ask_dollars),
     settlementTiming: kalshiSettlementTiming(km),
     eventId: km.event_ticker,
     feeAuthority: km.feeAuthority,

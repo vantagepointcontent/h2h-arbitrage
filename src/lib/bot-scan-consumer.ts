@@ -5,7 +5,7 @@ import type { BotPositionExecutionMode } from './bot-positions';
 import logger from './logger';
 import { auditArbClassification } from './arb-types';
 import type { BotLegRelationshipState } from './bot-leg-identity';
-import { isExecutableQuoteConsistent, type ExecutableBookQuote } from './executable-book';
+import { isExecutableQuoteConsistent, isUnavailableQuoteConsistent, type ExecutableBookQuote } from './executable-book';
 import type { PropositionRelationship } from './proposition-identity';
 
 export type BotScanSource = 'scan_api' | 'watcher' | 'scheduled' | 'catch_up';
@@ -69,6 +69,8 @@ export interface BotScanCandidate {
   pmNoMinOrderSize?: number | null;
   pmYesTickSize?: number | null;
   pmNoTickSize?: number | null;
+  requestedContracts?: 1;
+  evaluationContracts?: number;
   executionStatus?: 'executable' | 'non_executable' | 'unavailable';
   executionBlocker?: string | null;
   fees: BotScanFees | null;
@@ -426,6 +428,8 @@ function candidateAuditDetails(scan: PersistedBotScan, candidateIndex: number, c
         pmNoMinimumOrder: candidate.pmNoMinOrderSize ?? null,
         pmYesTickSize: candidate.pmYesTickSize ?? null,
         pmNoTickSize: candidate.pmNoTickSize ?? null,
+        canonicalExecutableQuantity: candidate.requestedContracts ?? 1,
+        evaluationQuantity: candidate.evaluationContracts ?? candidate.requestedContracts ?? 1,
       },
     },
     ...extra,
@@ -1385,14 +1389,11 @@ export function parseBotScanCandidate(value: unknown, expiryDate?: string | null
   const row = value as Record<string, unknown>;
   const fees = row.fees && typeof row.fees === 'object' ? row.fees as Record<string, unknown> : null;
   const pmFee = fees?.pmFee ?? fees?.polymarketFee;
-  const quote = (candidate: unknown): ExecutableBookQuote | undefined =>
-    isExecutableQuoteConsistent(
-      candidate as ExecutableBookQuote | undefined,
-      'buy',
-      (candidate as ExecutableBookQuote | undefined)?.requestedQuantityMicros ?? 0,
-    )
-      ? candidate as ExecutableBookQuote
-      : undefined;
+  const quote = (candidate: unknown): ExecutableBookQuote | undefined => {
+    const parsed = candidate as ExecutableBookQuote | undefined;
+    return isExecutableQuoteConsistent(parsed, 'buy', parsed?.requestedQuantityMicros ?? 0)
+      || isUnavailableQuoteConsistent(parsed) ? parsed : undefined;
+  };
   if (typeof row.artist !== 'string' || typeof row.strategy !== 'string'
       || !finite(row.roiPct) || !finite(row.expectedProfit)
       || typeof row.kalshiTicker !== 'string' || typeof row.pmConditionId !== 'string') return null;
@@ -1447,6 +1448,9 @@ export function parseBotScanCandidate(value: unknown, expiryDate?: string | null
     pmNoMinOrderSize: finite(row.pmNoMinOrderSize) ? row.pmNoMinOrderSize as number : null,
     pmYesTickSize: finite(row.pmYesTickSize) ? row.pmYesTickSize as number : null,
     pmNoTickSize: finite(row.pmNoTickSize) ? row.pmNoTickSize as number : null,
+    requestedContracts: row.requestedContracts === 1 ? 1 : undefined,
+    evaluationContracts: finite(row.evaluationContracts) && row.evaluationContracts >= 1
+      ? row.evaluationContracts as number : undefined,
     executionStatus: row.executionStatus === 'executable' || row.executionStatus === 'non_executable' || row.executionStatus === 'unavailable'
       ? row.executionStatus
       : undefined,

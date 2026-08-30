@@ -19,14 +19,14 @@ describe('buildKalshiArbShape', () => {
     ticker: 'KX-ASK-SIZE',
     yes_bid_dollars: '0.39',
     yes_ask_dollars: '0.41',
-    no_bid_dollars: '0.57',
-    no_ask_dollars: '0.59',
+    no_bid_dollars: '0.59',
+    no_ask_dollars: '0.61',
     last_price_dollars: '0.40',
     volume_24h_fp: '100',
     yes_bid_size_fp: '10',
     yes_ask_size_fp: '5',
-    no_bid_size_fp: '10',
-    no_ask_size_fp: '5',
+    no_bid_size_fp: '5',
+    no_ask_size_fp: '10',
     ...overrides,
   }) as unknown as Parameters<typeof buildKalshiArbShape>[0];
 
@@ -37,17 +37,132 @@ describe('buildKalshiArbShape', () => {
     }));
 
     expect(shape.yesAsk).toBe(0.41);
-    expect(shape.noAsk).toBe(0.59);
+    expect(shape.noAsk).toBe(0.61);
   });
 
   it('keeps explicitly zero-sized asks non-executable', () => {
     const shape = buildKalshiArbShape(market({
       yes_ask_size_fp: 0,
+      no_bid_size_fp: 0,
+      yes_bid_size_fp: 0,
       no_ask_size_fp: '0',
     }));
 
     expect(shape.yesAsk).toBe(0);
     expect(shape.noAsk).toBe(0);
+  });
+
+  it('maps reciprocal Kalshi bid size to NO ask liquidity and converts share counts to dollar depth', () => {
+    const shape = buildKalshiArbShape(market({
+      yes_bid_dollars: '0.2500',
+      yes_bid_size_fp: '72.62',
+      yes_ask_dollars: '0.2600',
+      yes_ask_size_fp: '3.95',
+      no_bid_size_fp: undefined,
+      no_ask_dollars: '0.7500',
+      no_ask_size_fp: undefined,
+      price_ranges: [
+        { start: '0.0000', end: '0.1000', step: '0.0010' },
+        { start: '0.1000', end: '0.9000', step: '0.0100' },
+        { start: '0.9000', end: '1.0000', step: '0.0010' },
+      ],
+    }));
+
+    expect(shape.yesAskDepth).toBe('1.027000');
+    expect(shape.noAskDepth).toBe('54.465000');
+    expect(shape.yesAskDepthStatus).toBe('available');
+    expect(shape.noAskDepthStatus).toBe('available');
+    expect(shape.yesTickSize).toBe(0.01);
+    expect(shape.noTickSize).toBe(0.01);
+  });
+
+  it('falls back to direct ask-size metadata and fails closed when reciprocal quantities disagree', () => {
+    const direct = buildKalshiArbShape(market({
+      yes_bid_size_fp: undefined,
+      no_ask_size_fp: '12.5',
+      no_ask_dollars: '0.75',
+    }));
+    const inconsistent = buildKalshiArbShape(market({
+      yes_bid_size_fp: '12.5',
+      no_ask_size_fp: '13.5',
+      no_ask_dollars: '0.75',
+    }));
+
+    expect(direct.noAskDepthStatus).toBe('available');
+    expect(direct.noAskDepth).toBe('9.375000');
+    expect(inconsistent.noAskDepthStatus).toBe('malformed');
+    expect(inconsistent.noAskDepth).toBeUndefined();
+  });
+
+  it('fails closed when a reciprocal bid quantity is attached to a contradictory ask price', () => {
+    const shape = buildKalshiArbShape(market({
+      yes_bid_dollars: '0.25',
+      yes_bid_size_fp: '10',
+      no_ask_dollars: '0.70',
+      no_ask_size_fp: undefined,
+    }));
+
+    expect(shape.noAskDepthStatus).toBe('malformed');
+    expect(shape.noAskDepth).toBeUndefined();
+  });
+
+  it('preserves distinct missing, malformed, inactive, and authoritative-empty Kalshi liquidity states', () => {
+    expect(buildKalshiArbShape(market({ yes_ask_size_fp: undefined, no_bid_size_fp: undefined })).yesAskDepthStatus).toBe('missing');
+    expect(buildKalshiArbShape(market({ yes_ask_size_fp: 'not-a-size' })).yesAskDepthStatus).toBe('malformed');
+    expect(buildKalshiArbShape(market({ status: 'closed' })).yesAskDepthStatus).toBe('inactive');
+    expect(buildKalshiArbShape(market({ yes_ask_size_fp: '0', no_bid_size_fp: '0' })).yesAskDepthStatus).toBe('authoritative_empty');
+  });
+
+  it('derives tapered sub-cent Kalshi ticks from the exact selected ask price', () => {
+    const shape = buildKalshiArbShape(market({
+      yes_ask_dollars: '0.0780',
+      no_ask_dollars: '0.9510',
+      price_ranges: [
+        { start: '0.0000', end: '0.1000', step: '0.0010' },
+        { start: '0.1000', end: '0.9000', step: '0.0100' },
+        { start: '0.9000', end: '1.0000', step: '0.0010' },
+      ],
+    }));
+
+    expect(shape.yesTickSize).toBe(0.001);
+    expect(shape.noTickSize).toBe(0.001);
+  });
+
+  it('uses the next tapered range tick at a shared price boundary', () => {
+    const shape = buildKalshiArbShape(market({
+      yes_ask_dollars: '0.1000',
+      price_ranges: [
+        { start: '0.0000', end: '0.1000', step: '0.0010' },
+        { start: '0.1000', end: '0.9000', step: '0.0100' },
+        { start: '0.9000', end: '1.0000', step: '0.0010' },
+      ],
+    }));
+
+    expect(shape.yesTickSize).toBe(0.01);
+  });
+
+  it('converts randomized decimal share depth with exact fixed-point rounding', () => {
+    let state = 0x858;
+    for (let index = 0; index < 100; index += 1) {
+      state = (state * 1664525 + 1013904223) >>> 0;
+      const priceMicros = 1_000 + (state % 998_001);
+      state = (state * 1664525 + 1013904223) >>> 0;
+      const shareMicros = 1 + (state % 1_000_000_000);
+      const price = `${Math.floor(priceMicros / 1_000_000)}.${String(priceMicros % 1_000_000).padStart(6, '0')}`;
+      const shares = `${Math.floor(shareMicros / 1_000_000)}.${String(shareMicros % 1_000_000).padStart(6, '0')}`;
+      const expectedMicros = (BigInt(priceMicros) * BigInt(shareMicros)) / 1_000_000n;
+      const expected = `${expectedMicros / 1_000_000n}.${String(expectedMicros % 1_000_000n).padStart(6, '0')}`;
+
+      const shape = buildKalshiArbShape(market({
+        yes_ask_dollars: price,
+        yes_ask_size_fp: shares,
+        no_bid_dollars: undefined,
+        no_bid_size_fp: shares,
+      }));
+
+      expect(shape.yesAskDepth).toBe(expected);
+      expect(shape.yesAskDepthStatus).toBe('available');
+    }
   });
 });
 
@@ -193,7 +308,8 @@ describe('calculateArbitrageMax', () => {
     expect(r.strategy).toBe('Buy YES Kalshi + NO PM');
     expect(r.executionStatus).toBe('non_executable');
     expect(r.executionBlocker).toMatch(/minimum order is 5 shares/);
-    expect(r.requestedContracts).toBe(5);
+    expect(r.requestedContracts).toBe(1);
+    expect(r.evaluationContracts).toBe(5);
     expect(r.expectedProfit).toBeGreaterThan(0);
     expect(r.kalshiStake + r.pmStake).toBeGreaterThan(0);
   });

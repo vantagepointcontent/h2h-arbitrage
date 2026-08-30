@@ -21,7 +21,7 @@ vi.mock('./proposition-registry', async (importOriginal) => {
     resolveCanonicalPropositionRelationship: (relationship: PropositionRelationship | null | undefined) => relationship ?? null,
   };
 });
-import { walkExecutableBook } from './executable-book';
+import { quoteOneShareFromTopAsk, walkExecutableBook } from './executable-book';
 
 function settings(overrides: Partial<BotSettings> = {}): BotSettings {
   return {
@@ -76,6 +76,33 @@ function candidate(overrides: Partial<BotScanCandidate> = {}): BotScanCandidate 
     expiryDate: '2026-08-18T00:00:00.000Z',
     ...overrides,
   };
+  const observedAt = '2026-08-11T12:00:10.000Z';
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'kalshiYesExecutableQuote')) {
+    result.kalshiYesExecutableQuote = quoteOneShareFromTopAsk({
+      price: result.kalshiYesAsk, depthUsd: result.kalshiYesDepth,
+      tickSize: 0.01, minimumOrderSize: 1, depthTimestamp: observedAt,
+    });
+  }
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'kalshiNoExecutableQuote')) {
+    result.kalshiNoExecutableQuote = quoteOneShareFromTopAsk({
+      price: result.kalshiNoAsk, depthUsd: result.kalshiNoDepth,
+      tickSize: 0.01, minimumOrderSize: 1, depthTimestamp: observedAt,
+    });
+  }
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'pmYesExecutableQuote')) {
+    result.pmYesExecutableQuote = quoteOneShareFromTopAsk({
+      price: result.pmYesAsk, depthUsd: result.pmYesDepth,
+      tickSize: result.pmYesTickSize, minimumOrderSize: result.pmYesMinOrderSize,
+      depthTimestamp: observedAt,
+    });
+  }
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'pmNoExecutableQuote')) {
+    result.pmNoExecutableQuote = quoteOneShareFromTopAsk({
+      price: result.pmNoAsk, depthUsd: result.pmNoDepth,
+      tickSize: result.pmNoTickSize, minimumOrderSize: result.pmNoMinOrderSize,
+      depthTimestamp: observedAt,
+    });
+  }
   if (overrides.propositionRelationship === undefined) {
     const states = ['team a', 'not team a'];
     result.propositionRelationship = {
@@ -457,6 +484,28 @@ describe('durable BotTrader scan consumer', () => {
     expect(parsed?.pmYesAsk).toBeNull();
   });
 
+  it('preserves a validated unavailable book reason across persisted scan parsing', () => {
+    const unavailable = quoteOneShareFromTopAsk({
+      price: 0.45,
+      depthUsd: null,
+      tickSize: 0.01,
+      minimumOrderSize: 1,
+      depthTimestamp: '2026-08-11T12:00:10.000Z',
+      unavailableReason: 'missing_depth',
+    });
+    const parsed = parseBotScanCandidate({
+      artist: 'A', strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct', roiPct: 5, expectedProfit: 5,
+      kalshiTicker: 'KX-A', pmConditionId: 'pm-a',
+      kalshiYesExecutableQuote: unavailable,
+      requestedContracts: 1,
+      evaluationContracts: 5,
+      fees: { kalshiFee: 0.01, pmFee: 0.01 },
+    });
+
+    expect(parsed?.kalshiYesExecutableQuote).toMatchObject({ status: 'unavailable', reason: 'missing_depth' });
+    expect(parsed).toMatchObject({ requestedContracts: 1, evaluationContracts: 5 });
+  });
+
   it('preserves authoritative fee values and calculation provenance from persisted candidates', () => {
     const parsed = parseBotScanCandidate({
       artist: 'A', strategy: 'Buy YES Kalshi + NO PM', arbType: 'direct', roiPct: 5, expectedProfit: 5,
@@ -517,7 +566,7 @@ describe('durable BotTrader scan consumer', () => {
     }));
   });
 
-  it('promotes a paper candidate rejected by the legacy one-share venue minimum check', async () => {
+  it('keeps a venue-minimum-above-one candidate non-executable in paper mode', async () => {
     const venueMinimumCandidate = candidate({
       executionStatus: 'non_executable',
       executionBlocker: 'Polymarket NO minimum order is 5 shares; requested 1 share',
@@ -532,14 +581,16 @@ describe('durable BotTrader scan consumer', () => {
       executionMode: 'paper',
     });
 
-    await expect(h.consumer.consume(41, 'scan_api')).resolves.toMatchObject({
-      state: 'placed',
-      placementCount: 1,
+    const result = await h.consumer.consume(41, 'scan_api');
+    expect(result).toMatchObject({
+      state: 'criteria_rejected',
+      placementCount: 0,
     });
-    expect(h.deps.execute).toHaveBeenCalledOnce();
+    expect(result.reason).toContain('canonical executable quantity 1');
+    expect(h.deps.execute).not.toHaveBeenCalled();
     expect(h.opportunityDecisions).toContainEqual(expect.objectContaining({
-      state: 'eligible',
-      reasonCode: 'scan_eligible',
+      state: 'rejected',
+      reasonCode: 'scan_criteria_rejected',
     }));
   });
 
@@ -562,7 +613,7 @@ describe('durable BotTrader scan consumer', () => {
     await expect(h.consumer.consume(41, 'scan_api')).resolves.toMatchObject({
       state: 'criteria_rejected',
       reasonCode: 'scan_criteria_rejected',
-      reason: '1 candidate(s) evaluated; 0 eligible — ROI 1.00% < min 2.00%',
+      reason: expect.stringContaining('ROI 1.00% < min 2.00%'),
     });
     expect(h.deps.execute).not.toHaveBeenCalled();
   });
@@ -715,7 +766,7 @@ describe('durable BotTrader scan consumer', () => {
     const h = harness({ current: [candidate({ kalshiYesDepth: 0 })] });
     const result = await h.consumer.consume(41, 'scan_api');
     expect(result.state).toBe('revalidation_rejected');
-    expect(result.reason).toContain('depth');
+    expect(result.reason).toContain('authoritative book is empty');
   });
 
   it('rejects a changed first-leg market identity', async () => {
