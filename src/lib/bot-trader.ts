@@ -56,7 +56,7 @@ import {
   type PropositionRelationship,
   type PropositionValidation,
 } from './proposition-identity';
-import { resolveMatchedMarketMapping } from './matched-market-mapping';
+import { resolveOrDeriveMatchedMarketMapping } from './matched-market-mapping';
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -554,15 +554,16 @@ export async function authorizeBotTradeInput(input: BotTradeInput): Promise<BotT
   if (!legs.supported || !input.kalshiTicker || !input.pmConditionId || !selectedPmToken) {
     return { reason: 'Matched market exact outcome mapping cannot be resolved: selected stable identifiers are missing' };
   }
-  let resolved: Awaited<ReturnType<typeof resolveMatchedMarketMapping>>;
+  let resolved: Awaited<ReturnType<typeof resolveOrDeriveMatchedMarketMapping>>;
   try {
-    resolved = await resolveMatchedMarketMapping({
+    resolved = await resolveOrDeriveMatchedMarketMapping({
       matchedMarketId: input.pairId,
       kalshiTicker: input.kalshiTicker,
       pmConditionId: input.pmConditionId,
       pmTokenId: selectedPmToken,
       kalshiSide: legs.kalshiOutcome,
       pmSide: legs.pmOutcome,
+      sourceScanId: input.sourceScanId ?? null,
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);

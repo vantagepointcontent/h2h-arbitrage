@@ -6,7 +6,7 @@ import {
   type PropositionRelationshipV2,
 } from './proposition-identity';
 
-export type MappingSource = 'matched_market_review' | 'legacy_registry_migration';
+export type MappingSource = 'matched_market_review' | 'legacy_registry_migration' | 'matched_market_scan_derivation';
 
 export interface MatchedMarketMappingInput {
   matchedMarketId: string;
@@ -21,6 +21,10 @@ export interface MatchedMarketExecutionTuple {
   pmTokenId: string;
   kalshiSide: 'yes' | 'no';
   pmSide: 'yes' | 'no';
+}
+
+export interface MatchedMarketDerivationInput extends MatchedMarketExecutionTuple {
+  sourceScanId: number | null;
 }
 
 export type MatchedMarketMappingResolution =
@@ -51,6 +55,128 @@ function mappingIdentity(matchedMarketId: string, relationship: PropositionRelat
 }
 function mappingRevision(relationship: PropositionRelationshipV2): string {
   return createHash('sha256').update(canonicalJson(relationship)).digest('hex');
+}
+
+function candidateSides(strategy: unknown): Pick<MatchedMarketExecutionTuple, 'kalshiSide' | 'pmSide'> | null {
+  if (typeof strategy !== 'string') return null;
+  const value = strategy.toLowerCase();
+  if (value.includes('yes kalshi') && value.includes('no pm')) return { kalshiSide: 'yes', pmSide: 'no' };
+  if (value.includes('yes pm') && value.includes('no kalshi')) return { kalshiSide: 'no', pmSide: 'yes' };
+  return null;
+}
+
+function text(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function outcomeKey(value: string): string {
+  return value.normalize('NFKD').replace(/\([^)]*\)/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function compatibleOutcomeLabels(values: string[]): boolean {
+  const keys = values.map(outcomeKey);
+  if (keys.some((value) => !value)) return false;
+  const shortest = [...keys].sort((a, b) => a.length - b.length)[0];
+  return keys.every((value) => value === shortest || value.startsWith(`${shortest} `));
+}
+
+function candidateTuple(candidate: Record<string, unknown>): Omit<MatchedMarketExecutionTuple, 'matchedMarketId'> | null {
+  const sides = candidateSides(candidate.strategy);
+  const kalshiTicker = text(candidate.kalshiTicker);
+  const pmConditionId = text(candidate.pmConditionId);
+  const pmTokenId = sides?.pmSide === 'yes' ? text(candidate.pmYesTokenId) : text(candidate.pmNoTokenId);
+  if (!sides || !kalshiTicker || !pmConditionId || !pmTokenId) return null;
+  return { kalshiTicker, pmConditionId, pmTokenId, ...sides };
+}
+
+function tupleMatches(left: Omit<MatchedMarketExecutionTuple, 'matchedMarketId'>, right: MatchedMarketExecutionTuple): boolean {
+  return left.kalshiTicker.trim().toUpperCase() === right.kalshiTicker.trim().toUpperCase()
+    && normalized(left.pmConditionId) === normalized(right.pmConditionId)
+    && left.pmTokenId.trim() === right.pmTokenId.trim()
+    && left.kalshiSide === right.kalshiSide
+    && left.pmSide === right.pmSide;
+}
+
+function settlementConflict(candidate: Record<string, unknown>): string | null {
+  const outcomeApy = candidate.outcomeApy;
+  if (!outcomeApy || typeof outcomeApy !== 'object') return null;
+  const payload = outcomeApy as Record<string, unknown>;
+  const kalshi = payload.kalshi as Record<string, unknown> | undefined;
+  const polymarket = payload.polymarket as Record<string, unknown> | undefined;
+  const kalshiAt = text(kalshi?.contractualAt);
+  const pmAt = text(polymarket?.contractualAt);
+  if (!kalshiAt || !pmAt) return null;
+  const kalshiMs = Date.parse(kalshiAt);
+  const pmMs = Date.parse(pmAt);
+  if (!Number.isFinite(kalshiMs) || !Number.isFinite(pmMs)) {
+    return `settlement timestamps are malformed: Kalshi ${kalshiAt}, Polymarket ${pmAt}`;
+  }
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  return Math.abs(kalshiMs - pmMs) > sevenDaysMs
+    ? `settlement timestamps conflict: Kalshi ${kalshiAt}, Polymarket ${pmAt}`
+    : null;
+}
+
+function derivedRelationship(
+  matchedMarketId: string,
+  scanId: number,
+  scannedAt: string,
+  candidate: Record<string, unknown>,
+  tuple: Omit<MatchedMarketExecutionTuple, 'matchedMarketId'>,
+): PropositionRelationshipV2 | { reason: string } {
+  const outcome = text(candidate.artist);
+  const kalshiOutcome = text(candidate.kalshiOutcomeLabel);
+  const pmOutcome = text(candidate.pmOutcomeLabel);
+  const kalshiQuestion = text(candidate.kalshiMarketQuestion);
+  const pmQuestion = text(candidate.pmMarketQuestion);
+  if (!outcome || !kalshiOutcome || !pmOutcome || !kalshiQuestion || !pmQuestion) {
+    return { reason: 'selected outcome metadata is incomplete' };
+  }
+  if (!compatibleOutcomeLabels([outcome, kalshiOutcome, pmOutcome])) {
+    return { reason: `selected outcome labels conflict: canonical ${outcome}, Kalshi ${kalshiOutcome}, Polymarket ${pmOutcome}` };
+  }
+  const settlement = settlementConflict(candidate);
+  if (settlement) return { reason: settlement };
+  const parentEventId = `matched-market:${matchedMarketId}`;
+  const resolutionRuleId = `${parentEventId}:approved-link-v1`;
+  const opposite = `not:${outcome}`;
+  const evidencePayload = {
+    matchedMarketId, scanId, tuple, outcome, kalshiOutcome, pmOutcome, kalshiQuestion, pmQuestion,
+    outcomeApy: candidate.outcomeApy ?? null,
+  };
+  const evidenceRevision = createHash('sha256').update(canonicalJson(evidencePayload)).digest('hex');
+  const resolutionRuleRevision = createHash('sha256').update(resolutionRuleId).digest('hex');
+  const payout = (side: 'yes' | 'no') => side === 'yes' ? outcome : opposite;
+  return {
+    schemaVersion: 2,
+    state: 'verified_complementary',
+    verificationSource: 'manually_verified_ids',
+    verifiedAt: scannedAt,
+    reviewedBy: [`matched-market-approval:${matchedMarketId}`, 'deterministic-outcome-resolver:v1'],
+    reviewedAt: scannedAt,
+    reviewTask: `matched-market:${matchedMarketId}`,
+    evidenceRevision,
+    resolutionRuleRevision,
+    evidence: [{ uri: `scan-results/${scanId}`, sha256: evidenceRevision, observedAt: scannedAt }],
+    parentEventId,
+    resolutionRuleId,
+    exhaustivePayoutStates: [outcome, opposite],
+    humanLabel: outcome,
+    legs: {
+      kalshi: {
+        platform: 'kalshi', platformMarketId: tuple.kalshiTicker, parentEventId,
+        selectedOutcome: outcome, contractSide: tuple.kalshiSide, payoutState: payout(tuple.kalshiSide),
+        eventPayoutStates: [outcome, opposite], resolutionRuleId, humanLabel: kalshiOutcome,
+        marketQuestion: kalshiQuestion, tokenId: null,
+      },
+      polymarket: {
+        platform: 'polymarket', platformMarketId: tuple.pmConditionId, parentEventId,
+        selectedOutcome: outcome, contractSide: tuple.pmSide, payoutState: payout(tuple.pmSide),
+        eventPayoutStates: [outcome, opposite], resolutionRuleId, humanLabel: pmOutcome,
+        marketQuestion: pmQuestion, tokenId: tuple.pmTokenId,
+      },
+    },
+  };
 }
 
 export function createMatchedMarketMappingStore(client: Client) {
@@ -96,8 +222,11 @@ export function createMatchedMarketMappingStore(client: Client) {
     ], 'write');
   }
 
-  async function persistVerified(input: MatchedMarketMappingInput): Promise<{ mappingId: string; revision: string; inserted: boolean }> {
-    await ensureSchema();
+  async function persistVerified(
+    input: MatchedMarketMappingInput,
+    options: { schemaReady?: boolean } = {},
+  ): Promise<{ mappingId: string; revision: string; inserted: boolean }> {
+    if (!options.schemaReady) await ensureSchema();
     const validation = validatePropositionRelationship(input.relationship);
     if (!validation.valid || input.relationship.schemaVersion !== 2) {
       throw new Error(`Invalid Matched Market exact outcome mapping: ${validation.valid ? 'review evidence is required' : validation.reason}`);
@@ -134,10 +263,10 @@ export function createMatchedMarketMappingStore(client: Client) {
       });
       throw new Error(`Conflicting Matched Market mapping for ${marketId}; existing authority was not overwritten`);
     }
-    const inserted = !existing.rows.some((row) => String(row.mapping_id) === mappingId);
-    if (inserted) {
-      await client.execute({
-        sql: `INSERT INTO matched_market_mappings
+    let inserted = false;
+    if (!existing.rows.some((row) => String(row.mapping_id) === mappingId)) {
+      const insert = await client.execute({
+        sql: `INSERT OR IGNORE INTO matched_market_mappings
           (mapping_id,matched_market_id,kalshi_ticker,pm_condition_id,pm_token_id,kalshi_side,pm_side,
            relationship_json,mapping_revision,evidence_revision,resolution_rule_revision,source,created_at)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -145,7 +274,8 @@ export function createMatchedMarketMappingStore(client: Client) {
           JSON.stringify(input.relationship), revision, input.relationship.evidenceRevision,
           input.relationship.resolutionRuleRevision, input.source, new Date().toISOString()],
       });
-      await client.execute({
+      inserted = Number(insert.rowsAffected ?? 0) > 0;
+      if (inserted) await client.execute({
         sql: `INSERT INTO matched_market_mapping_audit (matched_market_id,mapping_id,classification,reason,recorded_at)
           VALUES (?,?,?,?,?)`,
         args: [marketId, mappingId, 'mapped', `Persisted exact ${tuple.kalshiTicker}/${tuple.pmConditionId}/${tuple.pmTokenId}/${tuple.kalshiSide}/${tuple.pmSide}`, new Date().toISOString()],
@@ -198,6 +328,65 @@ export function createMatchedMarketMappingStore(client: Client) {
     }
   }
 
+  async function resolveOrDerive(input: MatchedMarketDerivationInput): Promise<MatchedMarketMappingResolution> {
+    const current = await resolve(input);
+    if (current.state !== 'missing') return current;
+    const marketId = input.matchedMarketId.trim();
+    if (!Number.isSafeInteger(input.sourceScanId) || Number(input.sourceScanId) <= 0) {
+      return {
+        state: 'invalid', matchedMarketId: marketId,
+        reason: `Matched market ${marketId} cannot derive exact tuple ${input.kalshiTicker}/${input.pmConditionId}/${input.pmTokenId}/${input.kalshiSide}/${input.pmSide}: persisted source scan ID is missing`,
+      };
+    }
+    const sourceScanId = Number(input.sourceScanId);
+    const scan = await client.execute({
+      sql: 'SELECT raw_result,scanned_at FROM scan_results WHERE id=? AND market_id=? LIMIT 1',
+      args: [sourceScanId, marketId],
+    });
+    if (scan.rows.length !== 1) {
+      return {
+        state: 'invalid', matchedMarketId: marketId,
+        reason: `Matched market ${marketId} cannot derive exact tuple from scan ${sourceScanId}: persisted scan identity does not match`,
+      };
+    }
+    let candidates: Record<string, unknown>[];
+    try {
+      const raw = JSON.parse(String(scan.rows[0].raw_result)) as { allArbs?: unknown };
+      candidates = Array.isArray(raw.allArbs)
+        ? raw.allArbs.filter((candidate): candidate is Record<string, unknown> => Boolean(candidate) && typeof candidate === 'object')
+        : [];
+    } catch {
+      return {
+        state: 'invalid', matchedMarketId: marketId,
+        reason: `Matched market ${marketId} cannot derive exact tuple from scan ${sourceScanId}: persisted scan payload is malformed`,
+      };
+    }
+    const exact = candidates.filter((candidate) => {
+      const tuple = candidateTuple(candidate);
+      return tuple != null && tupleMatches(tuple, input);
+    });
+    const identifiers = `${input.kalshiTicker}/${input.pmConditionId}/${input.pmTokenId}/${input.kalshiSide}/${input.pmSide}`;
+    if (exact.length !== 1) {
+      return {
+        state: exact.length === 0 ? 'mismatch' : 'invalid', matchedMarketId: marketId,
+        reason: `Matched market ${marketId} exact outcome resolution for ${identifiers} is ${exact.length === 0 ? 'not present' : `ambiguous (${exact.length} persisted candidates)`} in scan ${sourceScanId}`,
+      };
+    }
+    const tuple = candidateTuple(exact[0])!;
+    const relationship = derivedRelationship(marketId, sourceScanId, String(scan.rows[0].scanned_at), exact[0], tuple);
+    if ('reason' in relationship) {
+      return {
+        state: 'invalid', matchedMarketId: marketId,
+        reason: `Matched market ${marketId} exact outcome resolution conflict for ${identifiers} in scan ${sourceScanId}: ${relationship.reason}`,
+      };
+    }
+    await persistVerified(
+      { matchedMarketId: marketId, relationship, source: 'matched_market_scan_derivation' },
+      { schemaReady: true },
+    );
+    return resolve(input);
+  }
+
   async function counts() {
     await ensureSchema();
     const result = await client.execute(`SELECT classification,count(*) n FROM matched_market_mapping_audit GROUP BY classification`);
@@ -205,7 +394,7 @@ export function createMatchedMarketMappingStore(client: Client) {
     for (const row of result.rows) counts[String(row.classification) as keyof typeof counts] = Number(row.n);
     return counts;
   }
-  return { ensureSchema, persistVerified, resolve, counts };
+  return { ensureSchema, persistVerified, resolve, resolveOrDerive, counts };
 }
 
 const DB_PATH = process.env.H2H_SQLITE_PATH || path.join(process.cwd(), 'data', 'edgefinder.db');
@@ -290,5 +479,11 @@ export async function migrateLegacyRegistryToMatchedMarkets(client: Client, regi
 export async function resolveMatchedMarketMapping(input: MatchedMarketExecutionTuple): Promise<MatchedMarketMappingResolution> {
   const client = createClient({ url: `file:${DB_PATH}` });
   try { return await createMatchedMarketMappingStore(client).resolve(input); }
+  finally { client.close(); }
+}
+
+export async function resolveOrDeriveMatchedMarketMapping(input: MatchedMarketDerivationInput): Promise<MatchedMarketMappingResolution> {
+  const client = createClient({ url: `file:${DB_PATH}` });
+  try { return await createMatchedMarketMappingStore(client).resolveOrDerive(input); }
   finally { client.close(); }
 }

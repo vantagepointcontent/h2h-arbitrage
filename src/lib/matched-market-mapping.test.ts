@@ -44,6 +44,9 @@ async function harness() {
   const client = createClient({ url: ':memory:' });
   clients.push(client);
   await client.execute(`CREATE TABLE saved_markets (id TEXT PRIMARY KEY, event_title TEXT, last_scan_result TEXT, live_result TEXT)`);
+  await client.execute(`CREATE TABLE scan_results (
+    id INTEGER PRIMARY KEY, market_id TEXT NOT NULL, scanned_at TEXT NOT NULL, raw_result TEXT NOT NULL
+  )`);
   await client.execute({ sql: `INSERT INTO saved_markets (id,event_title) VALUES (?,?)`, args: ['matched-1', 'Team A'] });
   const store = createMatchedMarketMappingStore(client);
   await store.ensureSchema();
@@ -62,7 +65,7 @@ describe('Matched Market executable mapping authority', () => {
     })).resolves.toMatchObject({ state: 'verified', matchedMarketId: 'matched-1', relationship });
   });
 
-  it('fails closed with the Matched Market wording when the record has URLs but no exact mapping', async () => {
+  it('reports an internal cache miss before deterministic Matched Market derivation', async () => {
     const { store } = await harness();
     await expect(store.resolve({
       matchedMarketId: 'matched-1', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
@@ -71,6 +74,90 @@ describe('Matched Market executable mapping authority', () => {
       state: 'missing', matchedMarketId: 'matched-1',
       reason: 'Matched market exists, but exact outcome mapping is missing/unverified',
     });
+  });
+
+  it('derives and persists an exact tuple from the approved Matched Market scan instead of rejecting a missing cache row', async () => {
+    const { client, store } = await harness();
+    await client.execute({
+      sql: `INSERT INTO scan_results (id,market_id,scanned_at,raw_result) VALUES (?,?,?,?)`,
+      args: [1020904, 'matched-1', '2026-08-30T22:22:16.910Z', JSON.stringify({ allArbs: [{
+        artist: 'Computer', kalshiOutcomeLabel: 'Computer', pmOutcomeLabel: 'Computer (Laptop/Desktop)',
+        kalshiMarketQuestion: 'What kind of device will OpenAI announce?',
+        pmMarketQuestion: 'Will OpenAI announce a computer in 2026?',
+        strategy: 'Buy YES PM + NO Kalshi', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
+        pmYesTokenId: 'pm-yes-token', pmNoTokenId: 'pm-no-token',
+        outcomeApy: {
+          kalshi: { contractualAt: '2027-01-01T15:00:00.000Z' },
+          polymarket: { contractualAt: '2027-01-01T04:59:00.000Z' },
+        },
+      }] })],
+    });
+
+    const input = {
+      matchedMarketId: 'matched-1', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
+      pmTokenId: 'pm-yes-token', kalshiSide: 'no' as const, pmSide: 'yes' as const, sourceScanId: 1020904,
+    };
+    const batch = vi.spyOn(client, 'batch').mockRejectedValue(new Error('derivation attempted a schema write'));
+    const first = await store.resolveOrDerive(input);
+    expect(first).toMatchObject({ state: 'verified', matchedMarketId: 'matched-1' });
+    if (first.state !== 'verified') throw new Error(first.reason);
+    expect(first.relationship).toMatchObject({
+      reviewTask: 'matched-market:matched-1',
+      legs: {
+        kalshi: { platformMarketId: 'KXTEAM-A', contractSide: 'no', payoutState: 'not:Computer' },
+        polymarket: { platformMarketId: '0xcondition', tokenId: 'pm-yes-token', contractSide: 'yes', payoutState: 'Computer' },
+      },
+    });
+    await expect(store.resolveOrDerive(input)).resolves.toMatchObject({
+      state: 'verified', mappingId: first.mappingId, revision: first.revision,
+    });
+    const persisted = await client.execute(`SELECT source FROM matched_market_mappings`);
+    expect(persisted.rows).toEqual([expect.objectContaining({ source: 'matched_market_scan_derivation' })]);
+    expect(batch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['conflicting labels', { pmOutcomeLabel: 'Basketball' }, /labels conflict.*Computer.*Basketball/i],
+    ['settlement conflict', { outcomeApy: {
+      kalshi: { contractualAt: '2027-01-01T00:00:00.000Z' },
+      polymarket: { contractualAt: '2027-02-01T00:00:00.000Z' },
+    } }, /settlement timestamps conflict/i],
+  ])('rejects a genuine %s with exact Matched Market identifiers', async (_name, override, expected) => {
+    const { client, store } = await harness();
+    const candidate = {
+      artist: 'Computer', kalshiOutcomeLabel: 'Computer', pmOutcomeLabel: 'Computer',
+      kalshiMarketQuestion: 'Will OpenAI announce a computer?', pmMarketQuestion: 'Will OpenAI announce a computer?',
+      strategy: 'Buy YES PM + NO Kalshi', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
+      pmYesTokenId: 'pm-yes-token', pmNoTokenId: 'pm-no-token', ...override,
+    };
+    await client.execute({
+      sql: `INSERT INTO scan_results (id,market_id,scanned_at,raw_result) VALUES (?,?,?,?)`,
+      args: [88, 'matched-1', '2026-08-30T22:22:16.910Z', JSON.stringify({ allArbs: [candidate] })],
+    });
+    const result = await store.resolveOrDerive({
+      matchedMarketId: 'matched-1', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
+      pmTokenId: 'pm-yes-token', kalshiSide: 'no', pmSide: 'yes', sourceScanId: 88,
+    });
+    expect(result).toMatchObject({ state: 'invalid', matchedMarketId: 'matched-1' });
+    if (result.state === 'verified') throw new Error('Expected conflict rejection');
+    expect(result.reason).toMatch(expected);
+    expect(result.reason).toContain('KXTEAM-A/0xcondition/pm-yes-token/no/yes');
+  });
+
+  it('does not derive from a stale scan belonging to a different Matched Market', async () => {
+    const { client, store } = await harness();
+    await client.execute(`INSERT INTO saved_markets (id,event_title) VALUES ('other-market','Other')`);
+    await client.execute({
+      sql: `INSERT INTO scan_results (id,market_id,scanned_at,raw_result) VALUES (?,?,?,?)`,
+      args: [99, 'other-market', '2026-08-30T22:22:16.910Z', JSON.stringify({ allArbs: [] })],
+    });
+    const result = await store.resolveOrDerive({
+      matchedMarketId: 'matched-1', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
+      pmTokenId: 'pm-no-token', kalshiSide: 'yes', pmSide: 'no', sourceScanId: 99,
+    });
+    expect(result).toMatchObject({ state: 'invalid', matchedMarketId: 'matched-1' });
+    if (result.state === 'verified') throw new Error('Expected stale scan rejection');
+    expect(result.reason).toContain('persisted scan identity does not match');
   });
 
   it('resolves from the pre-existing authority schema without issuing DDL in the execution hot path', async () => {

@@ -766,7 +766,7 @@ describe('maybeExecuteBotTrade safety', () => {
     }));
     vi.doMock('./matched-market-mapping', async (importOriginal) => ({
       ...(await importOriginal<typeof import('./matched-market-mapping')>()),
-      resolveMatchedMarketMapping: vi.fn(async (tuple) => ({
+      resolveOrDeriveMatchedMarketMapping: vi.fn(async (tuple) => ({
         state: 'verified' as const,
         matchedMarketId: tuple.matchedMarketId,
         mappingId: 'test-mapping',
@@ -1004,17 +1004,17 @@ describe('maybeExecuteBotTrade safety', () => {
     expect(persistence.persistExecution).not.toHaveBeenCalled();
   });
 
-  it('does not call the placement adapter for an exact tuple in the checked-in rejection ledger', async () => {
+  it('does not call the placement adapter when deterministic Matched Market resolution finds an exact scan conflict', async () => {
     const executeArb = vi.fn();
     vi.doMock('./auto-execute', async (importOriginal) => ({
       ...(await importOriginal<typeof import('./auto-execute')>()),
       executeArb,
     }));
     const mapping = await import('./matched-market-mapping');
-    vi.mocked(mapping.resolveMatchedMarketMapping).mockResolvedValueOnce({
-      state: 'missing' as const,
+    vi.mocked(mapping.resolveOrDeriveMatchedMarketMapping).mockResolvedValueOnce({
+      state: 'invalid' as const,
       matchedMarketId: 'pair-1',
-      reason: 'Matched market exists, but exact outcome mapping is missing/unverified',
+      reason: 'Matched market pair-1 cannot derive exact tuple from scan 42: persisted scan identity does not match',
     });
     const { maybeExecuteBotTrade } = await import('./bot-trader');
     const input = makeInput({
@@ -1027,7 +1027,7 @@ describe('maybeExecuteBotTrade safety', () => {
     const result = await maybeExecuteBotTrade(input);
 
     expect(result).toMatchObject({ executed: false });
-    expect(result.reason).toMatch(/Matched market exists, but exact outcome mapping is missing\/unverified/i);
+    expect(result.reason).toContain('persisted scan identity does not match');
     expect(executeArb).not.toHaveBeenCalled();
   });
 
@@ -1038,7 +1038,7 @@ describe('maybeExecuteBotTrade safety', () => {
       executeArb,
     }));
     const mapping = await import('./matched-market-mapping');
-    vi.mocked(mapping.resolveMatchedMarketMapping).mockResolvedValueOnce({
+    vi.mocked(mapping.resolveOrDeriveMatchedMarketMapping).mockResolvedValueOnce({
       state: 'verified' as const,
       matchedMarketId: 'pair-1',
       mappingId: 'persisted-mapping',
@@ -1071,7 +1071,7 @@ describe('maybeExecuteBotTrade safety', () => {
       executeArb,
     }));
     const mapping = await import('./matched-market-mapping');
-    vi.mocked(mapping.resolveMatchedMarketMapping).mockRejectedValueOnce(new Error('SQLITE_BUSY: database is locked'));
+    vi.mocked(mapping.resolveOrDeriveMatchedMarketMapping).mockRejectedValueOnce(new Error('SQLITE_BUSY: database is locked'));
     const { maybeExecuteBotTrade } = await import('./bot-trader');
 
     const result = await maybeExecuteBotTrade(makeInput());
