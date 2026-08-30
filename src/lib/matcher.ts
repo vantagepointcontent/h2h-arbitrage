@@ -59,6 +59,7 @@ export interface UnifiedOutcome {
     eventId?: string;
     settlementTiming?: SettlementTiming;
     feeAuthority?: KalshiFeeAuthority;
+    quoteObservedAt?: string;
   } | null;
   polymarket: {
     marketId: string;
@@ -1612,6 +1613,7 @@ export function buildKalshiArbShape(km: KalshiMarket): NonNullable<UnifiedOutcom
     settlementTiming: kalshiSettlementTiming(km),
     eventId: km.event_ticker,
     feeAuthority: km.feeAuthority,
+    quoteObservedAt: km.quoteObservedAt,
   };
 }
 

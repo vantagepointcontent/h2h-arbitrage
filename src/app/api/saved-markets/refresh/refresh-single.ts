@@ -18,6 +18,7 @@ import { quoteOneShareFromTopAsk, type ExecutableBookQuote } from '@/lib/executa
 import { resolveCanonicalMarketExpiry } from '@/lib/canonical-market-expiry';
 import {
   buildKalshiExecutableQuote,
+  resolveKalshiQuoteSourceProvenance,
   type KalshiQuoteSourceProvenance,
 } from '@/lib/kalshi-executable-quote';
 
@@ -337,8 +338,14 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
       pmConditionId: selectedPmConditionId,
       pmYesTokenId: selectedPmLeg?.yesTokenId,
       pmNoTokenId: selectedPmLeg?.noTokenId,
-      kalshiYesExecutableQuote: buildRefreshKalshiExecutableQuote(o.kalshi, 'yes', scannedAt),
-      kalshiNoExecutableQuote: buildRefreshKalshiExecutableQuote(o.kalshi, 'no', scannedAt),
+      kalshiYesExecutableQuote: buildRefreshKalshiExecutableQuote(
+        o.kalshi, 'yes', scannedAt,
+        resolveKalshiQuoteSourceProvenance(o.kalshi?.quoteObservedAt, scannedAt),
+      ),
+      kalshiNoExecutableQuote: buildRefreshKalshiExecutableQuote(
+        o.kalshi, 'no', scannedAt,
+        resolveKalshiQuoteSourceProvenance(o.kalshi?.quoteObservedAt, scannedAt),
+      ),
       pmYesExecutableQuote: quoteOneShareFromTopAsk({
         price: selectedPmLeg?.yesPrice, depthUsd: selectedPmLeg?.askDepth,
         tickSize: selectedPmLeg?.yesTickSize, minimumOrderSize: selectedPmLeg?.yesMinOrderSize,

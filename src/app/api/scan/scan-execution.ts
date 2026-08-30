@@ -25,7 +25,7 @@ import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import { computePriceResolved } from '@/app/lib/page-shared';
 import { auditArbClassification } from '@/lib/arb-types';
 import { quoteOneShareFromTopAsk } from '@/lib/executable-book';
-import { buildKalshiExecutableQuote } from '@/lib/kalshi-executable-quote';
+import { buildKalshiExecutableQuote, resolveKalshiQuoteSourceProvenance } from '@/lib/kalshi-executable-quote';
 import { getUnavailableScanPlatforms, resolveScanLinks } from '@/lib/scan-links';
 import { parseScanCapital } from '@/lib/scan-request';
 import { parseJsonObject } from '@/lib/request-json';
@@ -612,8 +612,14 @@ export async function executeFullScan(request: NextRequest) {
             pmConditionId: selectedPmConditionId,
             pmYesTokenId: selectedPmLeg?.yesTokenId,
             pmNoTokenId: selectedPmLeg?.noTokenId,
-            kalshiYesExecutableQuote: buildKalshiExecutableQuote(o.kalshi, 'yes', scanObservedAt),
-            kalshiNoExecutableQuote: buildKalshiExecutableQuote(o.kalshi, 'no', scanObservedAt),
+            kalshiYesExecutableQuote: buildKalshiExecutableQuote(
+              o.kalshi, 'yes', scanObservedAt,
+              resolveKalshiQuoteSourceProvenance(o.kalshi?.quoteObservedAt, scanObservedAt),
+            ),
+            kalshiNoExecutableQuote: buildKalshiExecutableQuote(
+              o.kalshi, 'no', scanObservedAt,
+              resolveKalshiQuoteSourceProvenance(o.kalshi?.quoteObservedAt, scanObservedAt),
+            ),
             pmYesExecutableQuote: quoteOneShareFromTopAsk({
               price: selectedPmLeg?.yesPrice, depthUsd: selectedPmLeg?.askDepth,
               tickSize: selectedPmLeg?.yesTickSize, minimumOrderSize: selectedPmLeg?.yesMinOrderSize,
