@@ -1603,7 +1603,14 @@ async function acquire(scan: PersistedBotScan, source: BotScanSource): Promise<B
         : 'Persisted completed scan received',
       null,
     );
-    await refreshPersistedScanEvaluation(db, scan.id);
+    // This projection is rebuilt on reads and must not strand the durable scan
+    // lease if concurrent persistence makes the derived refresh fail.
+    await refreshPersistedScanEvaluation(db, scan.id).catch((error) => {
+      logger.warn('[bot-scan-consumer] initial evaluation projection refresh failed; continuing canonical consumption', {
+        scanId: scan.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
     return decision;
   } finally { db.close(); }
 }
