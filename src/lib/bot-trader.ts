@@ -56,10 +56,7 @@ import {
   type PropositionRelationship,
   type PropositionValidation,
 } from './proposition-identity';
-import {
-  findCanonicalPropositionRelationship,
-  resolveCanonicalPropositionRelationship,
-} from './proposition-registry';
+import { resolveMatchedMarketMapping } from './matched-market-mapping';
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -106,11 +103,21 @@ export interface BotTradeInput {
   pmOutcomeLabel?: string | null;
   kalshiMarketQuestion?: string | null;
   pmMarketQuestion?: string | null;
+  /** Scanner metadata only; server authorization re-derives exact sides from the executable strategy. */
+  relationshipVerified?: boolean;
   relationshipState?: string | null;
   relationshipExplanation?: string | null;
+  kalshiSide?: 'yes' | 'no';
+  pmSide?: 'yes' | 'no';
   strategy: string;
   /** Immutable proof that the exact purchased contracts are complementary. */
   propositionRelationship?: PropositionRelationship | null;
+  /** Server-resolved authority binding this exact execution tuple to one Matched Market mapping revision. */
+  matchedMarketMapping?: {
+    matchedMarketId: string;
+    mappingId: string;
+    revision: string;
+  } | null;
   roiPct: number;
   apyPct?: number | null;
   expectedProfit: number;
@@ -518,37 +525,53 @@ function validateSelectedPropositions(
   legs: ReturnType<typeof pickLegPrices>,
 ): PropositionValidation {
   const selectedPmToken = legs.pmOutcome === 'yes' ? input.pmYesTokenId : input.pmNoTokenId;
-  const proposedCanonical = resolveCanonicalPropositionRelationship(input.propositionRelationship);
-  const relationship = proposedCanonical ?? findCanonicalPropositionRelationship({
-    kalshiTicker: input.kalshiTicker,
-    pmConditionId: input.pmConditionId,
-    pmTokenId: selectedPmToken,
-    kalshiSide: legs.kalshiOutcome,
-    pmSide: legs.pmOutcome,
-  });
-  if (!relationship) {
-    return { valid: false, state: 'unknown', reason: 'Exact selected contracts are absent from the server-owned canonical proposition registry' };
-  }
-  if (input.propositionRelationship && !proposedCanonical) {
-    return { valid: false, state: 'invalid_metadata', reason: 'Candidate proposition metadata does not match the canonical registry' };
+  const relationship = input.propositionRelationship;
+  if (!input.matchedMarketMapping || input.matchedMarketMapping.matchedMarketId !== input.pairId || !relationship) {
+    return { valid: false, state: 'unknown', reason: 'Matched market exists, but exact outcome mapping is missing/unverified' };
   }
   const validation = validatePropositionRelationship(relationship);
   if (!validation.valid) return validation;
   const kalshi = relationship.legs.kalshi;
   const polymarket = relationship.legs.polymarket;
   if (kalshi.platformMarketId.trim().toLowerCase() !== input.kalshiTicker?.trim().toLowerCase()) {
-    return { valid: false, state: 'invalid_metadata', reason: 'Canonical Kalshi proposition does not identify the selected ticker' };
+    return { valid: false, state: 'invalid_metadata', reason: `Matched market Kalshi ticker mismatch: expected ${kalshi.platformMarketId}, received ${input.kalshiTicker ?? '(missing)'}` };
   }
   if (polymarket.platformMarketId.trim().toLowerCase() !== input.pmConditionId?.trim().toLowerCase()) {
-    return { valid: false, state: 'invalid_metadata', reason: 'Canonical Polymarket proposition does not identify the selected condition' };
+    return { valid: false, state: 'invalid_metadata', reason: `Matched market Polymarket condition mismatch: expected ${polymarket.platformMarketId}, received ${input.pmConditionId ?? '(missing)'}` };
   }
   if (kalshi.contractSide !== legs.kalshiOutcome || polymarket.contractSide !== legs.pmOutcome) {
-    return { valid: false, state: 'invalid_metadata', reason: 'Canonical contract sides do not match the strategy-selected orders' };
+    return { valid: false, state: 'invalid_metadata', reason: `Matched market contract side mismatch: expected ${kalshi.contractSide}/${polymarket.contractSide}, received ${legs.kalshiOutcome}/${legs.pmOutcome}` };
   }
   if (!selectedPmToken || polymarket.tokenId !== selectedPmToken) {
-    return { valid: false, state: 'invalid_metadata', reason: 'Canonical Polymarket token does not match the strategy-selected token' };
+    return { valid: false, state: 'invalid_metadata', reason: `Matched market Polymarket token mismatch: expected ${polymarket.tokenId}, received ${selectedPmToken ?? '(missing)'}` };
   }
   return { valid: true };
+}
+
+export async function authorizeBotTradeInput(input: BotTradeInput): Promise<BotTradeInput | { reason: string }> {
+  const legs = pickLegPrices(input.strategy, input);
+  const selectedPmToken = legs.pmOutcome === 'yes' ? input.pmYesTokenId : input.pmNoTokenId;
+  if (!legs.supported || !input.kalshiTicker || !input.pmConditionId || !selectedPmToken) {
+    return { reason: 'Matched market exact outcome mapping cannot be resolved: selected stable identifiers are missing' };
+  }
+  const resolved = await resolveMatchedMarketMapping({
+    matchedMarketId: input.pairId,
+    kalshiTicker: input.kalshiTicker,
+    pmConditionId: input.pmConditionId,
+    pmTokenId: selectedPmToken,
+    kalshiSide: legs.kalshiOutcome,
+    pmSide: legs.pmOutcome,
+  });
+  if (resolved.state !== 'verified') return { reason: resolved.reason };
+  return {
+    ...input,
+    propositionRelationship: resolved.relationship,
+    matchedMarketMapping: {
+      matchedMarketId: resolved.matchedMarketId,
+      mappingId: resolved.mappingId,
+      revision: resolved.revision,
+    },
+  };
 }
 
 export function getAuthoritativeMatchedFill(result: {
@@ -979,6 +1002,34 @@ function proposedStakeUsd(input: BotTradeInput, configuredMinShares: number): nu
 export async function maybeExecuteBotTrade(
   input: BotTradeInput,
 ): Promise<BotExecutionResult> {
+  const suppliedMapping = input.matchedMarketMapping;
+  const authorization = await authorizeBotTradeInput(input);
+  if (!('pairId' in authorization)) {
+    return { executed: false, dryRun: true, reason: authorization.reason };
+  }
+  if (suppliedMapping && (
+    suppliedMapping.matchedMarketId !== authorization.matchedMarketMapping?.matchedMarketId
+    || suppliedMapping.mappingId !== authorization.matchedMarketMapping?.mappingId
+    || suppliedMapping.revision !== authorization.matchedMarketMapping?.revision
+  )) {
+    const persistedMapping = authorization.matchedMarketMapping!;
+    const differences = [
+      suppliedMapping.matchedMarketId !== persistedMapping.matchedMarketId
+        ? `matchedMarketId expected ${suppliedMapping.matchedMarketId}, persisted ${persistedMapping.matchedMarketId}` : null,
+      suppliedMapping.mappingId !== persistedMapping.mappingId
+        ? `mappingId expected ${suppliedMapping.mappingId}, persisted ${persistedMapping.mappingId}` : null,
+      suppliedMapping.revision !== persistedMapping.revision
+        ? `revision expected ${suppliedMapping.revision}, persisted ${persistedMapping.revision}` : null,
+    ].filter((difference): difference is string => difference != null);
+    return {
+      executed: false,
+      dryRun: true,
+      reason: `Matched market mapping authority changed before execution: ${differences.join('; ')}`,
+    };
+  }
+  // The persisted Matched Market is the final execution authority. Never carry
+  // caller-supplied relationship metadata past this boundary.
+  input = authorization;
   // A pair/outcome may be evaluated repeatedly. Keep each attempt as its own
   // chain while the execution arbId remains stable for duplicate prevention.
   const tradeId = `${safeArbId(input.pairId, input.outcome)}:${crypto.randomUUID()}`;
@@ -1095,17 +1146,9 @@ export async function maybeExecuteBotTrade(
   });
 
   const entryLegs = pickLegPrices(input.strategy, input);
-  const selectedPmToken = entryLegs.pmOutcome === 'yes' ? input.pmYesTokenId : input.pmNoTokenId;
-  const canonicalRelationship = resolveCanonicalPropositionRelationship(input.propositionRelationship)
-    ?? findCanonicalPropositionRelationship({
-      kalshiTicker: input.kalshiTicker,
-      pmConditionId: input.pmConditionId,
-      pmTokenId: selectedPmToken,
-      kalshiSide: entryLegs.kalshiOutcome,
-      pmSide: entryLegs.pmOutcome,
-    });
+  const canonicalRelationship = input.propositionRelationship;
   if (!canonicalRelationship) {
-    return { executed: false, dryRun: effectiveDryRun, reason: 'Canonical proposition relationship became unavailable before execution' };
+    return { executed: false, dryRun: effectiveDryRun, reason: 'Matched market exact outcome mapping became unavailable before execution' };
   }
   let feeAuthority: AuthoritativeBotFeeConfig;
   let resolvedKalshiAuthority: KalshiFeeAuthority;
@@ -1492,16 +1535,6 @@ export function unifiedOutcomeToBotInput(
     pmNoTickSize: outcome.polymarket?.noTickSize ?? null,
     expiryDate,
   };
-  const legs = pickLegPrices(input.strategy, input);
-  const selectedPmToken = legs.pmOutcome === 'yes' ? input.pmYesTokenId : input.pmNoTokenId;
-  input.propositionRelationship = resolveCanonicalPropositionRelationship(input.propositionRelationship)
-    ?? findCanonicalPropositionRelationship({
-      kalshiTicker: input.kalshiTicker,
-      pmConditionId: input.pmConditionId,
-      pmTokenId: selectedPmToken,
-      kalshiSide: legs.kalshiOutcome,
-      pmSide: legs.pmOutcome,
-    });
   return input;
 }
 
@@ -1547,16 +1580,6 @@ export function liveArbResultToBotInput(
     crossOutcomeExhaustiveVerified: result.crossOutcomeExhaustiveVerified === true,
     expiryDate,
   };
-  const legs = pickLegPrices(input.strategy, input);
-  const selectedPmToken = legs.pmOutcome === 'yes' ? input.pmYesTokenId : input.pmNoTokenId;
-  input.propositionRelationship = resolveCanonicalPropositionRelationship(input.propositionRelationship)
-    ?? findCanonicalPropositionRelationship({
-      kalshiTicker: input.kalshiTicker,
-      pmConditionId: input.pmConditionId,
-      pmTokenId: selectedPmToken,
-      kalshiSide: legs.kalshiOutcome,
-      pmSide: legs.pmOutcome,
-    });
   return input;
 }
 

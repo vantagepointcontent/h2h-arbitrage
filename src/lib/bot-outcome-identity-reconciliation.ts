@@ -2,6 +2,7 @@ import type { PropositionRelationship } from './proposition-identity';
 
 export interface OutcomeIdentityPosition {
   id: number;
+  matchedMarketId: string | null;
   status: string;
   openedAt: string;
   kalshiTicker: string | null;
@@ -27,7 +28,7 @@ export interface OutcomeIdentityCorrection {
   pmMarketQuestion: string;
   kalshiOutcomeLabel: string;
   pmOutcomeLabel: string;
-  outcomeIdentitySource: 'canonical_proposition_relationship_v1';
+  outcomeIdentitySource: 'matched_market_mapping_v1';
   outcomeIdentityRecordedAt: string;
   previousOutcomeIdentityStatus: 'verified' | 'unresolved';
   previousKalshiMarketQuestion: string | null;
@@ -139,17 +140,18 @@ export async function applyBotOutcomeIdentityReconciliation(
 }
 
 type RelationshipResolver = (input: {
+  matchedMarketId: string;
   kalshiTicker: string | null;
   pmConditionId: string | null;
   pmTokenId: string | null;
   kalshiSide: 'yes' | 'no';
   pmSide: 'yes' | 'no';
-}) => PropositionRelationship | null;
+}) => PropositionRelationship | null | Promise<PropositionRelationship | null>;
 
-export function planBotOutcomeIdentityReconciliation(
+export async function planBotOutcomeIdentityReconciliation(
   positions: OutcomeIdentityPosition[],
   resolve: RelationshipResolver,
-): OutcomeIdentityReconciliationPlan {
+): Promise<OutcomeIdentityReconciliationPlan> {
   const corrections: OutcomeIdentityCorrection[] = [];
   const unresolved: OutcomeIdentityReconciliationPlan['unresolved'] = [];
   const persisted = (value: string | null | undefined) => value == null ? null : value;
@@ -165,11 +167,12 @@ export function planBotOutcomeIdentityReconciliation(
   });
   for (const position of [...positions].sort((a, b) => a.id - b.id)) {
     if (position.status !== 'open') continue;
-    if (!position.kalshiTicker?.trim() || !position.pmConditionId?.trim() || !position.pmEntryTokenId?.trim()) {
-      reject(position, 'Immutable execution-time platform market or Polymarket entry-token identity is missing');
+    if (!position.matchedMarketId?.trim() || !position.kalshiTicker?.trim() || !position.pmConditionId?.trim() || !position.pmEntryTokenId?.trim()) {
+      reject(position, 'Immutable Matched Market, platform market, or Polymarket entry-token identity is missing');
       continue;
     }
-    const relationship = resolve({
+    const relationship = await resolve({
+      matchedMarketId: position.matchedMarketId,
       kalshiTicker: position.kalshiTicker,
       pmConditionId: position.pmConditionId,
       pmTokenId: position.pmEntryTokenId,
@@ -177,7 +180,7 @@ export function planBotOutcomeIdentityReconciliation(
       pmSide: position.pmSide,
     });
     if (!relationship) {
-      reject(position, 'No server-owned canonical relationship proves the persisted exact entry token, sides, and held outcomes');
+      reject(position, 'No verified Matched Market mapping proves the persisted exact entry token, sides, and held outcomes');
       continue;
     }
     const normalized = (value: string | null | undefined) => value?.trim().toLowerCase() ?? '';
@@ -197,7 +200,7 @@ export function planBotOutcomeIdentityReconciliation(
       pmMarketQuestion: relationship.legs.polymarket.marketQuestion,
       kalshiOutcomeLabel: relationship.legs.kalshi.payoutState,
       pmOutcomeLabel: relationship.legs.polymarket.payoutState,
-      outcomeIdentitySource: 'canonical_proposition_relationship_v1',
+      outcomeIdentitySource: 'matched_market_mapping_v1',
       outcomeIdentityRecordedAt: relationship.verifiedAt,
       previousOutcomeIdentityStatus: position.outcomeIdentityStatus,
       previousKalshiMarketQuestion: persisted(position.kalshiMarketQuestion),

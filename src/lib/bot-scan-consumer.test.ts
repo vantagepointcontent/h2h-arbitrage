@@ -265,6 +265,10 @@ function harness(options: {
       if (options.current instanceof Error) throw options.current;
       return options.current ?? [candidate()];
     }),
+    authorize: vi.fn(async (input) => input.propositionRelationship ? {
+      ...input,
+      matchedMarketMapping: { matchedMarketId: input.pairId, mappingId: 'test-mapping', revision: 'test-revision' },
+    } : { reason: 'Matched market exists, but exact outcome mapping is missing/unverified' }),
     execute: vi.fn(async () => {
       if (options.execute instanceof Error) throw options.execute;
       return options.execute ?? execution();
@@ -575,6 +579,24 @@ describe('durable BotTrader scan consumer', () => {
       relationshipExplanation: 'Canonical matcher verification for exact legs.',
       kalshiSide: 'yes',
       pmSide: 'no',
+    }));
+    expect(h.opportunityDecisions).toContainEqual(expect.objectContaining({
+      candidateIndex: 0,
+      state: 'accepted',
+      details: expect.objectContaining({
+        matchedMarketMapping: {
+          matchedMarketId: 'pair-1',
+          mappingId: 'test-mapping',
+          revision: 'test-revision',
+        },
+        authorizedLegs: expect.objectContaining({
+          kalshiTicker: 'KXTEST-A',
+          pmConditionId: 'pm-condition-a',
+          pmTokenId: 'pm-no-token',
+          kalshiSide: 'yes',
+          pmSide: 'no',
+        }),
+      }),
     }));
     expect(result.placementCount).toBe(1);
   });
@@ -1097,7 +1119,7 @@ describe('durable BotTrader scan consumer', () => {
     expect(result).toMatchObject({
       state: 'criteria_rejected',
       reasonCode: 'scan_criteria_rejected',
-      reason: expect.stringContaining('canonical proposition registry'),
+      reason: expect.stringContaining('Matched market exists, but exact outcome mapping is missing/unverified'),
     });
     expect(h.deps.execute).not.toHaveBeenCalled();
   });
@@ -1117,7 +1139,7 @@ describe('durable BotTrader scan consumer', () => {
     expect(result).toMatchObject({
       state: 'criteria_rejected',
       reasonCode: 'scan_criteria_rejected',
-      reason: expect.stringContaining('canonical proposition registry'),
+      reason: expect.stringContaining('Matched market exists, but exact outcome mapping is missing/unverified'),
     });
     expect(h.deps.execute).not.toHaveBeenCalled();
   });

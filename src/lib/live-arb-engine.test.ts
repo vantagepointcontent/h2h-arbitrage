@@ -154,7 +154,7 @@ describe('computeAllLiveArbitrages stale handling (BUG-104)', () => {
 });
 
 describe('computeAllLiveArbitrages effective execution quotes', () => {
-  it('walks one share across shuffled depth and carries the same executable VWAP into BotTrader', () => {
+  it('walks one share across shuffled depth but fails closed before Matched Market authorization', () => {
     const observedAt = new Date().toISOString();
     const constraints = {
       tickSizeCents: 1,
@@ -189,9 +189,10 @@ describe('computeAllLiveArbitrages effective execution quotes', () => {
     expect(result.kalshiYesAsk).toBe(0.43);
     expect(result.pmNoAsk).toBe(0.475);
 
-    const request = buildExecutionRequest(liveArbResultToBotInput('pair-1', 'Market', undefined, result));
-    expect(request?.kalshiOrder).toMatchObject({ price: 0.45, executableQuote: result.kalshiYesExecutableQuote });
-    expect(request?.polymarketOrder).toMatchObject({ price: 0.50, executableQuote: result.pmNoExecutableQuote });
+    const input = liveArbResultToBotInput('pair-1', 'Market', undefined, result);
+    expect(input.kalshiYesExecutableQuote).toEqual(result.kalshiYesExecutableQuote);
+    expect(input.pmNoExecutableQuote).toEqual(result.pmNoExecutableQuote);
+    expect(buildExecutionRequest(input)).toBeNull();
   });
 
   it('marks one-share Polymarket execution non-executable when the book minimum is five', () => {
