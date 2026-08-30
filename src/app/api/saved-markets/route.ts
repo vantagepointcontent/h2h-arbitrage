@@ -6,6 +6,8 @@ import { clientSafeError } from '@/lib/error-handler';
 import { parseJsonObject } from '@/lib/request-json';
 import { parseSavedMarketCreate, parseSavedMarketId, parseSavedMarketPatch } from '@/lib/saved-market-request';
 import { getCanonicalCurrentMarketMetrics, type SavedMarket as SavedMarketView } from '@/app/lib/page-shared';
+import { buildBasicSavedMarketList } from '@/lib/saved-markets-list';
+import { buildSavedMarketLifecycle } from '@/lib/saved-market-lifecycle';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -47,6 +49,12 @@ export async function GET(request: NextRequest) {
         canonicalCurrentProfitStatus: current.profitStatus,
         canonicalCurrentProfitUnavailableReason: current.profitUnavailableReason,
         scheduler: scheduler ? { ...scheduler, lastSuccessAt } : null,
+        lifecycle: buildSavedMarketLifecycle({
+          scheduler: scheduler as Parameters<typeof buildSavedMarketLifecycle>[0]['scheduler'],
+          lastScanResult: market.lastScanResult,
+          liveResult: market.liveResult,
+          canonicalApyObservedAt: market.canonicalApyObservedAt,
+        }),
       };
     });
 
@@ -74,124 +82,7 @@ export async function GET(request: NextRequest) {
     if (fields === 'basic') {
       // Slim payload: only scalar fields the sidebar/overview need.
       // Full scan data comes from ?id= fetch when a market is selected.
-      const basic = markets.map((m: any) => {
-        const ls = m.lastScanResult;
-        const allArbs = Array.isArray(ls?.allArbs) ? ls.allArbs : [];
-        return {
-          id: m.id,
-          eventTitle: m.eventTitle,
-          kalshiUrl: m.kalshiUrl,
-          polymarketUrl: m.polymarketUrl,
-          expiryDate: m.expiryDate,
-          expirySource: m.expirySource ?? null,
-          expirySourceId: m.expirySourceId ?? null,
-          expiryObservedAt: m.expiryObservedAt ?? null,
-          scheduler: m.scheduler,
-          canonicalApyPct: m.canonicalApyPct ?? null,
-          canonicalApyUnavailableReason: m.canonicalApyUnavailableReason ?? null,
-          canonicalApyOutcome: m.canonicalApyOutcome ?? null,
-          canonicalApyObservedAt: m.canonicalApyObservedAt ?? null,
-          canonicalApySource: m.canonicalApySource ?? null,
-          canonicalApyRevision: m.canonicalApyRevision ?? null,
-          canonicalCurrentRoiPct: m.canonicalCurrentRoiPct ?? null,
-          canonicalCurrentRoiStatus: m.canonicalCurrentRoiStatus,
-          canonicalCurrentRoiUnavailableReason: m.canonicalCurrentRoiUnavailableReason,
-          canonicalCurrentProfit: m.canonicalCurrentProfit ?? null,
-          canonicalCurrentProfitStatus: m.canonicalCurrentProfitStatus,
-          canonicalCurrentProfitUnavailableReason: m.canonicalCurrentProfitUnavailableReason,
-          canonicalCurrentStrategy: m.canonicalCurrentStrategy ?? 'No arb',
-          canonicalCurrentDaysToExpiry: m.canonicalCurrentDaysToExpiry ?? null,
-          canonicalCurrentExpiryAt: m.canonicalCurrentExpiryAt ?? null,
-          canonicalCurrentRevision: m.canonicalCurrentRevision ?? null,
-          lastScanResult: ls ? {
-            bestRoiPct: ls.bestRoiPct ?? 0,
-            bestProfit: ls.bestProfit ?? 0,
-            strategy: ls.strategy ?? '',
-            scannedAt: ls.scannedAt ?? null,
-            venuePriceFreshness: ls.venuePriceFreshness ?? null,
-            matchedCount: ls.matchedCount ?? 0,
-            matchStatus: ls.matchStatus ?? (ls.scannedAt ? ((ls.matchedCount ?? 0) > 0 ? 'matched' : 'confirmed_zero') : 'not_scanned'),
-            matchError: ls.matchError ?? null,
-            matchedPairs: Array.isArray(ls.matchedPairs) ? ls.matchedPairs : [],
-            // Minimal arb objects — only fields sidebar/cached view reads
-            allArbs: allArbs.map((a: any) => ({
-              artist: a.artist ?? '',
-              roiPct: a.roiPct ?? 0,
-              expectedProfit: a.expectedProfit ?? 0,
-              strategy: a.strategy ?? '',
-              apyPct: a.apyPct ?? null,
-              daysToExpiry: a.daysToExpiry ?? null,
-              expiryAt: a.expiryAt ?? null,
-              apyUnavailableReason: a.apyUnavailableReason ?? null,
-              outcomeApy: a.outcomeApy ?? null,
-              kalshiTicker: a.kalshiTicker ?? null,
-              pmConditionId: a.pmConditionId ?? null,
-              kalshiYesAsk: a.kalshiYesAsk ?? null,
-              kalshiNoAsk: a.kalshiNoAsk ?? null,
-              pmYesPrice: a.pmYesPrice ?? null,
-              pmNoPrice: a.pmNoPrice ?? null,
-              kalshiStake: a.kalshiStake ?? null,
-              pmStake: a.pmStake ?? null,
-              totalStake: a.totalStake ?? a.maxCapital ?? null,
-              calculationEnvelope: a.calculationEnvelope,
-              fees: a.fees ? {
-                kalshiFee: a.fees.kalshiFee ?? null,
-                polymarketFee: a.fees.polymarketFee ?? a.fees.pmFee ?? null,
-                totalFees: a.fees.totalFees ?? (
-                  a.fees.kalshiFee != null && (a.fees.polymarketFee ?? a.fees.pmFee) != null
-                    ? a.fees.kalshiFee + (a.fees.polymarketFee ?? a.fees.pmFee)!
-                    : null
-                ),
-                worstCaseNetProfit: a.fees.worstCaseNetProfit ?? null,
-                kalshiFeeAuthority: a.fees.kalshiFeeAuthority ?? undefined,
-              } : undefined,
-            })),
-          } : null,
-          liveResult: m.liveResult ? {
-            bestRoiPct: m.liveResult.bestRoiPct ?? 0,
-            scannedAt: m.liveResult.scannedAt ?? null,
-            venuePriceFreshness: m.liveResult.venuePriceFreshness ?? null,
-            matchedCount: m.liveResult.matchedCount ?? 0,
-            matchStatus: m.liveResult.matchStatus ?? ((m.liveResult.matchedCount ?? 0) > 0 ? 'matched' : 'confirmed_zero'),
-            matchError: m.liveResult.matchError ?? null,
-            matchedPairs: Array.isArray(m.liveResult.matchedPairs) ? m.liveResult.matchedPairs : [],
-            allArbs: Array.isArray(m.liveResult.allArbs)
-              ? m.liveResult.allArbs.map((a: any) => ({
-                  artist: a.artist ?? '',
-                  roiPct: a.roiPct ?? 0,
-                  expectedProfit: a.expectedProfit ?? 0,
-                  strategy: a.strategy ?? '',
-                  apyPct: a.apyPct ?? null,
-                  daysToExpiry: a.daysToExpiry ?? null,
-                  expiryAt: a.expiryAt ?? null,
-                  apyUnavailableReason: a.apyUnavailableReason ?? null,
-                  outcomeApy: a.outcomeApy ?? null,
-                  kalshiTicker: a.kalshiTicker ?? null,
-                  pmConditionId: a.pmConditionId ?? null,
-                  kalshiYesAsk: a.kalshiYesAsk ?? null,
-                  kalshiNoAsk: a.kalshiNoAsk ?? null,
-                  pmYesPrice: a.pmYesPrice ?? null,
-                  pmNoPrice: a.pmNoPrice ?? null,
-                  kalshiStake: a.kalshiStake ?? null,
-                  pmStake: a.pmStake ?? null,
-                  totalStake: a.totalStake ?? a.maxCapital ?? null,
-                  calculationEnvelope: a.calculationEnvelope,
-                  fees: a.fees ? {
-                    kalshiFee: a.fees.kalshiFee ?? null,
-                    polymarketFee: a.fees.polymarketFee ?? a.fees.pmFee ?? null,
-                    totalFees: a.fees.totalFees ?? (
-                      a.fees.kalshiFee != null && (a.fees.polymarketFee ?? a.fees.pmFee) != null
-                        ? a.fees.kalshiFee + (a.fees.polymarketFee ?? a.fees.pmFee)!
-                        : null
-                    ),
-                    worstCaseNetProfit: a.fees.worstCaseNetProfit ?? null,
-                    kalshiFeeAuthority: a.fees.kalshiFeeAuthority ?? undefined,
-                  } : undefined,
-                }))
-              : [],
-          } : null,
-        };
-      });
+      const basic = buildBasicSavedMarketList(savedMarkets, schedulerState);
       // PERF-P3: ETag/304 — the UI polls every 60s but poller tiers are
       // 5-30min, so most polls are unchanged. 304 skips the 370KB body.
       const body = JSON.stringify({ markets: basic });
