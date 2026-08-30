@@ -1602,7 +1602,12 @@ async function acquire(scan: PersistedBotScan, source: BotScanSource): Promise<B
         ? 'Expired placement attempt was claimed for fail-closed reconciliation'
         : 'Persisted completed scan received',
       null,
-    );
+    ).catch((error) => {
+      logger.warn('[bot-scan-consumer] received audit event append failed; continuing canonical consumption', {
+        scanId: scan.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
     // This projection is rebuilt on reads and must not strand the durable scan
     // lease if concurrent persistence makes the derived refresh fail.
     await refreshPersistedScanEvaluation(db, scan.id).catch((error) => {
@@ -1672,7 +1677,13 @@ async function recordCandidateDecision(scan: PersistedBotScan, candidateIndex: n
         candidate.roiPct, candidate.apyPct ?? null, now, now, details == null ? null : JSON.stringify(details),
         `scan:${scan.id}:opportunity:${candidateIndex}`, configVersion, finalResult, executionId],
     });
-    await refreshPersistedScanEvaluation(db, scan.id);
+    await refreshPersistedScanEvaluation(db, scan.id).catch((error) => {
+      logger.warn('[bot-scan-consumer] candidate evaluation projection refresh failed; continuing canonical consumption', {
+        scanId: scan.id,
+        candidateIndex,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
   } finally { db.close(); }
 }
 
@@ -1751,8 +1762,31 @@ const productionDeps: BotScanConsumerDeps = {
 
 const consumer = createBotScanConsumer(productionDeps);
 
+async function releaseSafeRetryLease(scanId: number): Promise<void> {
+  await ensureSchema();
+  const db = await dbClient();
+  try {
+    await db.execute({
+      sql: `UPDATE bot_scan_decisions
+        SET lease_owner=NULL, lease_expires_at=NULL, updated_at=?
+        WHERE scan_id=? AND state='received' AND attempts=0 AND placement_count=0`,
+      args: [new Date().toISOString(), scanId],
+    });
+  } finally { db.close(); }
+}
+
 export async function consumePersistedBotScan(scanId: number, source: BotScanSource): Promise<BotScanDecision> {
-  return consumer.consume(scanId, source);
+  try {
+    return await consumer.consume(scanId, source);
+  } catch (error) {
+    await releaseSafeRetryLease(scanId).catch((releaseError) => {
+      logger.error('[bot-scan-consumer] failed to release safe-retry lease after consumption error', {
+        scanId,
+        error: releaseError instanceof Error ? releaseError.message : String(releaseError),
+      });
+    });
+    throw error;
+  }
 }
 
 export async function processBotScanBacklog(limit = 100): Promise<BotScanDecision[]> {
