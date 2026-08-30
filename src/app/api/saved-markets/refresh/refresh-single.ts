@@ -9,42 +9,29 @@ import {
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobAskDepths, getClobPrices } from '@/lib/polymarket-clob';
-import { matchOutcomes, calculateAllArbitrages, parseDepth, attachOutcomeContingentApy, applyManualMatches, type KalshiAskDepthStatus, type UnifiedOutcome } from '@/lib/matcher';
+import { matchOutcomes, calculateAllArbitrages, parseDepth, attachOutcomeContingentApy, applyManualMatches, type UnifiedOutcome } from '@/lib/matcher';
 import { getDecoupledPairs, applyDecoupledPairs } from '@/lib/decoupled-pairs';
 import { SavedMarket } from '@/lib/persistence';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import type { OutcomeContingentApy } from '@/lib/settlement-apy';
-import { quoteOneShareFromTopAsk, type ExecutableBookQuote, type ExecutableBookReason } from '@/lib/executable-book';
+import { quoteOneShareFromTopAsk, type ExecutableBookQuote } from '@/lib/executable-book';
 import { resolveCanonicalMarketExpiry } from '@/lib/canonical-market-expiry';
+import {
+  buildKalshiExecutableQuote,
+  type KalshiQuoteSourceProvenance,
+} from '@/lib/kalshi-executable-quote';
 
 const KALSHI_TIMEOUT_MS = 3000;
 const PM_TIMEOUT_MS = 3000;
 const CLOB_TIMEOUT_MS = 1500;
 
-function kalshiDepthUnavailableReason(status: KalshiAskDepthStatus | undefined): Extract<ExecutableBookReason,
-  'authoritative_empty' | 'missing_depth' | 'malformed_depth' | 'inactive_market'> | undefined {
-  if (status === 'authoritative_empty') return 'authoritative_empty';
-  if (status === 'missing') return 'missing_depth';
-  if (status === 'malformed') return 'malformed_depth';
-  if (status === 'inactive') return 'inactive_market';
-  return undefined;
-}
-
 export function buildRefreshKalshiExecutableQuote(
   kalshi: NonNullable<UnifiedOutcome['kalshi']> | null | undefined,
   side: 'yes' | 'no',
   depthTimestamp: string,
+  source?: KalshiQuoteSourceProvenance,
 ): ExecutableBookQuote {
-  return quoteOneShareFromTopAsk({
-    price: side === 'yes' ? kalshi?.yesAsk : kalshi?.noAsk,
-    depthUsd: side === 'yes' ? kalshi?.yesAskDepth : kalshi?.noAskDepth,
-    tickSize: side === 'yes' ? kalshi?.yesTickSize : kalshi?.noTickSize,
-    minimumOrderSize: 1,
-    depthTimestamp,
-    unavailableReason: kalshiDepthUnavailableReason(
-      side === 'yes' ? kalshi?.yesAskDepthStatus : kalshi?.noAskDepthStatus,
-    ),
-  });
+  return buildKalshiExecutableQuote(kalshi, side, depthTimestamp, source);
 }
 
 export interface SingleRefreshResult {
@@ -117,6 +104,7 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
   }
 
   const kalshiSeriesTicker = market.kalshiUrl ? extractKalshiSeriesFromUrl(market.kalshiUrl) : null;
+  const kalshiFetchFailures: string[] = [];
 
   let [kalshiMarkets, pmEvent] = await Promise.all([
     (async () => {
@@ -130,14 +118,18 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
           );
           if (multi.markets.length > 0) return multi.markets;
         } catch (e: any) {
-          if (e.message?.includes('timed out')) throw e;
+          if (e.message?.includes('timed out')) throw new Error('kalshi_source_timeout: Kalshi source request timed out');
+          kalshiFetchFailures.push(e instanceof Error ? e.message : String(e));
         }
       }
       // Fallback: single event_ticker
       try {
         const m = await withTimeout(fetchKalshiEventMarkets(kalshiTicker), KALSHI_TIMEOUT_MS, 'Kalshi event markets');
         if (m.length > 0) return m;
-      } catch (e: any) { if (e.message?.includes('timed out')) throw e; }
+      } catch (e: any) {
+        if (e.message?.includes('timed out')) throw new Error('kalshi_source_timeout: Kalshi source request timed out');
+        kalshiFetchFailures.push(e instanceof Error ? e.message : String(e));
+      }
       // Fallback: series prefix
       const seriesMatch = kalshiTicker.match(/^([A-Z]+)/);
       const seriesFallback = seriesMatch ? seriesMatch[1] : null;
@@ -145,12 +137,18 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
         try {
           const m = await withTimeout(fetchKalshiSeriesMarkets(seriesFallback), KALSHI_TIMEOUT_MS, 'Kalshi series markets');
           if (m.length > 0) return m;
-        } catch (e: any) { if (e.message?.includes('timed out')) throw e; }
+        } catch (e: any) {
+          if (e.message?.includes('timed out')) throw new Error('kalshi_source_timeout: Kalshi source request timed out');
+          kalshiFetchFailures.push(e instanceof Error ? e.message : String(e));
+        }
       }
       try {
         const m = await withTimeout(fetchKalshiSeriesMarkets(kalshiTicker), KALSHI_TIMEOUT_MS, 'Kalshi series markets');
         if (m.length > 0) return m;
-      } catch (e: any) { if (e.message?.includes('timed out')) throw e; }
+      } catch (e: any) {
+        if (e.message?.includes('timed out')) throw new Error('kalshi_source_timeout: Kalshi source request timed out');
+        kalshiFetchFailures.push(e instanceof Error ? e.message : String(e));
+      }
       return [] as any[];
     })(),
     withTimeout(
@@ -161,8 +159,21 @@ export async function refreshSingleMarket(market: SavedMarket, manualMatches: an
     ),
   ]);
 
-  // Filter Kalshi markets to the specific match within a multi-game event
+  const kalshiRawFetchedCount = kalshiMarkets.length;
   kalshiMarkets = filterKalshiMarketsToMatch(kalshiMarkets, extractKalshiMatchKey(market.kalshiUrl));
+  if (kalshiMarkets.length === 0) {
+    if (kalshiRawFetchedCount > 0) {
+      throw new Error(`kalshi_wrong_ticker: Kalshi returned ${kalshiRawFetchedCount} market(s), but matched no market for the requested ticker/outcome`);
+    }
+    if (kalshiFetchFailures.length > 0) {
+      const detail = [...new Set(kalshiFetchFailures)].join('; ');
+      const reason = kalshiFetchFailures.some(message => /(?:^|\D)429(?:\D|$)/.test(message))
+        ? 'kalshi_source_rate_limited'
+        : 'kalshi_source_unavailable';
+      throw new Error(`${reason}: Kalshi source attempts failed: ${detail}`);
+    }
+    throw new Error('kalshi_market_data_unavailable: Kalshi returned no open market data');
+  }
 
   if (!pmEvent) {
     return {

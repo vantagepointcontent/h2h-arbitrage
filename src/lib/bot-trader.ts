@@ -585,6 +585,18 @@ function executableBookUnavailableReason(
 ): string {
   const label = `${venue} ${side.toUpperCase()}`;
   const observed = quote.depthTimestamp ? ` (observed ${quote.depthTimestamp})` : '';
+  const sourceEvidence = (() => {
+    if (!quote.sourceStatus || !quote.sourceAttemptedAt) return '';
+    const attemptedMs = Date.parse(quote.sourceAttemptedAt);
+    const observedMs = quote.sourceObservedAt == null ? Number.NaN : Date.parse(quote.sourceObservedAt);
+    const age = Number.isFinite(attemptedMs) && Number.isFinite(observedMs) && attemptedMs >= observedMs
+      ? `source age at attempt ${attemptedMs - observedMs}ms; observed ${quote.sourceObservedAt}`
+      : 'source age unavailable';
+    const failure = quote.sourceFailureKind
+      ? `; ${quote.sourceFailureKind}${quote.sourceDetail ? `: ${quote.sourceDetail}` : ''}`
+      : quote.sourceDetail ? `; ${quote.sourceDetail}` : '';
+    return `; source status ${quote.sourceStatus}; ${age}; attempted ${quote.sourceAttemptedAt}${failure}`;
+  })();
   if (quote.reason === 'authoritative_empty') {
     return `${label} authoritative book is empty${observed}`;
   }
@@ -596,8 +608,8 @@ function executableBookUnavailableReason(
     return `${label} ask depth is malformed${observed}`;
   }
   if (quote.reason === 'inactive_market') return `${label} market is inactive${observed}`;
-  if (quote.reason === 'stale_book') return `${label} order book is stale${observed}`;
-  if (quote.reason === 'source_unavailable') return `${label} venue response is unavailable${observed}`;
+  if (quote.reason === 'stale_book') return `${label} order book is stale${observed}${sourceEvidence}`;
+  if (quote.reason === 'source_unavailable') return `${label} venue response is unavailable${observed}${sourceEvidence}`;
   return `${label} executable book is unavailable: ${quote.reason ?? 'unknown_reason'}${observed}`;
 }
 

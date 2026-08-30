@@ -11,7 +11,7 @@ import {
 } from '@/lib/kalshi';
 import { extractPolymarketSlug, fetchPolymarketEvent, fetchPolymarketMarketAsEvent, isPolymarketMarketUrl, parseOutcomePrices } from '@/lib/polymarket';
 import { fetchClobMarkets, getClobAskDepths, getClobPrices } from '@/lib/polymarket-clob';
-import { buildKalshiArbShape, matchOutcomes, calculateAllArbitrages, parseDepth, attachOutcomeContingentApy, applyManualMatches, setSuspiciousRoiPct, UnifiedOutcome, type KalshiAskDepthStatus } from '@/lib/matcher';
+import { buildKalshiArbShape, matchOutcomes, calculateAllArbitrages, parseDepth, attachOutcomeContingentApy, applyManualMatches, setSuspiciousRoiPct, UnifiedOutcome } from '@/lib/matcher';
 import { resolveKalshiFeeAuthoritiesForMarkets } from '@/lib/kalshi-fee-quote';
 import { getSetting } from '@/lib/settings';
 import { getManualMatches } from '@/lib/manual-matches';
@@ -24,7 +24,8 @@ import { clientSafeError } from '@/lib/error-handler';
 import { withTimeout, chooseBestPmStructure } from '@/lib/scan-shared';
 import { computePriceResolved } from '@/app/lib/page-shared';
 import { auditArbClassification } from '@/lib/arb-types';
-import { quoteOneShareFromTopAsk, type ExecutableBookReason } from '@/lib/executable-book';
+import { quoteOneShareFromTopAsk } from '@/lib/executable-book';
+import { buildKalshiExecutableQuote } from '@/lib/kalshi-executable-quote';
 import { getUnavailableScanPlatforms, resolveScanLinks } from '@/lib/scan-links';
 import { parseScanCapital } from '@/lib/scan-request';
 import { parseJsonObject } from '@/lib/request-json';
@@ -44,15 +45,6 @@ const KALSHI_MULTI_TIMEOUT_MS = 8000; // multi-series gets a bit more headroom
 const DEBUG_H2H = process.env.DEBUG_H2H === '1' || process.env.DEBUG_H2H === 'true';
 
 const DORMANT_REASON_CODES = new Set(['clob_book_empty', 'clob_metadata_incomplete']);
-
-function kalshiDepthUnavailableReason(status: KalshiAskDepthStatus | undefined): Extract<ExecutableBookReason,
-  'authoritative_empty' | 'missing_depth' | 'malformed_depth' | 'inactive_market'> | undefined {
-  if (status === 'authoritative_empty') return 'authoritative_empty';
-  if (status === 'missing') return 'missing_depth';
-  if (status === 'malformed') return 'malformed_depth';
-  if (status === 'inactive') return 'inactive_market';
-  return undefined;
-}
 
 export async function executeFullScan(request: NextRequest) {
   const scanAttemptedAt = new Date().toISOString();
@@ -157,6 +149,7 @@ export async function executeFullScan(request: NextRequest) {
     // Kalshi: try event_ticker first, fallback to series_ticker
     let kalshiFetchSource: 'event_ticker' | 'multi_series' | 'series_prefix' | 'series_ticker' | 'none' = 'none';
     let kalshiSeriesFetched: string[] = [];
+    const kalshiFetchFailures: string[] = [];
     let [kalshiMarkets, pmEvent, manualMatches, decoupledPairs] = await Promise.all([
       (async () => {
         // First try the event_ticker from the URL
@@ -189,6 +182,7 @@ export async function executeFullScan(request: NextRequest) {
           }
         } catch (e: any) {
           if (e.message?.includes('timed out')) throw e;
+          kalshiFetchFailures.push(e instanceof Error ? e.message : String(e));
         }
         const seriesMatch = kalshiTicker.match(/^([A-Z]+)/);
         const seriesFallback = seriesMatch ? seriesMatch[1] : null;
@@ -201,6 +195,7 @@ export async function executeFullScan(request: NextRequest) {
             }
           } catch (e: any) {
             if (e.message?.includes('timed out')) throw e;
+            kalshiFetchFailures.push(e instanceof Error ? e.message : String(e));
           }
         }
         try {
@@ -211,6 +206,7 @@ export async function executeFullScan(request: NextRequest) {
           }
         } catch (e: any) {
           if (e.message?.includes('timed out')) throw e;
+          kalshiFetchFailures.push(e instanceof Error ? e.message : String(e));
         }
         return [] as any[];
       })(),
@@ -224,7 +220,9 @@ export async function executeFullScan(request: NextRequest) {
       getDecoupledPairs(),
     ]);
 
-    // Filter Kalshi markets to the specific match within a multi-game event
+    // Keep the pre-filter count so a wrong ticker/outcome cannot masquerade as
+    // an authoritative empty venue response.
+    const kalshiRawFetchedCount = kalshiMarkets.length;
     kalshiMarkets = filterKalshiMarketsToMatch(kalshiMarkets, extractKalshiMatchKey(kalshiUrl!));
 
     if (!pmEvent) {
@@ -277,6 +275,21 @@ export async function executeFullScan(request: NextRequest) {
     // credential/feed degradation. Preserve the prior durable values and make
     // the failed replacement attempt explicit instead.
     if (kalshiMarkets.length === 0 || pmMarketsRaw.length === 0) {
+      if (kalshiMarkets.length === 0 && kalshiRawFetchedCount > 0) {
+        return failIncompleteScan(
+          'kalshi_wrong_ticker',
+          `Kalshi returned ${kalshiRawFetchedCount} market(s), but matched no market for the requested ticker/outcome.`,
+        );
+      }
+      if (kalshiMarkets.length === 0 && kalshiFetchFailures.length > 0) {
+        const detail = [...new Set(kalshiFetchFailures)].join('; ');
+        return failIncompleteScan(
+          kalshiFetchFailures.some(message => /(?:^|\D)429(?:\D|$)/.test(message))
+            ? 'kalshi_source_rate_limited'
+            : 'kalshi_source_unavailable',
+          `Kalshi source attempts failed: ${detail}.`,
+        );
+      }
       const platform = kalshiMarkets.length === 0 ? 'Kalshi' : 'Polymarket';
       const reasonCode = kalshiMarkets.length === 0
         ? 'kalshi_market_data_unavailable'
@@ -599,16 +612,8 @@ export async function executeFullScan(request: NextRequest) {
             pmConditionId: selectedPmConditionId,
             pmYesTokenId: selectedPmLeg?.yesTokenId,
             pmNoTokenId: selectedPmLeg?.noTokenId,
-            kalshiYesExecutableQuote: quoteOneShareFromTopAsk({
-              price: o.kalshi?.yesAsk, depthUsd: o.kalshi?.yesAskDepth,
-              tickSize: o.kalshi?.yesTickSize, minimumOrderSize: 1, depthTimestamp: scanObservedAt,
-              unavailableReason: kalshiDepthUnavailableReason(o.kalshi?.yesAskDepthStatus),
-            }),
-            kalshiNoExecutableQuote: quoteOneShareFromTopAsk({
-              price: o.kalshi?.noAsk, depthUsd: o.kalshi?.noAskDepth,
-              tickSize: o.kalshi?.noTickSize, minimumOrderSize: 1, depthTimestamp: scanObservedAt,
-              unavailableReason: kalshiDepthUnavailableReason(o.kalshi?.noAskDepthStatus),
-            }),
+            kalshiYesExecutableQuote: buildKalshiExecutableQuote(o.kalshi, 'yes', scanObservedAt),
+            kalshiNoExecutableQuote: buildKalshiExecutableQuote(o.kalshi, 'no', scanObservedAt),
             pmYesExecutableQuote: quoteOneShareFromTopAsk({
               price: selectedPmLeg?.yesPrice, depthUsd: selectedPmLeg?.askDepth,
               tickSize: selectedPmLeg?.yesTickSize, minimumOrderSize: selectedPmLeg?.yesMinOrderSize,
@@ -822,7 +827,12 @@ export async function executeFullScan(request: NextRequest) {
     });
   } catch (err: any) {
     logger.trackError(err, { service: 'scan', path: '/api/scan' });
-    const msg = clientSafeError(err, 'Unknown error');
+    const rawMessage = err instanceof Error ? err.message : String(err);
+    const kalshiTimeout = /kalshi/i.test(rawMessage) && /timed out/i.test(rawMessage);
+    const reasonCode = kalshiTimeout ? 'kalshi_source_timeout' : undefined;
+    const msg = kalshiTimeout
+      ? 'kalshi_source_timeout: Kalshi source request timed out; no replacement quote was published.'
+      : clientSafeError(err, 'Unknown error');
     const status = msg.includes('timed out') ? 504 : msg.includes('not found') ? 404 : 500;
     if (savedMarketId && publicationGeneration != null) {
       await reconcileSavedMarketMatchSummary(savedMarketId, {
@@ -835,7 +845,7 @@ export async function executeFullScan(request: NextRequest) {
       }).catch(() => {});
     }
     return NextResponse.json(
-      { error: msg },
+      { error: msg, reasonCode, fullScanPersisted: false },
       { status }
     );
   } finally {

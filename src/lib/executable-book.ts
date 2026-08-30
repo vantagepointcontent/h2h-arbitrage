@@ -45,6 +45,12 @@ export interface ExecutableBookQuote {
   /** Venue constraints bound to the observed ladder and checked at runtime boundaries. */
   tickSizeMicroCents: number;
   minimumOrderQuantityMicros: number;
+  /** Optional producer provenance retained across scan persistence. */
+  sourceStatus?: 'fresh' | 'source_unavailable' | 'stale';
+  sourceAttemptedAt?: string;
+  sourceObservedAt?: string | null;
+  sourceFailureKind?: 'rate_limited' | 'timeout' | 'wrong_ticker' | 'source_error' | 'stale_snapshot' | null;
+  sourceDetail?: string | null;
 }
 
 export interface WalkExecutableBookRequest {
@@ -277,6 +283,19 @@ export function isUnavailableQuoteConsistent(candidate: ExecutableBookQuote | un
     'inactive_market', 'source_unavailable', 'stale_book', 'malformed_level',
     'missing_depth_timestamp',
   ];
+  const timestampValid = candidate?.reason === 'source_unavailable'
+      && candidate.sourceStatus === 'source_unavailable'
+      && candidate.sourceObservedAt === null
+    ? candidate.depthTimestamp === null
+    : typeof candidate?.depthTimestamp === 'string' && Number.isFinite(Date.parse(candidate.depthTimestamp));
+  const sourceProvenanceValid = candidate?.sourceStatus == null || (
+    (candidate.sourceStatus === 'fresh' || candidate.sourceStatus === 'source_unavailable' || candidate.sourceStatus === 'stale')
+    && typeof candidate.sourceAttemptedAt === 'string'
+    && Number.isFinite(Date.parse(candidate.sourceAttemptedAt))
+    && (candidate.sourceObservedAt === null
+      || (typeof candidate.sourceObservedAt === 'string' && Number.isFinite(Date.parse(candidate.sourceObservedAt))))
+    && (candidate.sourceDetail == null || typeof candidate.sourceDetail === 'string')
+  );
   return candidate?.status === 'unavailable'
     && candidate.reason != null
     && reasons.includes(candidate.reason)
@@ -290,7 +309,8 @@ export function isUnavailableQuoteConsistent(candidate: ExecutableBookQuote | un
     && candidate.fills.length === 0
     && (candidate.reason === 'missing_depth_timestamp'
       ? candidate.depthTimestamp === null
-      : typeof candidate.depthTimestamp === 'string' && Number.isFinite(Date.parse(candidate.depthTimestamp)))
+      : timestampValid)
+    && sourceProvenanceValid
     // Tick metadata can itself be unavailable. Zero is safe here because an
     // unavailable quote can never authorize a fill; retaining its exact source
     // reason is more important than discarding the evidence at persistence.
