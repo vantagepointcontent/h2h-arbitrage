@@ -42,15 +42,20 @@ export interface CanonicalSavedMarketMetrics {
 export function selectCanonicalSavedMarketMetrics(
   candidates: CanonicalSavedMarketCandidate[],
   scannedAt: string | null | undefined,
+  options?: { allowNonExecutable?: boolean },
 ): CanonicalSavedMarketMetrics {
   const observedAt = typeof scannedAt === 'string' && Number.isFinite(Date.parse(scannedAt))
     ? scannedAt : null;
+  const allowNonExecutable = options?.allowNonExecutable ?? false;
   const eligible = candidates.filter((candidate) => {
     const declared = candidate.arbType === 'cross' || candidate.arbType === 'direct' || candidate.arbType === 'internal'
       ? candidate.arbType : null;
     const classification = auditArbClassification(candidate.strategy, declared);
+    const executionOk = candidate.executionStatus == null
+      || candidate.executionStatus === 'executable'
+      || (allowNonExecutable && candidate.executionStatus === 'non_executable');
     return classification.valid && classification.canonicalType !== null
-      && (candidate.executionStatus == null || candidate.executionStatus === 'executable')
+      && executionOk
       && Number.isFinite(candidate.roiPct) && candidate.roiPct > 0;
   });
   const best = eligible.reduce<CanonicalSavedMarketCandidate | null>((current, candidate) => {
@@ -69,7 +74,7 @@ export function selectCanonicalSavedMarketMetrics(
 
   const expiryAt = typeof best.expiryAt === 'string' ? best.expiryAt : null;
   const apy = calculateScanApy(best.roiPct, scannedAt ?? '', expiryAt);
-  const profit = (best.executionStatus == null || best.executionStatus === 'executable')
+  const profit = (best.executionStatus == null || best.executionStatus === 'executable' || allowNonExecutable)
     && typeof best.expectedProfit === 'number' && Number.isFinite(best.expectedProfit)
     && best.expectedProfit > 0 ? best.expectedProfit : null;
   const profitUnavailableReason = profit != null ? null

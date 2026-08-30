@@ -83,6 +83,36 @@ describe('BUG-183 canonical saved-market APY derivation', () => {
     });
   });
 
+  it('allows non_executable positive candidates when explicitly requested for list/detail reconciliation', () => {
+    const result = selectCanonicalSavedMarketMetrics([
+      candidate({ executionStatus: 'non_executable', expectedProfit: 0.05, totalStake: 5 }),
+    ], scannedAt, { allowNonExecutable: true });
+
+    expect(result).toMatchObject({
+      value: expect.any(Number),
+      roiPct: 2,
+      roiStatus: 'available',
+      profit: 0.05,
+      profitStatus: 'available',
+      strategy: 'Buy YES Kalshi + NO PM',
+      observedAt: scannedAt,
+    });
+    expect(result.value).toBeCloseTo((Math.pow(1.02, 365 / 10) - 1) * 100, 12);
+  });
+
+  it('still excludes unavailable candidates even when allowNonExecutable is true', () => {
+    const result = selectCanonicalSavedMarketMetrics([
+      candidate({ executionStatus: 'unavailable', expectedProfit: 0.05, totalStake: 5 }),
+    ], scannedAt, { allowNonExecutable: true });
+
+    expect(result).toMatchObject({
+      value: null,
+      unavailableReason: 'no_canonical_arbitrage',
+      roiPct: null,
+      strategy: 'No arb',
+    });
+  });
+
   it.each([
     ['missing expiry', null, 'missing_expiry'],
     ['invalid expiry', 'not-a-date', 'invalid_expiry'],
