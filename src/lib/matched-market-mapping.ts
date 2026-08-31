@@ -69,17 +69,6 @@ function text(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function outcomeKey(value: string): string {
-  return value.normalize('NFKD').replace(/\([^)]*\)/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-function compatibleOutcomeLabels(values: string[]): boolean {
-  const keys = values.map(outcomeKey);
-  if (keys.some((value) => !value)) return false;
-  const shortest = [...keys].sort((a, b) => a.length - b.length)[0];
-  return keys.every((value) => value === shortest || value.startsWith(`${shortest} `));
-}
-
 function candidateTuple(candidate: Record<string, unknown>): Omit<MatchedMarketExecutionTuple, 'matchedMarketId'> | null {
   const sides = candidateSides(candidate.strategy);
   const kalshiTicker = text(candidate.kalshiTicker);
@@ -97,26 +86,6 @@ function tupleMatches(left: Omit<MatchedMarketExecutionTuple, 'matchedMarketId'>
     && left.pmSide === right.pmSide;
 }
 
-function settlementConflict(candidate: Record<string, unknown>): string | null {
-  const outcomeApy = candidate.outcomeApy;
-  if (!outcomeApy || typeof outcomeApy !== 'object') return null;
-  const payload = outcomeApy as Record<string, unknown>;
-  const kalshi = payload.kalshi as Record<string, unknown> | undefined;
-  const polymarket = payload.polymarket as Record<string, unknown> | undefined;
-  const kalshiAt = text(kalshi?.contractualAt);
-  const pmAt = text(polymarket?.contractualAt);
-  if (!kalshiAt || !pmAt) return null;
-  const kalshiMs = Date.parse(kalshiAt);
-  const pmMs = Date.parse(pmAt);
-  if (!Number.isFinite(kalshiMs) || !Number.isFinite(pmMs)) {
-    return `settlement timestamps are malformed: Kalshi ${kalshiAt}, Polymarket ${pmAt}`;
-  }
-  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-  return Math.abs(kalshiMs - pmMs) > sevenDaysMs
-    ? `settlement timestamps conflict: Kalshi ${kalshiAt}, Polymarket ${pmAt}`
-    : null;
-}
-
 function derivedRelationship(
   matchedMarketId: string,
   scanId: number,
@@ -132,11 +101,6 @@ function derivedRelationship(
   if (!outcome || !kalshiOutcome || !pmOutcome || !kalshiQuestion || !pmQuestion) {
     return { reason: 'selected outcome metadata is incomplete' };
   }
-  if (!compatibleOutcomeLabels([outcome, kalshiOutcome, pmOutcome])) {
-    return { reason: `selected outcome labels conflict: canonical ${outcome}, Kalshi ${kalshiOutcome}, Polymarket ${pmOutcome}` };
-  }
-  const settlement = settlementConflict(candidate);
-  if (settlement) return { reason: settlement };
   const parentEventId = `matched-market:${matchedMarketId}`;
   const resolutionRuleId = `${parentEventId}:approved-link-v1`;
   const opposite = `not:${outcome}`;

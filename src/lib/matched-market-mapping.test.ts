@@ -147,18 +147,16 @@ describe('Matched Market executable mapping authority', () => {
   });
 
   it.each([
-    ['conflicting labels', { pmOutcomeLabel: 'Basketball' }, /labels conflict.*Computer.*Basketball/i],
-    ['settlement conflict', { outcomeApy: {
-      kalshi: { contractualAt: '2027-01-01T00:00:00.000Z' },
-      polymarket: { contractualAt: '2027-02-01T00:00:00.000Z' },
-    } }, /settlement timestamps conflict/i],
-  ])('rejects a genuine %s with exact Matched Market identifiers', async (_name, override, expected) => {
+    ['person-to-party labels', 'Democratic', 'Hilda Solis', 'Democratic Party'],
+    ['spelling and formatting differences', 'Computer', 'COMPUTER', 'Computer (Laptop/Desktop)'],
+    ['abbreviated venue labels', 'Los Angeles Lakers', 'LA Lakers', 'L.A. Lakers'],
+  ])('authorizes approved %s through exact stable IDs', async (_name, outcome, kalshiOutcomeLabel, pmOutcomeLabel) => {
     const { client, store } = await harness();
     const candidate = {
-      artist: 'Computer', kalshiOutcomeLabel: 'Computer', pmOutcomeLabel: 'Computer',
-      kalshiMarketQuestion: 'Will OpenAI announce a computer?', pmMarketQuestion: 'Will OpenAI announce a computer?',
+      artist: outcome, kalshiOutcomeLabel, pmOutcomeLabel,
+      kalshiMarketQuestion: `Will ${kalshiOutcomeLabel} win?`, pmMarketQuestion: `Will ${pmOutcomeLabel} win?`,
       strategy: 'Buy YES PM + NO Kalshi', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
-      pmYesTokenId: 'pm-yes-token', pmNoTokenId: 'pm-no-token', ...override,
+      pmYesTokenId: 'pm-yes-token', pmNoTokenId: 'pm-no-token',
     };
     await client.execute({
       sql: `INSERT INTO scan_results (id,market_id,scanned_at,raw_result) VALUES (?,?,?,?)`,
@@ -168,10 +166,75 @@ describe('Matched Market executable mapping authority', () => {
       matchedMarketId: 'matched-1', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
       pmTokenId: 'pm-yes-token', kalshiSide: 'no', pmSide: 'yes', sourceScanId: 88,
     });
-    expect(result).toMatchObject({ state: 'invalid', matchedMarketId: 'matched-1' });
-    if (result.state === 'verified') throw new Error('Expected conflict rejection');
-    expect(result.reason).toMatch(expected);
-    expect(result.reason).toContain('KXTEAM-A/0xcondition/pm-yes-token/no/yes');
+    expect(result).toMatchObject({
+      state: 'verified',
+      matchedMarketId: 'matched-1',
+      relationship: {
+        humanLabel: outcome,
+        legs: {
+          kalshi: { humanLabel: kalshiOutcomeLabel },
+          polymarket: { humanLabel: pmOutcomeLabel },
+        },
+      },
+    });
+  });
+
+  it('authorizes the approved CA-38 person-to-party selection from scan 1031474', async () => {
+    const { client, store } = await harness();
+    const matchedMarketId = '1782999196726-house-ca38';
+    const kalshiTicker = 'KXHOUSERACE-CA38-26-D';
+    const pmConditionId = '0xd08f9a8c8dce572d84324956f1838a663e3f8eafac29d6619c1883ac8edea728';
+    const pmTokenId = '107502907842119542543006740497615498434504367390239788355286605269821169156520';
+    await client.execute({
+      sql: `INSERT INTO saved_markets (id,event_title) VALUES (?,?)`,
+      args: [matchedMarketId, 'CA-38 House Election Winner'],
+    });
+    await client.execute({
+      sql: `INSERT INTO scan_results (id,market_id,scanned_at,raw_result) VALUES (?,?,?,?)`,
+      args: [1031474, matchedMarketId, '2026-08-31T10:24:59.370Z', JSON.stringify({ allArbs: [{
+        artist: 'Democratic', kalshiOutcomeLabel: 'Hilda Solis', pmOutcomeLabel: 'Democratic Party',
+        kalshiMarketQuestion: 'Will Democratic win the House race for CA-38?',
+        pmMarketQuestion: 'Will the Democratic Party win the CA-38 House seat?',
+        strategy: 'Buy YES PM + NO Kalshi', kalshiTicker, pmConditionId,
+        pmYesTokenId: pmTokenId, pmNoTokenId: 'ca38-pm-no-token',
+      }] })],
+    });
+
+    await expect(store.resolveOrDerive({
+      matchedMarketId, kalshiTicker, pmConditionId, pmTokenId,
+      kalshiSide: 'no', pmSide: 'yes', sourceScanId: 1031474,
+    })).resolves.toMatchObject({
+      state: 'verified',
+      matchedMarketId,
+      relationship: {
+        legs: {
+          kalshi: { platformMarketId: kalshiTicker, humanLabel: 'Hilda Solis', contractSide: 'no' },
+          polymarket: { platformMarketId: pmConditionId, tokenId: pmTokenId, humanLabel: 'Democratic Party', contractSide: 'yes' },
+        },
+      },
+    });
+  });
+
+  it('does not add a settlement-semantic approval layer after exact Matched Market authorization', async () => {
+    const { client, store } = await harness();
+    await client.execute({
+      sql: `INSERT INTO scan_results (id,market_id,scanned_at,raw_result) VALUES (?,?,?,?)`,
+      args: [89, 'matched-1', '2026-08-30T22:22:16.910Z', JSON.stringify({ allArbs: [{
+        artist: 'Democratic', kalshiOutcomeLabel: 'Hilda Solis', pmOutcomeLabel: 'Democratic Party',
+        kalshiMarketQuestion: 'Will Hilda Solis win?', pmMarketQuestion: 'Will the Democratic Party win?',
+        strategy: 'Buy YES PM + NO Kalshi', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
+        pmYesTokenId: 'pm-yes-token', pmNoTokenId: 'pm-no-token',
+        outcomeApy: {
+          kalshi: { contractualAt: '2027-01-01T00:00:00.000Z' },
+          polymarket: { contractualAt: '2027-02-01T00:00:00.000Z' },
+        },
+      }] })],
+    });
+
+    await expect(store.resolveOrDerive({
+      matchedMarketId: 'matched-1', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
+      pmTokenId: 'pm-yes-token', kalshiSide: 'no', pmSide: 'yes', sourceScanId: 89,
+    })).resolves.toMatchObject({ state: 'verified', matchedMarketId: 'matched-1' });
   });
 
   it('does not derive from a stale scan belonging to a different Matched Market', async () => {
@@ -188,6 +251,54 @@ describe('Matched Market executable mapping authority', () => {
     expect(result).toMatchObject({ state: 'invalid', matchedMarketId: 'matched-1' });
     if (result.state === 'verified') throw new Error('Expected stale scan rejection');
     expect(result.reason).toContain('persisted scan identity does not match');
+  });
+
+  it.each([
+    ['missing selected leg', [{
+      artist: 'Democratic', kalshiOutcomeLabel: 'Hilda Solis', pmOutcomeLabel: 'Democratic Party',
+      kalshiMarketQuestion: 'Will Hilda Solis win?', pmMarketQuestion: 'Will the Democratic Party win?',
+      strategy: 'Buy YES PM + NO Kalshi', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
+      pmYesTokenId: null, pmNoTokenId: 'pm-no-token',
+    }], 'mismatch'],
+    ['ambiguous exact selected leg', Array.from({ length: 2 }, () => ({
+      artist: 'Democratic', kalshiOutcomeLabel: 'Hilda Solis', pmOutcomeLabel: 'Democratic Party',
+      kalshiMarketQuestion: 'Will Hilda Solis win?', pmMarketQuestion: 'Will the Democratic Party win?',
+      strategy: 'Buy YES PM + NO Kalshi', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
+      pmYesTokenId: 'pm-yes-token', pmNoTokenId: 'pm-no-token',
+    })), 'invalid'],
+  ])('fails closed when the approved %s is not uniquely present', async (_name, allArbs, state) => {
+    const { client, store } = await harness();
+    await client.execute({
+      sql: `INSERT INTO scan_results (id,market_id,scanned_at,raw_result) VALUES (?,?,?,?)`,
+      args: [90, 'matched-1', '2026-08-30T22:22:16.910Z', JSON.stringify({ allArbs })],
+    });
+
+    await expect(store.resolveOrDerive({
+      matchedMarketId: 'matched-1', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
+      pmTokenId: 'pm-yes-token', kalshiSide: 'no', pmSide: 'yes', sourceScanId: 90,
+    })).resolves.toMatchObject({ state, matchedMarketId: 'matched-1' });
+  });
+
+  it('fails closed when the approved Matched Market is deleted', async () => {
+    const { client, store } = await harness();
+    await store.persistVerified(mapping);
+    await client.execute(`DELETE FROM saved_markets WHERE id='matched-1'`);
+
+    await expect(store.resolve({
+      matchedMarketId: 'matched-1', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
+      pmTokenId: 'pm-no-token', kalshiSide: 'yes', pmSide: 'no',
+    })).resolves.toMatchObject({ state: 'invalid', matchedMarketId: 'matched-1' });
+  });
+
+  it('fails closed when the persisted mapping revision is forged or stale', async () => {
+    const { client, store } = await harness();
+    await store.persistVerified(mapping);
+    await client.execute(`UPDATE matched_market_mappings SET mapping_revision='stale-revision' WHERE matched_market_id='matched-1'`);
+
+    await expect(store.resolve({
+      matchedMarketId: 'matched-1', kalshiTicker: 'KXTEAM-A', pmConditionId: '0xcondition',
+      pmTokenId: 'pm-no-token', kalshiSide: 'yes', pmSide: 'no',
+    })).resolves.toMatchObject({ state: 'invalid', matchedMarketId: 'matched-1' });
   });
 
   it('resolves from the pre-existing authority schema without issuing DDL in the execution hot path', async () => {
