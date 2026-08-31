@@ -1031,6 +1031,29 @@ describe('maybeExecuteBotTrade safety', () => {
     expect(executeArb).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['deleted', 'Matched market exact outcome mapping is stale/unverified: approved coupling v1:kalshi:KXTEST-A|polymarket:0xcondition coupling is deleted'],
+    ['revised', 'Matched market exact outcome mapping is stale/unverified: approved coupling v1:kalshi:KXTEST-A|polymarket:0xcondition coupling revision mismatch: approved 1, current 2'],
+  ])('re-resolves the persisted mapping at the final placement boundary and stops on a %s coupling', async (_state, reason) => {
+    const executeArb = vi.fn();
+    vi.doMock('./auto-execute', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('./auto-execute')>()),
+      executeArb,
+    }));
+    const mapping = await import('./matched-market-mapping');
+    vi.mocked(mapping.resolveOrDeriveMatchedMarketMapping).mockResolvedValueOnce({
+      state: 'invalid' as const,
+      matchedMarketId: 'pair-1',
+      reason,
+    });
+    const { maybeExecuteBotTrade } = await import('./bot-trader');
+
+    const result = await maybeExecuteBotTrade(makeInput());
+
+    expect(result).toMatchObject({ executed: false, reason });
+    expect(executeArb).not.toHaveBeenCalled();
+  });
+
   it('does not call the placement adapter when caller-supplied Matched Market authority is fabricated or stale', async () => {
     const executeArb = vi.fn();
     vi.doMock('./auto-execute', async (importOriginal) => ({
