@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import BotActionLogs from './BotActionLogs';
 
-describe('BotActionLogs qualified-only filter', () => {
+describe('BotActionLogs placement filters', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
@@ -41,6 +41,15 @@ describe('BotActionLogs qualified-only filter', () => {
     steps: [{ ...firstTrade.steps[0], id: 102, action: 'Second action', responseStatus: 'passed', errorReason: null }],
   };
 
+  const positiveRejectedTrade = {
+    ...secondTrade,
+    tradeId: 'trade-positive-rejected',
+    marketId: 'market-positive-rejected',
+    marketTitle: 'Positive arb rejected by ROI gate',
+    qualified: false,
+    positiveArb: true,
+  };
+
   it('requests server-side qualified chains and shows the dedicated empty state', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
@@ -51,6 +60,251 @@ describe('BotActionLogs qualified-only filter', () => {
     fireEvent.click(toggle);
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes('qualified=true'))).toBe(true));
     expect(await screen.findByText('No qualifying evaluations in the selected period.')).toBeTruthy();
+  });
+
+  it('defines qualified as positive arb that passed every eligibility gate', () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, trades: [], decisions: [] }),
+    } as Response);
+
+    render(<BotActionLogs />);
+
+    const definition = screen.getByText('Positive Arb + all eligibility gates passed');
+    const checkbox = screen.getByRole('checkbox', { name: 'Qualified only' });
+    expect(definition.id).toBe('qualified-only-description');
+    expect(checkbox.getAttribute('aria-describedby')).toBe(definition.id);
+  });
+
+  it('hides the unqualified result set immediately while a qualified request is pending or fails', async () => {
+    const rejectedDecision = {
+      scanId: 41,
+      logUuid: 'A1B2C3',
+      marketId: 'market-2',
+      marketName: 'Rejected scan market',
+      state: 'rejected',
+      reasonCode: 'no_positive_arb',
+      reason: 'No Positive Arb — BotTrader not applicable',
+      updatedAt: '2026-08-11T12:00:00.000Z',
+    };
+    let rejectQualifiedRequest: ((reason?: unknown) => void) | undefined;
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, trades: [{ ...secondTrade, qualified: false }], decisions: [rejectedDecision], nextCursor: null }),
+      } as Response)
+      .mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectQualifiedRequest = reject; }));
+
+    render(<BotActionLogs />);
+    expect(await screen.findByText('Second market')).toBeTruthy();
+    expect(screen.getByText('No Positive Arb — BotTrader not applicable')).toBeTruthy();
+    expect(screen.getByText('1 attempts')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Qualified only' }));
+
+    expect(screen.queryByText('Second market')).toBeNull();
+    expect(screen.queryByText('No Positive Arb — BotTrader not applicable')).toBeNull();
+    expect(screen.getByText('0 attempts')).toBeTruthy();
+    await waitFor(() => expect(String(fetchMock.mock.calls[1]?.[0])).toContain('qualified=true'));
+
+    rejectQualifiedRequest?.(new Error('Audit service unavailable'));
+    expect((await screen.findByRole('alert')).textContent).toContain('Audit service unavailable');
+    expect(screen.queryByText('Second market')).toBeNull();
+    expect(screen.queryByText('No Positive Arb — BotTrader not applicable')).toBeNull();
+    expect(screen.getByText('0 attempts')).toBeTruthy();
+  });
+
+  it('composes qualification with the other filters and restores the full result set', async () => {
+    const rejectedDecision = {
+      scanId: 41,
+      logUuid: 'A1B2C3',
+      marketId: 'market-1',
+      marketName: 'Rejected scan market',
+      state: 'rejected',
+      reasonCode: 'no_positive_arb',
+      reason: 'No Positive Arb — BotTrader not applicable',
+      updatedAt: '2026-08-11T12:00:00.000Z',
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const query = new URL(String(input), 'http://localhost').searchParams;
+      const qualified = query.get('qualified') === 'true';
+      return {
+        ok: true,
+        json: async () => ({
+          success: true,
+          trades: qualified ? [firstTrade] : [firstTrade, secondTrade],
+          decisions: qualified ? [] : [rejectedDecision],
+          nextCursor: null,
+        }),
+      } as Response;
+    });
+
+    render(<BotActionLogs selectionMethod="roi" />);
+    expect(await screen.findByText('Second market')).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'failed' } });
+    fireEvent.change(screen.getByLabelText('Since'), { target: { value: '2026-08-01' } });
+    fireEvent.change(screen.getByPlaceholderText('All markets'), { target: { value: 'market-1' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Qualified only' }));
+
+    expect(await screen.findByText('First market')).toBeTruthy();
+    expect(screen.queryByText('Second market')).toBeNull();
+    expect(screen.queryByText('No Positive Arb — BotTrader not applicable')).toBeNull();
+    expect(screen.getByText('1 attempts')).toBeTruthy();
+    expect(screen.getByText('Method: roi')).toBeTruthy();
+
+    const qualifiedUrl = new URL(String(fetchMock.mock.calls.at(-1)?.[0]), 'http://localhost');
+    expect(Object.fromEntries(qualifiedUrl.searchParams)).toMatchObject({
+      status: 'failed',
+      marketId: 'market-1',
+      qualified: 'true',
+    });
+    expect(qualifiedUrl.searchParams.get('since')).toContain('2026-08-01');
+
+    const callsBeforeRefresh = fetchMock.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh action logs' }));
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBeforeRefresh));
+    expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain('qualified=true');
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Qualified only' }));
+    expect(await screen.findByText('Second market')).toBeTruthy();
+    expect(screen.getByText('No Positive Arb — BotTrader not applicable')).toBeTruthy();
+    const restoredUrl = new URL(String(fetchMock.mock.calls.at(-1)?.[0]), 'http://localhost');
+    expect(restoredUrl.searchParams.has('qualified')).toBe(false);
+    expect(Object.fromEntries(restoredUrl.searchParams)).toMatchObject({ status: 'failed', marketId: 'market-1' });
+    expect(screen.getByText('Method: roi')).toBeTruthy();
+  });
+
+  it('retains the qualified filter during the 30-second auto-refresh callback', async () => {
+    const intervalCallbacks: Array<() => void> = [];
+    vi.spyOn(window, 'setInterval').mockImplementation((callback, delay) => {
+      if (delay === 30_000) intervalCallbacks.push(callback);
+      return intervalCallbacks.length as unknown as NodeJS.Timeout;
+    });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, trades: [], decisions: [], nextCursor: null }),
+    } as Response);
+
+    render(<BotActionLogs />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Qualified only' }));
+    await waitFor(() => expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain('qualified=true'));
+    await waitFor(() => expect(intervalCallbacks.length).toBeGreaterThan(1));
+
+    const callsBeforeTick = fetchMock.mock.calls.length;
+    const latestCallback = intervalCallbacks.at(-1);
+    if (!latestCallback) throw new Error('Expected auto-refresh callback');
+    await act(async () => latestCallback());
+
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBeforeTick));
+    expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain('qualified=true');
+  });
+
+  it('immediately removes only non-positive rows and counts while a positive-arb request fails', async () => {
+    const noPositiveDecision = {
+      scanId: 41,
+      logUuid: 'A1B2C3',
+      marketId: 'market-no-arb',
+      marketName: 'No arb market',
+      state: 'criteria_rejected',
+      reasonCode: 'no_positive_arb',
+      reason: 'No Positive Arb — BotTrader not applicable',
+      updatedAt: '2026-08-11T12:00:00.000Z',
+    };
+    const laterGateDecision = {
+      ...noPositiveDecision,
+      scanId: 42,
+      logUuid: 'D4E5F6',
+      marketId: 'market-positive-rejected',
+      marketName: 'Positive candidate market',
+      reasonCode: 'scan_criteria_rejected',
+      reason: 'Positive candidate missed the ROI threshold',
+    };
+    let rejectPositiveRequest: ((reason?: unknown) => void) | undefined;
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          trades: [positiveRejectedTrade, { ...secondTrade, marketTitle: 'Legacy unclassified row', positiveArb: false }],
+          decisions: [noPositiveDecision, laterGateDecision],
+          nextCursor: 101,
+        }),
+      } as Response)
+      .mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectPositiveRequest = reject; }));
+
+    render(<BotActionLogs />);
+    expect(await screen.findByText('Legacy unclassified row')).toBeTruthy();
+    expect(screen.getByText('No Positive Arb — BotTrader not applicable')).toBeTruthy();
+    expect(screen.getByText('2 attempts')).toBeTruthy();
+    expect(screen.getByText('2 runs')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Positive arb only' }));
+
+    expect(screen.queryByText('Legacy unclassified row')).toBeNull();
+    expect(screen.queryByText('No Positive Arb — BotTrader not applicable')).toBeNull();
+    expect(screen.getByText('Positive arb rejected by ROI gate')).toBeTruthy();
+    expect(screen.getByText('Positive candidate missed the ROI threshold')).toBeTruthy();
+    expect(screen.getByText('1 attempts')).toBeTruthy();
+    expect(screen.getByText('1 runs')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Load older action logs' })).toBeNull();
+    await waitFor(() => expect(String(fetchMock.mock.calls[1]?.[0])).toContain('positiveArb=true'));
+
+    rejectPositiveRequest?.(new Error('Filtered audit unavailable'));
+    expect((await screen.findByRole('alert')).textContent).toContain('Filtered audit unavailable');
+    expect(screen.queryByText('Legacy unclassified row')).toBeNull();
+    expect(screen.queryByText('No Positive Arb — BotTrader not applicable')).toBeNull();
+    expect(screen.getByText('1 attempts')).toBeTruthy();
+    expect(screen.getByText('1 runs')).toBeTruthy();
+  });
+
+  it('composes positive arb with qualification and keeps it through refresh and auto-refresh', async () => {
+    const intervalCallbacks: Array<() => void> = [];
+    vi.spyOn(window, 'setInterval').mockImplementation((callback, delay) => {
+      if (delay === 30_000) intervalCallbacks.push(callback);
+      return intervalCallbacks.length as unknown as NodeJS.Timeout;
+    });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, trades: [positiveRejectedTrade], decisions: [], nextCursor: null }),
+    } as Response);
+
+    render(<BotActionLogs selectionMethod="apy" />);
+    await screen.findByText('Positive arb rejected by ROI gate');
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'failed' } });
+    fireEvent.change(screen.getByLabelText('Since'), { target: { value: '2026-08-01' } });
+    fireEvent.change(screen.getByPlaceholderText('All markets'), { target: { value: 'market-positive-rejected' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Positive arb only' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Qualified only' }));
+
+    await waitFor(() => {
+      const url = new URL(String(fetchMock.mock.calls.at(-1)?.[0]), 'http://localhost');
+      expect(Object.fromEntries(url.searchParams)).toMatchObject({
+        positiveArb: 'true',
+        qualified: 'true',
+        status: 'failed',
+        marketId: 'market-positive-rejected',
+      });
+      expect(url.searchParams.get('since')).toContain('2026-08-01');
+    });
+    expect(screen.getByText('Method: apy')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh action logs' }));
+    await waitFor(() => expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain('positiveArb=true'));
+    const latestCallback = intervalCallbacks.at(-1);
+    if (!latestCallback) throw new Error('Expected positive-arb auto-refresh callback');
+    await act(async () => latestCallback());
+    await waitFor(() => expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain('positiveArb=true'));
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Qualified only' }));
+    await waitFor(() => {
+      const url = new URL(String(fetchMock.mock.calls.at(-1)?.[0]), 'http://localhost');
+      expect(url.searchParams.get('positiveArb')).toBe('true');
+      expect(url.searchParams.has('qualified')).toBe(false);
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Positive arb only' }));
+    await waitFor(() => expect(new URL(String(fetchMock.mock.calls.at(-1)?.[0]), 'http://localhost').searchParams.has('positiveArb')).toBe(false));
   });
 
   it('shows a row-reconcilable reason for every persisted scan decision', async () => {

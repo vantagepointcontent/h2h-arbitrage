@@ -24,12 +24,93 @@ describe('GET /api/bot-trader/logs qualified filter', () => {
   it('passes qualified=true to persistence', async () => {
     const response = await GET(new NextRequest('http://localhost/api/bot-trader/logs?qualified=true'));
     expect(response.status).toBe(200);
-    expect(getBotActionLogs).toHaveBeenCalledWith(expect.objectContaining({ qualified: true }));
+    expect(getBotActionLogs).toHaveBeenCalledWith(expect.objectContaining({ qualified: true, positiveArb: true }));
+  });
+
+  it('excludes scan-level decisions from the qualified candidate result set', async () => {
+    vi.mocked(getBotScanDecisions).mockResolvedValue([
+      { scanId: 41, state: 'daily_limit', reasonCode: 'no_positive_arb', reason: 'No positive arb', updatedAt: '2026-08-30T12:00:00.000Z' },
+      { scanId: 42, state: 'rejected', reasonCode: 'scan_criteria_rejected', reason: 'Criteria rejected', updatedAt: '2026-08-30T12:01:00.000Z' },
+    ] as Awaited<ReturnType<typeof getBotScanDecisions>>);
+
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/logs?qualified=true'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.decisions).toEqual([]);
+    expect(getScanAuditReferences).not.toHaveBeenCalled();
   });
 
   it('rejects invalid qualified values', async () => {
     const response = await GET(new NextRequest('http://localhost/api/bot-trader/logs?qualified=yes'));
     expect(response.status).toBe(400);
+    expect(getBotActionLogs).not.toHaveBeenCalled();
+  });
+
+  it('composes positive-arb filtering with qualification and every placement-log filter', async () => {
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/logs?positiveArb=true&qualified=true&status=failed&since=2026-08-01T00%3A00%3A00.000Z&marketId=market-1&cursor=41'));
+
+    expect(response.status).toBe(200);
+    expect(getBotActionLogs).toHaveBeenCalledWith({
+      positiveArb: true,
+      qualified: true,
+      status: 'failed',
+      since: '2026-08-01T00:00:00.000Z',
+      marketId: 'market-1',
+      cursor: 41,
+    });
+    expect(getBotScanDecisions).not.toHaveBeenCalled();
+  });
+
+  it('filters no-positive-arb scan classifications server-side while retaining later gate rejections', async () => {
+    vi.mocked(getBotScanDecisions).mockResolvedValue([
+      { scanId: 41, state: 'criteria_rejected', reasonCode: 'no_positive_arb', reason: 'No Positive Arb — BotTrader not applicable', updatedAt: '2026-08-30T12:00:00.000Z' },
+      { scanId: 42, state: 'criteria_rejected', reasonCode: 'scan_criteria_rejected', reason: 'Positive candidate missed ROI threshold', updatedAt: '2026-08-30T12:01:00.000Z' },
+    ] as Awaited<ReturnType<typeof getBotScanDecisions>>);
+
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/logs?positiveArb=true'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(getBotActionLogs).toHaveBeenCalledWith(expect.objectContaining({ positiveArb: true }));
+    expect(getBotScanDecisions).toHaveBeenCalledWith(expect.objectContaining({ positiveArbOnly: true }));
+    expect(body.decisions).toEqual([expect.objectContaining({ scanId: 42, reasonCode: 'scan_criteria_rejected' })]);
+  });
+
+  it('preserves positive-arb classification when status filtering omits the detection row', async () => {
+    vi.mocked(getBotActionLogs).mockResolvedValue({
+      rows: [{
+        id: 7,
+        tradeId: 'later-rejected',
+        trigger: 'scan',
+        marketId: 'market-1',
+        marketTitle: 'Positive candidate rejected later',
+        timestamp: '2026-08-30T12:00:00.000Z',
+        step: 'criteria_check',
+        action: 'ROI threshold rejected',
+        requestPayload: null,
+        responsePayload: null,
+        responseStatus: 'failed',
+        errorReason: 'ROI threshold rejected',
+        durationMs: null,
+        alertMetadata: null,
+        qualificationOutcome: 'dead',
+        positiveArb: true,
+      }],
+      nextCursor: null,
+    });
+
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/logs?status=failed&positiveArb=true'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.trades).toEqual([expect.objectContaining({ tradeId: 'later-rejected', positiveArb: true })]);
+  });
+
+  it('rejects invalid positiveArb values', async () => {
+    const response = await GET(new NextRequest('http://localhost/api/bot-trader/logs?positiveArb=yes'));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ success: false, error: 'positiveArb must be true or false' });
     expect(getBotActionLogs).not.toHaveBeenCalled();
   });
 

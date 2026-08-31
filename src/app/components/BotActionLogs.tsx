@@ -28,6 +28,7 @@ interface TradeChain {
   startedAt: string;
   status: LogStatus;
   qualified: boolean | null;
+  positiveArb: boolean;
   steps: ActionStep[];
 }
 
@@ -102,6 +103,12 @@ function decisionStatus(decision: ScanDecision): LogStatus {
   return 'failed';
 }
 
+function isPositiveArbDecision(decision: ScanDecision): boolean {
+  return decision.reasonCode !== 'no_positive_arb'
+    && decision.reasonCode !== 'no_opportunities'
+    && !/no positive arb/i.test(decision.reason);
+}
+
 function mergeTradePages(current: TradeChain[], incoming: TradeChain[]): TradeChain[] {
   const merged = new Map(current.map((trade) => [trade.tradeId, trade]));
   for (const trade of incoming) {
@@ -147,6 +154,7 @@ export default function BotActionLogs({ selectionMethod }: { selectionMethod?: S
   const [expandedTrades, setExpandedTrades] = useState<Set<string>>(new Set());
   const [expandedScans, setExpandedScans] = useState<Set<number>>(new Set());
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [positiveArbOnly, setPositiveArbOnly] = useState(false);
   const [qualifiedOnly, setQualifiedOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -162,10 +170,11 @@ export default function BotActionLogs({ selectionMethod }: { selectionMethod?: S
     if (status !== 'all') query.set('status', status);
     if (market.trim()) query.set('marketId', market.trim());
     if (since) query.set('since', new Date(`${since}T00:00:00`).toISOString());
+    if (positiveArbOnly) query.set('positiveArb', 'true');
     if (qualifiedOnly) query.set('qualified', 'true');
     if (cursor != null) query.set('cursor', String(cursor));
     return query;
-  }, [market, qualifiedOnly, since, status]);
+  }, [market, positiveArbOnly, qualifiedOnly, since, status]);
 
   const load = useCallback(async () => {
     const generation = ++requestGeneration.current;
@@ -285,7 +294,30 @@ export default function BotActionLogs({ selectionMethod }: { selectionMethod?: S
           <input value={market} onChange={(event) => { invalidateQuery(); setMarket(event.target.value); }} placeholder="All markets" className="min-h-11 min-w-52 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-workspace)] px-3 text-xs font-medium normal-case text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--status-info)]" />
         </label>
         <label className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-xs text-[var(--text-secondary)]"><input type="checkbox" checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} /> Auto-refresh 30s</label>
-        <label className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-semibold ${qualifiedOnly ? 'border-[var(--status-info)]/40 bg-[var(--status-info)]/10 text-[var(--status-info)]' : 'border-[var(--border-strong)] text-[var(--text-secondary)]'}`}><input aria-label="Qualified only" type="checkbox" checked={qualifiedOnly} onChange={(event) => { invalidateQuery(); setQualifiedOnly(event.target.checked); }} /> Qualified only</label>
+        <label className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold ${positiveArbOnly ? 'border-[var(--status-info)]/40 bg-[var(--status-info)]/10 text-[var(--status-info)]' : 'border-[var(--border-strong)] text-[var(--text-secondary)]'}`} title="Positive Arb classification only; later BotTrader gate rejections remain visible.">
+          <input aria-label="Positive arb only" aria-describedby="positive-arb-only-description" type="checkbox" checked={positiveArbOnly} onChange={(event) => {
+            const nextPositiveArbOnly = event.target.checked;
+            invalidateQuery();
+            if (nextPositiveArbOnly) {
+              setTrades((current) => current.filter((trade) => trade.positiveArb));
+              setDecisions((current) => current.filter(isPositiveArbDecision));
+            }
+            setPositiveArbOnly(nextPositiveArbOnly);
+          }} />
+          <span className="grid leading-tight"><span>Positive arb only</span><span id="positive-arb-only-description" className="text-[9px] font-medium">Includes candidates rejected by later gates</span></span>
+        </label>
+        <label className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold ${qualifiedOnly ? 'border-[var(--status-info)]/40 bg-[var(--status-info)]/10 text-[var(--status-info)]' : 'border-[var(--border-strong)] text-[var(--text-secondary)]'}`} title="Qualified means Positive Arb and every BotTrader eligibility gate passed.">
+          <input aria-label="Qualified only" aria-describedby="qualified-only-description" type="checkbox" checked={qualifiedOnly} onChange={(event) => {
+            const nextQualifiedOnly = event.target.checked;
+            invalidateQuery();
+            if (nextQualifiedOnly) {
+              setTrades([]);
+              setDecisions([]);
+            }
+            setQualifiedOnly(nextQualifiedOnly);
+          }} />
+          <span className="grid leading-tight"><span>Qualified only</span><span id="qualified-only-description" className="text-[9px] font-medium">Positive Arb + all eligibility gates passed</span></span>
+        </label>
         <span title="Backend-ranked selection method used for new BotTrader evaluations" className="flex min-h-11 items-center justify-center rounded-lg border border-[var(--border-strong)] px-3 text-[10px] font-bold uppercase text-[var(--text-primary)]">Method: {selectionMethod ?? 'unknown'}</span>
         <button type="button" onClick={() => void load()} aria-label="Refresh action logs" className="min-h-11 min-w-11 rounded-lg border border-[var(--border-strong)] text-[var(--text-secondary)] hover:bg-[var(--surface-workspace)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--status-info)]">
           <RefreshCw className={`mx-auto h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -402,7 +434,7 @@ export default function BotActionLogs({ selectionMethod }: { selectionMethod?: S
               </article>
             );
           })}
-          {!loading && trades.length === 0 && <div className="rounded-xl border border-dashed border-[var(--border-strong)] py-12 text-center text-sm text-[var(--text-secondary)]">{qualifiedOnly ? 'No qualifying evaluations in the selected period.' : 'No BotTrader actions match these filters.'}</div>}
+          {!loading && trades.length === 0 && <div className="rounded-xl border border-dashed border-[var(--border-strong)] py-12 text-center text-sm text-[var(--text-secondary)]">{qualifiedOnly ? 'No qualifying evaluations in the selected period.' : positiveArbOnly ? 'No positive-arb evaluations in the selected period.' : 'No BotTrader actions match these filters.'}</div>}
         </div>
         {nextCursor != null && <button type="button" onClick={() => void loadMore()} disabled={loading || loadingMore} className="min-h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface-panel)] px-4 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-workspace)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--status-info)] disabled:cursor-wait disabled:opacity-60">{loadingMore ? 'Loading older action logs…' : 'Load older action logs'}</button>}
       </section>

@@ -15,6 +15,7 @@ function groupByTrade(rows: BotActionLogRow[]) {
     startedAt: string;
     status: BotActionStatus;
     qualified: boolean | null;
+    positiveArb: boolean;
     steps: BotActionLogRow[];
   }>();
   for (const row of rows) {
@@ -26,6 +27,7 @@ function groupByTrade(rows: BotActionLogRow[]) {
       startedAt: row.timestamp,
       status: row.responseStatus,
       qualified: row.qualificationOutcome === 'qualified' ? true : row.qualificationOutcome === 'dead' ? false : null,
+      positiveArb: row.positiveArb,
       steps: [],
     };
     group.startedAt = row.timestamp < group.startedAt ? row.timestamp : group.startedAt;
@@ -34,6 +36,7 @@ function groupByTrade(rows: BotActionLogRow[]) {
     else if (row.responseStatus === 'pending' && group.status !== 'failed') group.status = 'pending';
     if (row.qualificationOutcome === 'qualified') group.qualified = true;
     else if (row.qualificationOutcome === 'dead' && group.qualified !== true) group.qualified = false;
+    if (row.positiveArb) group.positiveArb = true;
     groups.set(row.tradeId, group);
   }
   return [...groups.values()].map((group) => ({
@@ -65,14 +68,27 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (qualifiedParam && qualifiedParam !== 'true' && qualifiedParam !== 'false') {
       return NextResponse.json({ success: false, error: 'qualified must be true or false' }, { status: 400 });
     }
+    const positiveArbParam = params.get('positiveArb');
+    if (positiveArbParam && positiveArbParam !== 'true' && positiveArbParam !== 'false') {
+      return NextResponse.json({ success: false, error: 'positiveArb must be true or false' }, { status: 400 });
+    }
     await pruneBotActionLogs(30);
+    const qualified = qualifiedParam == null ? undefined : qualifiedParam === 'true';
+    const positiveArb = positiveArbParam === 'true' || qualified === true;
     const [result, decisions] = await Promise.all([getBotActionLogs({
-      status: statusParam as BotActionStatus | undefined,
+      status: statusParam as BotActionStatus || undefined,
       marketId: params.get('marketId') || undefined,
       since,
       cursor,
-      qualified: qualifiedParam == null ? undefined : qualifiedParam === 'true',
-    }), getBotScanDecisions(200)]);
+      qualified,
+      positiveArb,
+    }), qualified === true ? Promise.resolve([]) : getBotScanDecisions({
+      limit: 200,
+      positiveArbOnly: positiveArb,
+      status: statusParam as BotActionStatus || undefined,
+      marketId: params.get('marketId') || undefined,
+      since,
+    })]);
     // OPS-854: filter out pre-reset tombstoned decisions and any decisions
     // whose latest update is before the reset baseline, so the visible
     // BotTrader history starts cleanly after reset. Idempotency keys and
@@ -80,10 +96,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const baseline = await getResetBaseline();
     const visibleDecisions = decisions.filter((d) => {
       if (d.state === ('reset_cleared' as BotScanDecisionState)) return false;
+      if (positiveArb && (d.reasonCode === 'no_positive_arb' || d.reasonCode === 'no_opportunities' || /no positive arb/i.test(d.reason))) return false;
       if (!baseline) return true;
       return d.updatedAt >= baseline.resetAt;
     });
-    const auditReferences = await getScanAuditReferences(visibleDecisions.map((decision) => decision.scanId));
+    const auditReferences = visibleDecisions.length > 0
+      ? await getScanAuditReferences(visibleDecisions.map((decision) => decision.scanId))
+      : new Map();
     const enrichedDecisions = visibleDecisions.map((decision) => ({
       ...decision,
       logUuid: auditReferences.get(decision.scanId)?.logUuid ?? null,

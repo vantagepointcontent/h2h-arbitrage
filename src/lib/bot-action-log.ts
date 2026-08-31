@@ -24,6 +24,7 @@ export interface BotActionLogInput {
 export interface BotActionLogRow extends Omit<BotActionLogInput, 'requestPayload' | 'responsePayload' | 'alertMetadata' | 'timestamp'> {
   id: number;
   timestamp: string;
+  positiveArb: boolean;
   requestPayload: unknown;
   responsePayload: unknown;
   alertMetadata: unknown;
@@ -116,6 +117,7 @@ export async function getBotActionLogs(filters: {
   cursor?: number;
   limit?: number;
   qualified?: boolean;
+  positiveArb?: boolean;
 } = {}): Promise<{ rows: BotActionLogRow[]; nextCursor: number | null }> {
   await ensureTable();
   const conditions: string[] = [];
@@ -125,15 +127,46 @@ export async function getBotActionLogs(filters: {
   if (filters.since) { conditions.push('timestamp >= ?'); args.push(filters.since); }
   if (filters.cursor) { conditions.push('id < ?'); args.push(filters.cursor); }
   if (filters.qualified !== undefined) {
-    conditions.push(`trade_id IN (SELECT trade_id FROM bot_action_log WHERE qualification_outcome = ?)`);
-    args.push(filters.qualified ? 'qualified' : 'dead');
+    if (filters.qualified) {
+      conditions.push(`trade_id IN (
+        SELECT qualified.trade_id FROM bot_action_log AS qualified
+        WHERE qualified.qualification_outcome = 'qualified'
+          AND qualified.step = 'safety-gate'
+          AND EXISTS (
+            SELECT 1 FROM bot_action_log AS detected
+            WHERE detected.trade_id = qualified.trade_id
+              AND detected.step = 'detection'
+              AND detected.response_status = 'passed'
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM bot_action_log AS rejected
+            WHERE rejected.trade_id = qualified.trade_id
+              AND rejected.qualification_outcome = 'dead'
+          )
+      )`);
+    } else {
+      conditions.push(`trade_id IN (SELECT trade_id FROM bot_action_log WHERE qualification_outcome = 'dead')`);
+    }
+  }
+  if (filters.positiveArb) {
+    conditions.push(`trade_id IN (
+      SELECT positive.trade_id FROM bot_action_log AS positive
+      WHERE positive.step = 'detection'
+        AND positive.response_status = 'passed'
+    )`);
   }
   const limit = Math.min(500, Math.max(1, filters.limit ?? 200));
   args.push(limit + 1);
   const db = client();
   try {
     const result = await db.execute({
-      sql: `SELECT * FROM bot_action_log ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''} ORDER BY id DESC LIMIT ?`,
+      sql: `SELECT bot_action_log.*, EXISTS (
+          SELECT 1 FROM bot_action_log AS positive
+          WHERE positive.trade_id = bot_action_log.trade_id
+            AND positive.step = 'detection'
+            AND positive.response_status = 'passed'
+        ) AS positive_arb
+        FROM bot_action_log ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''} ORDER BY id DESC LIMIT ?`,
       args,
     });
     const raw = result.rows as unknown as Array<Record<string, unknown>>;
@@ -141,7 +174,7 @@ export async function getBotActionLogs(filters: {
     const page = raw.slice(0, limit);
     return {
       rows: page.map((row) => ({
-        id: Number(row.id), tradeId: String(row.trade_id), trigger: String(row.trigger),
+        id: Number(row.id), tradeId: String(row.trade_id), trigger: String(row.trigger), positiveArb: Number(row.positive_arb) === 1,
         marketId: String(row.market_id), marketTitle: String(row.market_title), timestamp: String(row.timestamp),
         step: String(row.step), action: String(row.action), requestPayload: parse(row.request_payload),
         responsePayload: parse(row.response_payload), responseStatus: row.response_status as BotActionStatus,

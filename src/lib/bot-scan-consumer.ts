@@ -7,6 +7,7 @@ import { auditArbClassification } from './arb-types';
 import type { BotLegRelationshipState } from './bot-leg-identity';
 import { isExecutableQuoteConsistent, isUnavailableQuoteConsistent, type ExecutableBookQuote } from './executable-book';
 import type { PropositionRelationship } from './proposition-identity';
+import type { BotActionStatus } from './bot-action-log';
 
 export type BotScanSource = 'scan_api' | 'watcher' | 'scheduled' | 'catch_up';
 export type BotScanDecisionState =
@@ -1793,11 +1794,37 @@ export async function processBotScanBacklog(limit = 100): Promise<BotScanDecisio
   return consumer.processBacklog(limit);
 }
 
-export async function getBotScanDecisions(limit = 100): Promise<BotScanDecision[]> {
+export interface BotScanDecisionFilters {
+  limit?: number;
+  positiveArbOnly?: boolean;
+  status?: BotActionStatus;
+  since?: string;
+  marketId?: string;
+}
+
+export async function getBotScanDecisions(filters: number | BotScanDecisionFilters = 100): Promise<BotScanDecision[]> {
   await ensureSchema();
   const db = await dbClient();
   try {
-    const result = await db.execute({ sql: 'SELECT * FROM bot_scan_decisions ORDER BY scan_id DESC LIMIT ?', args: [Math.min(500, Math.max(1, limit))] });
+    const options = typeof filters === 'number' ? { limit: filters } : filters;
+    const conditions: string[] = [];
+    const args: Array<string | number> = [];
+    if (options.positiveArbOnly) {
+      conditions.push('s.positive_arb_count > 0');
+    }
+    if (options.status === 'passed') conditions.push("d.state = 'placed'");
+    else if (options.status === 'pending') conditions.push("d.state IN ('received', 'placement_attempted')");
+    else if (options.status === 'failed') conditions.push("d.state NOT IN ('placed', 'received', 'placement_attempted')");
+    if (options.since) { conditions.push('d.updated_at >= ?'); args.push(options.since); }
+    if (options.marketId) { conditions.push('s.market_id = ?'); args.push(options.marketId); }
+    args.push(Math.min(500, Math.max(1, options.limit ?? 100)));
+    const result = await db.execute({
+      sql: `SELECT d.* FROM bot_scan_decisions d
+        INNER JOIN scan_results s ON s.id = d.scan_id
+        ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
+        ORDER BY d.scan_id DESC LIMIT ?`,
+      args,
+    });
     return (result.rows as unknown as Record<string, unknown>[]).map(rowToDecision);
   } finally { db.close(); }
 }
