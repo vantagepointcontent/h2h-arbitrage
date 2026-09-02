@@ -268,6 +268,35 @@ describe('executeArb', () => {
     expect(result.error).toContain('positive whole contract/share quantity');
   });
 
+  it('rejects a self-consistent two-contract request at the final execution boundary', async () => {
+    const req = makeRequest();
+    for (const leg of [req.kalshiOrder, req.polymarketOrder]) {
+      leg.contracts = 2;
+      leg.size = leg.price * 2;
+      leg.executableQuote = walkExecutableBook({
+        side: 'buy',
+        levels: [{ priceCents: leg.price * 100, quantityMicros: 2_000_000 }],
+        requestedQuantityMicros: 2_000_000,
+        tickSizeCents: 1,
+        minimumOrderQuantityMicros: 1_000_000,
+        depthTimestamp: new Date().toISOString(),
+      });
+    }
+    orderbookState.setBook(req.kalshiOrder.ticker!, [{ price: req.kalshiOrder.price, quantity: 2 }], [], 0, {
+      tickSizeCents: 1, minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp: req.kalshiOrder.executableQuote!.depthTimestamp!,
+    });
+    orderbookState.setBook(req.polymarketOrder.marketId, [{ price: req.polymarketOrder.price, quantity: 2 }], [], 0, {
+      tickSizeCents: 1, minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp: req.polymarketOrder.executableQuote!.depthTimestamp!,
+    });
+
+    const result = await executeArb(req);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('exactly one contract/share');
+  });
+
   it('rejects a buy limit above the walked worst consumed level', async () => {
     const req = makeRequest();
     req.polymarketOrder.price = 0.51;

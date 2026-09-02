@@ -87,7 +87,9 @@ function levelPriceMicroCents(level: ExecutableBookLevel): number {
 }
 
 function requestTickMicroCents(request: WalkExecutableBookRequest): number {
-  if (Number.isSafeInteger(request.tickSizeMicroCents)) return request.tickSizeMicroCents!;
+  // Preserve an explicitly supplied malformed value in the quote so the
+  // execution gate can distinguish malformed metadata from missing metadata.
+  if (request.tickSizeMicroCents != null) return request.tickSizeMicroCents;
   const scaled = (request.tickSizeCents ?? Number.NaN) * MICRO_CENTS_PER_CENT;
   const rounded = Math.round(scaled);
   return Number.isSafeInteger(rounded) && Math.abs(scaled - rounded) < 1e-6
@@ -144,11 +146,12 @@ function quote(
  */
 export function walkExecutableBook(request: WalkExecutableBookRequest): ExecutableBookQuote {
   const tickSizeMicroCents = requestTickMicroCents(request);
+  if (!Number.isSafeInteger(tickSizeMicroCents) || tickSizeMicroCents <= 0) {
+    return quote(request, 'unavailable', 'invalid_tick');
+  }
   const validRequest = Number.isSafeInteger(request.requestedQuantityMicros)
     && request.requestedQuantityMicros > 0
     && request.requestedQuantityMicros <= Math.floor(Number.MAX_SAFE_INTEGER / MICRO_CENTS_PER_DOLLAR)
-    && Number.isSafeInteger(tickSizeMicroCents)
-    && tickSizeMicroCents > 0
     && Number.isSafeInteger(request.minimumOrderQuantityMicros)
     && request.minimumOrderQuantityMicros > 0;
   if (!validRequest) return quote(request, 'unavailable', 'invalid_request');

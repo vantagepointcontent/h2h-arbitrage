@@ -637,6 +637,11 @@ function executableBookUnavailableReason(
   if (quote.reason === 'malformed_depth' || quote.reason === 'malformed_level') {
     return `${label} ask depth is malformed${observed}`;
   }
+  if (quote.reason === 'invalid_tick') {
+    const tick = quote.tickSizeMicroCents;
+    const kind = !Number.isFinite(tick) || tick <= 0 ? 'missing' : 'malformed';
+    return `${label} tick size metadata is ${kind}${observed}`;
+  }
   if (quote.reason === 'inactive_market') return `${label} market is inactive${observed}`;
   if (quote.reason === 'stale_book') return `${label} order book is stale${observed}${sourceEvidence}`;
   if (quote.reason === 'source_unavailable') return `${label} venue response is unavailable${observed}${sourceEvidence}`;
@@ -741,10 +746,12 @@ export function evaluateBotTrade(
   }
   if (selectedQuotes.kalshiQuote?.status === 'executable') {
     const kalshiTickMicroCents = selectedQuotes.kalshiQuote.tickSizeMicroCents;
-    if (!Number.isSafeInteger(kalshiTickMicroCents) || kalshiTickMicroCents <= 0) {
-      reasons.push(`Kalshi ${legs.kalshiOutcome.toUpperCase()} tick size is unavailable`);
-    } else if (kalshiTickMicroCents !== 1_000_000) {
-      reasons.push(`Kalshi ${legs.kalshiOutcome.toUpperCase()} tick size $${(kalshiTickMicroCents / 100_000_000).toFixed(6)} is unsupported by the cent-only execution adapter`);
+    if (kalshiTickMicroCents === 0) {
+      reasons.push(`Kalshi ${legs.kalshiOutcome.toUpperCase()} tick size metadata is missing`);
+    } else if (!Number.isSafeInteger(kalshiTickMicroCents) || kalshiTickMicroCents < 0) {
+      reasons.push(`Kalshi ${legs.kalshiOutcome.toUpperCase()} tick size metadata is malformed`);
+    } else if (kalshiTickMicroCents % 10_000 !== 0 || 100_000_000 % kalshiTickMicroCents !== 0) {
+      reasons.push(`Kalshi ${legs.kalshiOutcome.toUpperCase()} tick size $${(kalshiTickMicroCents / 100_000_000).toFixed(8)} is unsupported by the fixed-point order API`);
     }
   }
   if ((!kalshiUnavailable && sharesK < evaluationQuantity) || (!pmUnavailable && sharesP < evaluationQuantity)) {
@@ -883,10 +890,9 @@ export function buildExecutionRequest(input: BotTradeInput, _configuredMinShares
   if (kalshiQuote?.status !== 'executable' || pmQuote?.status !== 'executable'
     || kalshiQuote.vwapPriceMicroCents == null || pmQuote.vwapPriceMicroCents == null
     || kalshiQuote.limitPriceMicroCents == null || pmQuote.limitPriceMicroCents == null) return null;
-  // The installed Kalshi adapter submits integer cent prices. Until that
-  // boundary supports fixed-point dollar prices, sub-cent quotes must remain
-  // visible but non-executable rather than being rounded into another order.
-  if (kalshiQuote.tickSizeMicroCents !== 1_000_000) return null;
+  if (!Number.isSafeInteger(kalshiQuote.tickSizeMicroCents) || kalshiQuote.tickSizeMicroCents <= 0
+      || kalshiQuote.tickSizeMicroCents % 10_000 !== 0
+      || 100_000_000 % kalshiQuote.tickSizeMicroCents !== 0) return null;
   const kalshiExecutionPrice = kalshiQuote.vwapPriceMicroCents / 100_000_000;
   const pmExecutionPrice = pmQuote.vwapPriceMicroCents / 100_000_000;
   const kalshiLimitPrice = kalshiQuote.limitPriceMicroCents / 100_000_000;
@@ -908,6 +914,8 @@ export function buildExecutionRequest(input: BotTradeInput, _configuredMinShares
     minimumOrderSize: 1,
     tickSize: kalshiQuote.tickSizeMicroCents / 100_000_000,
     price: kalshiLimitPrice,
+    priceMicroCents: kalshiQuote.limitPriceMicroCents,
+    tickSizeMicroCents: kalshiQuote.tickSizeMicroCents,
     orderType: 'limit',
     executableQuote: kalshiQuote,
   };
@@ -962,8 +970,13 @@ export function revalidateBotTradeEconomics(
     kalshiFeeType: authority.kalshi.feeType,
     pmFeeRateBps: authority.polymarket.feeRateBps,
   });
-  const expectedProfit = (1_000_000 - costs.totalCostMicrousd) / 1_000_000;
-  const roiPct = expectedProfit * 100;
+  const profitMicrousd = 1_000_000 - costs.totalCostMicrousd;
+  const expectedProfit = profitMicrousd / 1_000_000;
+  // Scanner ROI uses capital deployed (fee-inclusive entry cost) as its
+  // denominator. Keep preflight on that same exact integer-money basis.
+  const roiPct = costs.totalCostMicrousd > 0
+    ? profitMicrousd / costs.totalCostMicrousd * 100
+    : 0;
   const apyPct = computeApy(roiPct, input.expiryDate);
   const reasons: string[] = [];
   if (expectedProfit <= 0) reasons.push(`Authoritative net profit $${expectedProfit.toFixed(5)} is not positive`);

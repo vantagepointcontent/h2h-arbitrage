@@ -261,6 +261,19 @@ describe('walkExecutableBook', () => {
     expect(quote).toMatchObject({ status: 'unavailable', reason: 'invalid_request' });
   });
 
+  it.each([undefined, 100_000.5])('classifies missing or malformed tick metadata as invalid_tick', (tickSizeMicroCents) => {
+    const quote = walkExecutableBook({
+      side: 'buy',
+      levels: [{ priceMicroCents: 42_500_000, quantityMicros: ONE_SHARE }],
+      requestedQuantityMicros: ONE_SHARE,
+      tickSizeMicroCents,
+      minimumOrderQuantityMicros: ONE_SHARE,
+      depthTimestamp: OBSERVED_AT,
+    });
+
+    expect(quote).toMatchObject({ status: 'unavailable', reason: 'invalid_tick' });
+  });
+
   it('rejects an internally consistent quote whose fill is off its carried venue tick', () => {
     const forged = walkExecutableBook({
       side: 'buy',
