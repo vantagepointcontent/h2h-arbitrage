@@ -49,7 +49,7 @@ describe('POST /api/logs/current-roi', () => {
     ] });
   });
 
-  it.each([[], [0], [1.5], Array.from({ length: 101 }, (_, index) => index + 1)])('rejects an invalid batch', async (ids) => {
+  it.each([[], [0], [1.5], [Number.MAX_SAFE_INTEGER + 1], Array.from({ length: 101 }, (_, index) => index + 1)])('rejects an invalid batch', async (ids) => {
     expect((await POST(request({ ids }))).status).toBe(400);
     expect(mocks.getCurrentLogRoiBatch).not.toHaveBeenCalled();
   });
@@ -80,7 +80,7 @@ describe('GET /api/logs/current-roi', () => {
     await expect(response.json()).resolves.toEqual({ valuations: [{ id: 7, status: 'available', roiPct: 1.2 }] });
   });
 
-  it.each(['', '0', '1.5', Array.from({ length: 101 }, (_, index) => index + 1).join(',')])(
+  it.each(['', '0', '1.5', '01', '1e3', '0x10', '9007199254740992', Array.from({ length: 101 }, (_, index) => index + 1).join(',')])(
     'rejects invalid browser batch %s', async (ids) => {
       expect((await GET(new NextRequest(`http://localhost/api/logs/current-roi?ids=${ids}`))).status).toBe(400);
       expect(mocks.getCurrentLogRoiBatch).not.toHaveBeenCalled();

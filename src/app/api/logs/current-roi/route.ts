@@ -6,7 +6,15 @@ const MAX_BATCH = 100;
 
 function validIds(ids: unknown): ids is number[] {
   return Array.isArray(ids) && ids.length > 0 && ids.length <= MAX_BATCH
-    && ids.every((id) => Number.isInteger(id) && id > 0);
+    && ids.every((id) => Number.isSafeInteger(id) && id > 0);
+}
+
+function parseQueryIds(raw: string | null): number[] | null {
+  if (!raw) return null;
+  const values = raw.split(',');
+  if (values.some((value) => !/^[1-9]\d*$/.test(value))) return null;
+  const ids = values.map(Number);
+  return validIds(ids) ? ids : null;
 }
 
 async function responseFor(ids: unknown) {
@@ -20,8 +28,7 @@ async function responseFor(ids: unknown) {
 /** Read-only browser batch. GET deliberately avoids the mutation-auth middleware. */
 export async function GET(request: NextRequest) {
   const raw = new URL(request.url).searchParams.get('ids');
-  const ids = raw ? raw.split(',').map((value) => Number(value)) : [];
-  return responseFor(ids);
+  return responseFor(parseQueryIds(raw));
 }
 
 export async function POST(request: NextRequest) {
