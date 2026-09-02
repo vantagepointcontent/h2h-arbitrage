@@ -124,6 +124,61 @@ describe('BUG-153 live entry terminality', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
+  it('rejects fractional entry quantities before either venue adapter is called', async () => {
+    const req = request();
+    req.kalshiOrder.contracts = 1.5;
+    req.polymarketOrder.contracts = 1.5;
+
+    const result = await executeArb(req);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('positive whole contract/share quantity');
+    expect(mocks.placeKalshiOrder).not.toHaveBeenCalled();
+    expect(mocks.placePmOrder).not.toHaveBeenCalled();
+  });
+
+  it('places the exact authoritative mill-tick quote instead of an advisory rounded price', async () => {
+    const req = request();
+    const depthTimestamp = new Date().toISOString();
+    const exactQuote = walkExecutableBook({
+      side: 'buy',
+      levels: [{ priceMicroCents: 42_500_000, quantityMicros: 1_000_000 }],
+      requestedQuantityMicros: 1_000_000,
+      tickSizeMicroCents: 100_000,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp,
+    });
+    req.kalshiOrder = {
+      ...req.kalshiOrder,
+      size: 0.425,
+      price: 0.425,
+      tickSize: 0.001,
+      priceMicroCents: 43_000_000,
+      tickSizeMicroCents: 1_000_000,
+      executableQuote: exactQuote,
+    };
+    orderbookState.setBook('KXBUG153', [{ price: 0.425, quantity: 1 }], [], 0, {
+      tickSizeMicroCents: 100_000, minimumOrderQuantityMicros: 1_000_000, depthTimestamp,
+    });
+    mocks.placeKalshiOrder.mockResolvedValue({
+      orderId: 'k-entry', status: 'executed', filledCount: 1, remainingCount: 0,
+      evidence: {
+        ...evidence('kalshi', 1, 0.425, 1, '1'),
+        orderId: 'k-entry',
+      },
+      raw: {},
+    });
+    mocks.placePmOrder.mockResolvedValue(pmOrder('matched', 1, 1, '1'));
+
+    await executeArb(req);
+
+    expect(mocks.placeKalshiOrder).toHaveBeenCalledWith(expect.objectContaining({
+      ticker: 'KXBUG153', side: 'yes', count: 1,
+      priceMicroCents: 42_500_000,
+      tickSizeMicroCents: 100_000,
+    }));
+  });
+
   it('records terminal provenance when initially live entries fully fill on the ordinary poll path', async () => {
     mocks.placeKalshiOrder.mockResolvedValue({
       orderId: 'k-entry', status: 'resting', filledCount: 0, remainingCount: 5, raw: {},

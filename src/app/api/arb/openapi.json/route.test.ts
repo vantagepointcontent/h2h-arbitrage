@@ -6,18 +6,35 @@ describe('GET /api/arb/openapi.json Entry Arb Profit contract', () => {
     const response = GET();
     const spec = await response.json() as {
       info: { version: string };
-      paths: Record<string, { get: { responses: Record<string, { content: Record<string, { schema: unknown }> }> } }>;
+      paths: Record<string, { get: {
+        parameters?: unknown[];
+        responses: Record<string, { content: Record<string, { schema: unknown }> }>;
+      } }>;
       components: { schemas: Record<string, {
         required?: string[];
         properties: Record<string, unknown>;
       }> };
     };
-    expect(spec.info.version).toBe('1.5.2');
+    expect(spec.info.version).toBe('1.5.3');
     expect(spec.paths['/api/executions'].get.responses['200'].content['application/json'].schema)
       .toEqual({ $ref: '#/components/schemas/ExecutionListResponse' });
     expect(spec.components.schemas.ExecutionRecord.properties).toMatchObject({
+      source: { type: 'string', enum: ['manual', 'bot', 'unknown'] },
       sourceScanId: { type: ['integer', 'null'], minimum: 1 },
       sourceOpportunityId: { type: ['string', 'null'] },
+    });
+    expect(spec.paths['/api/executions'].get.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'source', schema: expect.objectContaining({ type: 'string', enum: ['manual', 'bot', 'unknown'] }) }),
+      expect.objectContaining({ name: 'view', schema: expect.objectContaining({ type: 'string', enum: ['real', 'dry', 'pending'] }) }),
+      expect.objectContaining({ name: 'offset', schema: expect.objectContaining({ type: 'integer', minimum: 0, maximum: 1_000_000 }) }),
+    ]));
+    expect(spec.components.schemas.ExecutionListResponse).toMatchObject({
+      required: expect.arrayContaining(['total', 'sourceCounts', 'summary', 'nextOffset']),
+      properties: {
+        summary: {
+          required: ['realCount', 'pendingCount', 'totalNetPnlMicros', 'unhedgedCount', 'unhedgedExposure'],
+        },
+      },
     });
     expect(spec.components.schemas.HistoricalScanFinancials).toMatchObject({
       required: ['revision', 'scanId', 'envelope', 'fields'],

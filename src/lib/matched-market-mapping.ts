@@ -5,6 +5,7 @@ import {
   validatePropositionRelationship,
   type PropositionRelationshipV2,
 } from './proposition-identity';
+import { couplingKey, ensureCouplingStore, normalizeCouplingIdentity } from './coupling-store';
 
 export type MappingSource = 'matched_market_review' | 'legacy_registry_migration' | 'matched_market_scan_derivation';
 
@@ -69,17 +70,6 @@ function text(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function outcomeKey(value: string): string {
-  return value.normalize('NFKD').replace(/\([^)]*\)/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-function compatibleOutcomeLabels(values: string[]): boolean {
-  const keys = values.map(outcomeKey);
-  if (keys.some((value) => !value)) return false;
-  const shortest = [...keys].sort((a, b) => a.length - b.length)[0];
-  return keys.every((value) => value === shortest || value.startsWith(`${shortest} `));
-}
-
 function candidateTuple(candidate: Record<string, unknown>): Omit<MatchedMarketExecutionTuple, 'matchedMarketId'> | null {
   const sides = candidateSides(candidate.strategy);
   const kalshiTicker = text(candidate.kalshiTicker);
@@ -97,26 +87,6 @@ function tupleMatches(left: Omit<MatchedMarketExecutionTuple, 'matchedMarketId'>
     && left.pmSide === right.pmSide;
 }
 
-function settlementConflict(candidate: Record<string, unknown>): string | null {
-  const outcomeApy = candidate.outcomeApy;
-  if (!outcomeApy || typeof outcomeApy !== 'object') return null;
-  const payload = outcomeApy as Record<string, unknown>;
-  const kalshi = payload.kalshi as Record<string, unknown> | undefined;
-  const polymarket = payload.polymarket as Record<string, unknown> | undefined;
-  const kalshiAt = text(kalshi?.contractualAt);
-  const pmAt = text(polymarket?.contractualAt);
-  if (!kalshiAt || !pmAt) return null;
-  const kalshiMs = Date.parse(kalshiAt);
-  const pmMs = Date.parse(pmAt);
-  if (!Number.isFinite(kalshiMs) || !Number.isFinite(pmMs)) {
-    return `settlement timestamps are malformed: Kalshi ${kalshiAt}, Polymarket ${pmAt}`;
-  }
-  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-  return Math.abs(kalshiMs - pmMs) > sevenDaysMs
-    ? `settlement timestamps conflict: Kalshi ${kalshiAt}, Polymarket ${pmAt}`
-    : null;
-}
-
 function derivedRelationship(
   matchedMarketId: string,
   scanId: number,
@@ -132,11 +102,6 @@ function derivedRelationship(
   if (!outcome || !kalshiOutcome || !pmOutcome || !kalshiQuestion || !pmQuestion) {
     return { reason: 'selected outcome metadata is incomplete' };
   }
-  if (!compatibleOutcomeLabels([outcome, kalshiOutcome, pmOutcome])) {
-    return { reason: `selected outcome labels conflict: canonical ${outcome}, Kalshi ${kalshiOutcome}, Polymarket ${pmOutcome}` };
-  }
-  const settlement = settlementConflict(candidate);
-  if (settlement) return { reason: settlement };
   const parentEventId = `matched-market:${matchedMarketId}`;
   const resolutionRuleId = `${parentEventId}:approved-link-v1`;
   const opposite = `not:${outcome}`;
@@ -181,6 +146,7 @@ function derivedRelationship(
 
 export function createMatchedMarketMappingStore(client: Client) {
   async function ensureSchema(): Promise<void> {
+    await ensureCouplingStore(client);
     await client.batch([
       `CREATE TABLE IF NOT EXISTS matched_market_mappings (
         mapping_id TEXT PRIMARY KEY,
@@ -190,6 +156,8 @@ export function createMatchedMarketMappingStore(client: Client) {
         pm_token_id TEXT NOT NULL,
         kalshi_side TEXT NOT NULL CHECK(kalshi_side IN ('yes','no')),
         pm_side TEXT NOT NULL CHECK(pm_side IN ('yes','no')),
+        coupling_key TEXT NOT NULL,
+        coupling_revision INTEGER NOT NULL CHECK(coupling_revision >= 1),
         relationship_json TEXT NOT NULL,
         mapping_revision TEXT NOT NULL,
         evidence_revision TEXT NOT NULL,
@@ -220,6 +188,61 @@ export function createMatchedMarketMappingStore(client: Client) {
         recorded_at TEXT NOT NULL
       )`,
     ], 'write');
+    const mappingColumns = await client.execute(`PRAGMA table_info(matched_market_mappings)`);
+    const columnNames = new Set(mappingColumns.rows.map((row) => String(row.name)));
+    if (!columnNames.has('coupling_key')) {
+      await client.execute(`ALTER TABLE matched_market_mappings ADD COLUMN coupling_key TEXT`);
+    }
+    if (!columnNames.has('coupling_revision')) {
+      await client.execute(`ALTER TABLE matched_market_mappings ADD COLUMN coupling_revision INTEGER`);
+    }
+    await client.execute(`UPDATE matched_market_mappings AS mapping
+      SET coupling_key = (
+        SELECT coupling.coupling_key FROM coupling_states coupling
+        WHERE coupling.kalshi_ticker = mapping.kalshi_ticker
+          AND coupling.pm_condition_id = mapping.pm_condition_id
+          AND coupling.state != 'deleted'
+          AND coupling.updated_at <= mapping.created_at
+      ), coupling_revision = (
+        SELECT coupling.revision FROM coupling_states coupling
+        WHERE coupling.kalshi_ticker = mapping.kalshi_ticker
+          AND coupling.pm_condition_id = mapping.pm_condition_id
+          AND coupling.state != 'deleted'
+          AND coupling.updated_at <= mapping.created_at
+      )
+      WHERE coupling_key IS NULL OR coupling_revision IS NULL`);
+  }
+
+  async function resolveCouplingApproval(
+    kalshiTicker: string,
+    pmConditionId: string,
+    approved?: { couplingKey: string; couplingRevision: number },
+  ): Promise<{ couplingKey: string; couplingRevision: number } | { reason: string }> {
+    const normalized = normalizeCouplingIdentity(kalshiTicker, pmConditionId);
+    const expectedKey = couplingKey(normalized.kalshiTicker, normalized.pmConditionId);
+    if (approved && (approved.couplingKey !== expectedKey || !Number.isSafeInteger(approved.couplingRevision))) {
+      return { reason: 'cached mapping has malformed coupling authority' };
+    }
+    const current = await client.execute({
+      sql: `SELECT coupling_key,kalshi_ticker,pm_condition_id,state,revision
+        FROM coupling_states WHERE coupling_key=? LIMIT 2`,
+      args: [expectedKey],
+    });
+    if (current.rows.length !== 1) return { reason: `approved coupling ${expectedKey} is missing` };
+    const row = current.rows[0];
+    if (String(row.kalshi_ticker) !== normalized.kalshiTicker
+      || String(row.pm_condition_id) !== normalized.pmConditionId) {
+      return { reason: `approved coupling ${expectedKey} stable IDs do not match` };
+    }
+    if (row.state === 'deleted') return { reason: `approved coupling ${expectedKey} coupling is deleted` };
+    const currentRevision = Number(row.revision);
+    if (!Number.isSafeInteger(currentRevision) || currentRevision < 1) {
+      return { reason: `approved coupling ${expectedKey} revision is invalid` };
+    }
+    if (approved && currentRevision !== approved.couplingRevision) {
+      return { reason: `approved coupling ${expectedKey} coupling revision mismatch: approved ${approved.couplingRevision}, current ${currentRevision}` };
+    }
+    return { couplingKey: expectedKey, couplingRevision: currentRevision };
   }
 
   async function persistVerified(
@@ -236,12 +259,21 @@ export function createMatchedMarketMappingStore(client: Client) {
     const market = await client.execute({ sql: 'SELECT id FROM saved_markets WHERE id=? LIMIT 1', args: [marketId] });
     if (market.rows.length === 0) throw new Error(`Matched Market ${marketId} does not exist`);
     const tuple = tupleFor(input.relationship);
+    const coupling = await resolveCouplingApproval(tuple.kalshiTicker, tuple.pmConditionId);
+    if ('reason' in coupling) throw new Error(`Invalid Matched Market coupling authority: ${coupling.reason}`);
     const mappingId = mappingIdentity(marketId, input.relationship);
     const revision = mappingRevision(input.relationship);
     const existing = await client.execute({
-      sql: `SELECT mapping_id,mapping_revision,relationship_json FROM matched_market_mappings WHERE matched_market_id=?`,
+      sql: `SELECT mapping_id,mapping_revision,relationship_json,coupling_key,coupling_revision
+        FROM matched_market_mappings WHERE matched_market_id=?`,
       args: [marketId],
     });
+    const staleCoupling = existing.rows.find((row) => String(row.mapping_id) === mappingId
+      && (String(row.coupling_key ?? '') !== coupling.couplingKey
+        || Number(row.coupling_revision) !== coupling.couplingRevision));
+    if (staleCoupling) {
+      throw new Error(`Cached mapping coupling revision is stale for ${marketId}: approved ${String(staleCoupling.coupling_revision)}, current ${coupling.couplingRevision}`);
+    }
     const incompatible = existing.rows.some((row) => {
       if (String(row.mapping_id) === mappingId) return String(row.mapping_revision) !== revision;
       try {
@@ -268,10 +300,10 @@ export function createMatchedMarketMappingStore(client: Client) {
       const insert = await client.execute({
         sql: `INSERT OR IGNORE INTO matched_market_mappings
           (mapping_id,matched_market_id,kalshi_ticker,pm_condition_id,pm_token_id,kalshi_side,pm_side,
-           relationship_json,mapping_revision,evidence_revision,resolution_rule_revision,source,created_at)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+           coupling_key,coupling_revision,relationship_json,mapping_revision,evidence_revision,resolution_rule_revision,source,created_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         args: [mappingId, marketId, tuple.kalshiTicker, tuple.pmConditionId, tuple.pmTokenId, tuple.kalshiSide, tuple.pmSide,
-          JSON.stringify(input.relationship), revision, input.relationship.evidenceRevision,
+          coupling.couplingKey, coupling.couplingRevision, JSON.stringify(input.relationship), revision, input.relationship.evidenceRevision,
           input.relationship.resolutionRuleRevision, input.source, new Date().toISOString()],
       });
       inserted = Number(insert.rowsAffected ?? 0) > 0;
@@ -314,18 +346,27 @@ export function createMatchedMarketMappingStore(client: Client) {
       return { state: 'mismatch', matchedMarketId: marketId,
         reason: `Matched market exact outcome mapping mismatch: ${differences.join('; ') || 'ambiguous mapping'}` };
     }
+    let relationship: PropositionRelationshipV2;
     try {
-      const relationship = JSON.parse(String(exact.relationship_json)) as PropositionRelationshipV2;
-      const validation = validatePropositionRelationship(relationship);
-      if (!validation.valid || relationship.schemaVersion !== 2 || mappingRevision(relationship) !== String(exact.mapping_revision)) {
-        return { state: 'invalid', matchedMarketId: marketId,
-          reason: `Matched market exact outcome mapping is corrupt/unverified: ${validation.valid ? 'revision mismatch' : validation.reason}` };
-      }
-      return { state: 'verified', matchedMarketId: marketId, mappingId: String(exact.mapping_id),
-        revision: String(exact.mapping_revision), relationship };
+      relationship = JSON.parse(String(exact.relationship_json)) as PropositionRelationshipV2;
     } catch {
       return { state: 'invalid', matchedMarketId: marketId, reason: 'Matched market exact outcome mapping is corrupt/unverified: malformed relationship JSON' };
     }
+    const validation = validatePropositionRelationship(relationship);
+    if (!validation.valid || relationship.schemaVersion !== 2 || mappingRevision(relationship) !== String(exact.mapping_revision)) {
+      return { state: 'invalid', matchedMarketId: marketId,
+        reason: `Matched market exact outcome mapping is corrupt/unverified: ${validation.valid ? 'revision mismatch' : validation.reason}` };
+    }
+    const coupling = await resolveCouplingApproval(String(exact.kalshi_ticker), String(exact.pm_condition_id), {
+      couplingKey: String(exact.coupling_key ?? ''),
+      couplingRevision: Number(exact.coupling_revision),
+    });
+    if ('reason' in coupling) {
+      return { state: 'invalid', matchedMarketId: marketId,
+        reason: `Matched market exact outcome mapping is stale/unverified: ${coupling.reason}` };
+    }
+    return { state: 'verified', matchedMarketId: marketId, mappingId: String(exact.mapping_id),
+      revision: String(exact.mapping_revision), relationship };
   }
 
   async function resolveOrDerive(input: MatchedMarketDerivationInput): Promise<MatchedMarketMappingResolution> {
@@ -450,8 +491,25 @@ export async function migrateLegacyRegistryToMatchedMarkets(client: Client, regi
       await store.persistVerified({ matchedMarketId: String(matched[0].id), relationship, source: 'legacy_registry_migration' });
       report.mapped += 1;
     } catch (error) {
-      report.conflicting += 1;
-      if (!String(error).includes('Conflicting Matched Market mapping')) throw error;
+      const detail = error instanceof Error ? error.message : String(error);
+      if (detail.includes('Conflicting Matched Market mapping')) {
+        report.conflicting += 1;
+        continue;
+      }
+      if (detail.includes('Invalid Matched Market coupling authority')
+        || detail.includes('Cached mapping coupling revision is stale')) {
+        report.missing += 1;
+        const staleMappingId = mappingIdentity(String(matched[0].id), relationship);
+        await client.execute({
+          sql: `INSERT INTO matched_market_mapping_audit (matched_market_id,mapping_id,classification,reason,recorded_at)
+            SELECT ?,?,'missing',?,? WHERE NOT EXISTS (
+              SELECT 1 FROM matched_market_mapping_audit WHERE mapping_id=? AND classification='missing'
+            )`,
+          args: [String(matched[0].id), staleMappingId, detail, new Date().toISOString(), staleMappingId],
+        });
+        continue;
+      }
+      throw error;
     }
   }
   for (const rejection of registry.rejections) {

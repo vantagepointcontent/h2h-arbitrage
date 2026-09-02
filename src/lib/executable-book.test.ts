@@ -27,6 +27,27 @@ describe('walkExecutableBook', () => {
     });
   });
 
+  it('prices one authoritative share independently from a larger venue submission minimum', () => {
+    const quote = quoteOneShareFromTopAsk({
+      price: 0.95,
+      depthUsd: 556.8995,
+      tickSize: 0.01,
+      minimumOrderSize: 5,
+      depthTimestamp: OBSERVED_AT,
+    });
+
+    expect(quote).toMatchObject({
+      status: 'executable',
+      reason: null,
+      requestedQuantityMicros: ONE_SHARE,
+      filledQuantityMicros: ONE_SHARE,
+      vwapPriceMicroCents: 95_000_000,
+      limitPriceMicroCents: 95_000_000,
+      minimumOrderQuantityMicros: 5_000_000,
+    });
+    expect(isExecutableQuoteConsistent(quote, 'buy', ONE_SHARE)).toBe(true);
+  });
+
   it('does not claim one-share execution when server-derived top-ask depth is insufficient', () => {
     expect(quoteOneShareFromTopAsk({
       price: 0.5,
@@ -259,6 +280,19 @@ describe('walkExecutableBook', () => {
     });
 
     expect(quote).toMatchObject({ status: 'unavailable', reason: 'invalid_request' });
+  });
+
+  it.each([undefined, 100_000.5])('classifies missing or malformed tick metadata as invalid_tick', (tickSizeMicroCents) => {
+    const quote = walkExecutableBook({
+      side: 'buy',
+      levels: [{ priceMicroCents: 42_500_000, quantityMicros: ONE_SHARE }],
+      requestedQuantityMicros: ONE_SHARE,
+      tickSizeMicroCents,
+      minimumOrderQuantityMicros: ONE_SHARE,
+      depthTimestamp: OBSERVED_AT,
+    });
+
+    expect(quote).toMatchObject({ status: 'unavailable', reason: 'invalid_tick' });
   });
 
   it('rejects an internally consistent quote whose fill is off its carried venue tick', () => {

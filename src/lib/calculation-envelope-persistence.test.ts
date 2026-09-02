@@ -14,7 +14,10 @@ import { parseCalculationEnvelope } from './calculation-envelope';
 afterAll(async () => {
   const dbPath = process.env.H2H_SQLITE_PATH || path.join(process.cwd(), 'data', 'edgefinder.db');
   const client = createClient({ url: `file:${dbPath}` });
-  await client.execute({ sql: 'DELETE FROM executions WHERE arb_id = ?', args: ['t_ede745a7-envelope-fixture'] });
+  await client.execute({
+    sql: 'DELETE FROM executions WHERE arb_id IN (?, ?)',
+    args: ['t_ede745a7-envelope-fixture', 'missing-source-must-not-persist'],
+  });
   await client.execute({
     sql: 'DELETE FROM closed_positions WHERE pair_id IN (?, ?, ?)',
     args: ['t_ede745a7-closed-envelope-fixture', 't_ede745a7-legacy-closed-fixture', 't_6542eec4-unavailable-close'],
@@ -23,6 +26,17 @@ afterAll(async () => {
 });
 
 describe('calculation envelope persistence', () => {
+  it('requires every application-written execution to declare canonical source', async () => {
+    await expect(persistExecution({
+      timestamp: '2099-08-14T12:00:01.000Z',
+      arbId: 'missing-source-must-not-persist',
+      marketTitle: 'Missing source fixture',
+      dryRun: true,
+      success: false,
+      estimatedProfit: 0,
+    })).rejects.toThrow('Execution source must be declared');
+  });
+
   it('round-trips the immutable envelope independently of mutable execution result JSON', async () => {
     const id = await persistExecution({
       timestamp: '2099-08-14T12:00:02.000Z',
@@ -32,6 +46,7 @@ describe('calculation envelope persistence', () => {
       success: true,
       result: { mutableStatus: 'submitted' },
       estimatedProfit: -0.00856,
+      source: 'manual',
       calculationEnvelope: { ...executableEnvelopeFixture, scope: 'execution' },
     });
 

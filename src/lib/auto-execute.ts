@@ -63,6 +63,10 @@ export interface OrderRequest {
   minimumOrderSize?: number;
   /** Executable price increment captured from the exact venue book. */
   tickSize?: number;
+  /** Exact limit in millionths of one cent. Required for live Kalshi placement. */
+  priceMicroCents?: number;
+  /** Exact authoritative increment in millionths of one cent. */
+  tickSizeMicroCents?: number;
   price: number;        // limit price (0-1)
   orderType: OrderType;
   /** Exact executable depth quote used for paper/live price parity. */
@@ -205,6 +209,8 @@ export function validateExecution(req: ExecutionRequest, limits: SafetyLimits): 
   for (const leg of [req.kalshiOrder, req.polymarketOrder]) {
     if (!Number.isSafeInteger(leg.contracts) || leg.contracts! < 1) {
       errors.push(`${leg.platform} order must request a positive whole contract/share quantity`);
+    } else if (leg.contracts !== 1) {
+      errors.push(`${leg.platform} order must request exactly one contract/share`);
     }
     if (!Number.isFinite(leg.minimumOrderSize) || leg.minimumOrderSize! <= 0) {
       errors.push(`${leg.platform} minimum order is unavailable`);
@@ -382,13 +388,15 @@ async function placeRealKalshiLeg(req: OrderRequest, arbId: string): Promise<Ord
   let lastErr: unknown;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const priceCents = Math.round(req.price * 100);
       const count = req.contracts!;
+      const priceMicroCents = req.executableQuote?.limitPriceMicroCents;
+      const tickSizeMicroCents = req.executableQuote?.tickSizeMicroCents;
       const r = await placeKalshiOrder({
         ticker: req.ticker,
         side: req.outcome,
         count,
-        priceCents,
+        priceMicroCents: priceMicroCents!,
+        tickSizeMicroCents: tickSizeMicroCents!,
         clientOrderId: `h2h-${arbId}-k${attempt > 0 ? `-r${attempt}` : ''}`.slice(0, 64),
       });
       return mapKalshiOrderResult(r);
@@ -653,13 +661,15 @@ async function autoCloseLeg(
   try {
     if (leg.platform === 'kalshi') {
       const { placeKalshiSellOrder } = await import('./kalshi-orders');
-      const priceCents = Math.round((leg.filledPrice ?? req.price) * 100);
       const count = contracts;
+      const priceMicroCents = req.executableQuote?.limitPriceMicroCents;
+      const tickSizeMicroCents = req.executableQuote?.tickSizeMicroCents;
       const r = await placeKalshiSellOrder({
         ticker: req.ticker!,
         side: req.outcome,
         count,
-        priceCents,
+        priceMicroCents: priceMicroCents!,
+        tickSizeMicroCents: tickSizeMicroCents!,
         clientOrderId: `h2h-close-${arbId}-k`.slice(0, 64),
       });
       const mapped = mapKalshiOrderResult(r);

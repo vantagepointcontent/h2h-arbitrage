@@ -48,7 +48,7 @@ const openapi = {
   openapi: '3.1.0',
   info: {
     title: 'H2H Arbitrage API',
-    version: '1.5.2',
+    version: '1.5.3',
     description: 'Scanner, saved-market, and BotTrader settlement contracts. Canonical APY is a persisted percentage compounded from net ROI and the same event-time expiry/TTE snapshot shown by clients; venue timing APYs remain additional provenance.',
   },
   paths: {
@@ -119,7 +119,15 @@ const openapi = {
         '400': { description: 'Invalid or oversized ID batch' },
       },
     } },
-    '/api/executions': { get: { summary: 'Read executions with calculation envelopes and canonical Logs lineage', responses: { '200': {
+    '/api/executions': { get: {
+      summary: 'Read canonically sourced executions with calculation envelopes and Logs lineage',
+      parameters: [
+        { name: 'source', in: 'query', required: false, schema: { type: 'string', enum: ['manual', 'bot', 'unknown'] } },
+        { name: 'view', in: 'query', required: false, schema: { type: 'string', enum: ['real', 'dry', 'pending'] } },
+        { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 1000, default: 200 } },
+        { name: 'offset', in: 'query', required: false, schema: { type: 'integer', minimum: 0, maximum: 1_000_000, default: 0 } },
+      ],
+      responses: { '200': {
       description: 'Execution records',
       content: { 'application/json': { schema: { $ref: '#/components/schemas/ExecutionListResponse' } } },
     } } } },
@@ -140,7 +148,7 @@ const openapi = {
         type: 'object', additionalProperties: true,
         properties: {
           id: { type: 'integer', minimum: 1 },
-          source: { type: 'string', enum: ['manual', 'bot'] },
+          source: { type: 'string', enum: ['manual', 'bot', 'unknown'] },
           sourceScanId: { type: ['integer', 'null'], minimum: 1 },
           sourceOpportunityId: { type: ['string', 'null'] },
           calculationEnvelope: { $ref: '#/components/schemas/CalculationEnvelope' },
@@ -148,10 +156,33 @@ const openapi = {
       },
       ExecutionListResponse: {
         type: 'object', additionalProperties: false,
-        required: ['success', 'count', 'executions'],
+        required: ['success', 'count', 'total', 'sourceCounts', 'summary', 'nextOffset', 'executions'],
         properties: {
           success: { type: 'boolean' },
           count: { type: 'integer', minimum: 0 },
+          total: { type: 'integer', minimum: 0 },
+          sourceCounts: {
+            type: 'object', additionalProperties: false,
+            required: ['all', 'manual', 'bot', 'unknown'],
+            properties: {
+              all: { type: 'integer', minimum: 0 },
+              manual: { type: 'integer', minimum: 0 },
+              bot: { type: 'integer', minimum: 0 },
+              unknown: { type: 'integer', minimum: 0 },
+            },
+          },
+          summary: {
+            type: 'object', additionalProperties: false,
+            required: ['realCount', 'pendingCount', 'totalNetPnlMicros', 'unhedgedCount', 'unhedgedExposure'],
+            properties: {
+              realCount: { type: 'integer', minimum: 0 },
+              pendingCount: { type: 'integer', minimum: 0 },
+              totalNetPnlMicros: { type: ['integer', 'null'] },
+              unhedgedCount: { type: 'integer', minimum: 0 },
+              unhedgedExposure: { type: 'number' },
+            },
+          },
+          nextOffset: { type: ['integer', 'null'], minimum: 0 },
           executions: { type: 'array', items: { $ref: '#/components/schemas/ExecutionRecord' } },
         },
       },

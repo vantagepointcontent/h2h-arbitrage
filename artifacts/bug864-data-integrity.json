@@ -1,0 +1,35 @@
+{
+  "checkedAt": "2026-09-02T10:27:17.065Z",
+  "passed": true,
+  "primaryBackupByteIdentical": true,
+  "snapshots": [
+    {
+      "path": "data/saved-markets.json",
+      "sha256": "4693774d783d2f407e2236b08c2b7a3b5f25637787ee6255f4aafa03e4b676d9",
+      "count": 476,
+      "duplicateIds": 0,
+      "malformedIds": 0
+    },
+    {
+      "path": "data/saved-markets.json.bak",
+      "sha256": "4693774d783d2f407e2236b08c2b7a3b5f25637787ee6255f4aafa03e4b676d9",
+      "count": 476,
+      "duplicateIds": 0,
+      "malformedIds": 0
+    },
+    {
+      "path": "data/manual-matches.json",
+      "sha256": "7d3babad8ff9ba75f9c3105ee343dafb109092a483e7143fe0207acabd62578a",
+      "count": 114,
+      "duplicateIds": 0,
+      "malformedIds": 0
+    },
+    {
+      "path": "data/predictionhunt-markets.json",
+      "sha256": "703348ed9ea8cf4f9078cff07d1155f32e285b4463db202fa297cf272c6bbde5",
+      "count": 13,
+      "duplicateIds": 0,
+      "malformedIds": 0
+    }
+  ]
+}

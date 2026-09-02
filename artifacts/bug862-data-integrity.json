@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "checkedAt": "2026-09-02T09:00:59.965Z",
+  "snapshots": [
+    {
+      "path": "data/saved-markets.json",
+      "sha256": "53f88f56c6efdb5fba23f993299a7db3b593fd98e3e5f1c1daa59517dec12f1a",
+      "count": 473,
+      "uniqueIds": 473,
+      "duplicateIds": 0,
+      "missingIds": 0
+    },
+    {
+      "path": "data/saved-markets.json.bak",
+      "sha256": "53f88f56c6efdb5fba23f993299a7db3b593fd98e3e5f1c1daa59517dec12f1a",
+      "count": 473,
+      "uniqueIds": 473,
+      "duplicateIds": 0,
+      "missingIds": 0
+    }
+  ],
+  "byteIdentical": true,
+  "sqlite": {
+    "quickCheck": [
+      "ok"
+    ],
+    "foreignKeyViolations": 0
+  }
+}

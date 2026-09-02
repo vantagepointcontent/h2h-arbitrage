@@ -1,7 +1,7 @@
 /**
  * HOOKUP-04 step 2 (FEAT-006): Kalshi order placement — REAL trading API.
  *
- * POST /trade-api/v2/portfolio/orders on api.elections.kalshi.com using the
+ * POST /trade-api/v2/portfolio/events/orders on api.elections.kalshi.com using the
  * existing RSA signing helpers (kalshi-auth.ts).
  *
  * SAFETY: This module is only reachable through executeArb(), which is only
@@ -22,9 +22,96 @@ export interface KalshiOrderParams {
   side: 'yes' | 'no';
   /** Number of contracts. */
   count: number;
-  /** Limit price in CENTS (1-99). */
-  priceCents: number;
+  /** Exact selected-outcome limit in millionths of one cent. */
+  priceMicroCents?: number;
+  /** Authoritative market increment in millionths of one cent. */
+  tickSizeMicroCents?: number;
+  /** @deprecated Compatibility-only input; never used for placement. */
+  priceCents?: number;
   clientOrderId: string;
+}
+
+const MICRO_CENTS_PER_DOLLAR = 100_000_000;
+// Kalshi order requests accept prices to four decimal places.
+const MICRO_CENTS_PER_ORDER_PRICE_QUANTUM = 10_000;
+
+function fixedPointDollars(priceMicroCents: number): string {
+  if (priceMicroCents % MICRO_CENTS_PER_ORDER_PRICE_QUANTUM !== 0) {
+    throw new Error(`Kalshi price ${priceMicroCents} microcents exceeds the API's fixed-point precision`);
+  }
+  const tenThousandths = priceMicroCents / MICRO_CENTS_PER_ORDER_PRICE_QUANTUM;
+  const whole = Math.floor(tenThousandths / 10_000);
+  const fraction = String(tenThousandths % 10_000).padStart(4, '0').replace(/0+$/, '');
+  return fraction ? `${whole}.${fraction}` : String(whole);
+}
+
+function validateOrderParams(
+  p: KalshiOrderParams,
+  action: 'buy' | 'sell',
+): asserts p is KalshiOrderParams & { priceMicroCents: number; tickSizeMicroCents: number } {
+  if (typeof p.priceMicroCents !== 'number' || !Number.isSafeInteger(p.priceMicroCents)
+      || p.priceMicroCents <= 0 || p.priceMicroCents >= MICRO_CENTS_PER_DOLLAR) {
+    throw new Error(`Kalshi price is malformed or out of range: ${String(p.priceMicroCents)} microcents`);
+  }
+  if (typeof p.tickSizeMicroCents !== 'number'
+      || !Number.isSafeInteger(p.tickSizeMicroCents) || p.tickSizeMicroCents <= 0) {
+    throw new Error(`Kalshi tick metadata is missing or malformed: ${String(p.tickSizeMicroCents)}`);
+  }
+  if (p.tickSizeMicroCents % MICRO_CENTS_PER_ORDER_PRICE_QUANTUM !== 0
+      || MICRO_CENTS_PER_DOLLAR % p.tickSizeMicroCents !== 0) {
+    throw new Error(`Kalshi tick ${p.tickSizeMicroCents} microcents is unsupported by the fixed-point order API`);
+  }
+  if (p.priceMicroCents % p.tickSizeMicroCents !== 0) {
+    throw new Error(`Kalshi price ${p.priceMicroCents} microcents is off tick ${p.tickSizeMicroCents}`);
+  }
+  if (!Number.isSafeInteger(p.count) || p.count < 1) {
+    throw new Error(`Kalshi count must be a positive integer, got ${p.count}`);
+  }
+  if (action === 'buy' && p.count !== 1) {
+    throw new Error(`Kalshi entry count must be exactly 1, got ${p.count}`);
+  }
+}
+
+function exactOrderParams(p: KalshiOrderParams): KalshiOrderParams {
+  // Whole-cent prices are valid in every Kalshi price-level structure. Keep
+  // legacy manual closes working only when their integer-cent value is exact;
+  // all sub-cent entry paths must carry authoritative tick metadata.
+  if (p.priceMicroCents == null && p.tickSizeMicroCents == null
+      && typeof p.priceCents === 'number' && Number.isSafeInteger(p.priceCents)
+      && p.priceCents > 0 && p.priceCents < 100) {
+    return {
+      ...p,
+      priceMicroCents: p.priceCents * 1_000_000,
+      tickSizeMicroCents: 1_000_000,
+    };
+  }
+  return p;
+}
+
+function createV2Body(p: KalshiOrderParams, action: 'buy' | 'sell') {
+  validateOrderParams(p, action);
+  const yesPriceMicroCents = p.side === 'yes'
+    ? p.priceMicroCents
+    : MICRO_CENTS_PER_DOLLAR - p.priceMicroCents;
+  const bookSide = action === 'buy'
+    ? (p.side === 'yes' ? 'bid' : 'ask')
+    : (p.side === 'yes' ? 'ask' : 'bid');
+  return {
+    ticker: p.ticker,
+    client_order_id: p.clientOrderId,
+    side: bookSide,
+    count: String(p.count),
+    price: fixedPointDollars(yesPriceMicroCents),
+    time_in_force: 'immediate_or_cancel',
+    self_trade_prevention_type: 'taker_at_cross',
+  };
+}
+
+function v2Status(filledCount: number | undefined, remainingCount: number | undefined, count: number): string {
+  if (filledCount === count) return 'executed';
+  if (filledCount != null && filledCount > 0) return 'partial';
+  if (filledCount === 0 && remainingCount === 0) return 'canceled';
+  return 'pending';
 }
 
 export interface KalshiOrderResponse {
@@ -173,21 +260,15 @@ async function attachFillEvidence(
 }
 
 export async function placeKalshiOrder(p: KalshiOrderParams): Promise<KalshiOrderResponse> {
-  if (p.priceCents < 1 || p.priceCents > 99) throw new Error(`Kalshi price out of range: ${p.priceCents}¢`);
-  if (p.count < 1) throw new Error(`Kalshi count must be >= 1, got ${p.count}`);
+  p = exactOrderParams(p);
+  const path = '/trade-api/v2/portfolio/events/orders';
+  const body = createV2Body(p, 'buy');
+  logger.info('[kalshi-orders] submitting exact order', {
+    ticker: p.ticker, action: 'buy', outcome: p.side, bookSide: body.side,
+    priceMicroCents: p.priceMicroCents, tickSizeMicroCents: p.tickSizeMicroCents, wirePrice: body.price,
+  });
 
-  const path = '/trade-api/v2/portfolio/orders';
-  const body = {
-    ticker: p.ticker,
-    client_order_id: p.clientOrderId,
-    action: 'buy',
-    side: p.side,
-    count: Math.floor(p.count),
-    type: 'limit',
-    ...(p.side === 'yes' ? { yes_price: Math.round(p.priceCents) } : { no_price: Math.round(p.priceCents) }),
-  };
-
-  const res = await fetch(`${KALSHI_TRADE_BASE}/portfolio/orders`, {
+  const res = await fetch(`${KALSHI_TRADE_BASE}/portfolio/events/orders`, {
     method: 'POST',
     headers: { ...makeKalshiAuthHeaders('POST', path), 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -206,18 +287,20 @@ export async function placeKalshiOrder(p: KalshiOrderParams): Promise<KalshiOrde
 
   const payload = asRecord(data);
   const order = asRecord(payload?.order) ?? payload;
+  const filledCount = parseKalshiCount(order?.immediate_fill_count ?? order?.fill_count_fp ?? order?.fill_count);
+  const remainingCount = parseKalshiCount(order?.remaining_count_fp ?? order?.remaining_count);
   return attachFillEvidence({
     orderId: nonEmptyString(order?.order_id) ?? '',
-    status: nonEmptyString(order?.status) ?? 'unknown',
-    filledCount: parseKalshiCount(order?.fill_count_fp ?? order?.taker_fill_count ?? order?.fill_count),
-    remainingCount: parseKalshiCount(order?.remaining_count_fp ?? order?.remaining_count),
+    status: nonEmptyString(order?.status) ?? v2Status(filledCount, remainingCount, p.count),
+    filledCount,
+    remainingCount,
     raw: data,
   }, { ticker: p.ticker, outcomeSide: p.side });
 }
 
 export async function cancelKalshiOrder(orderId: string): Promise<boolean> {
-  const path = `/trade-api/v2/portfolio/orders/${orderId}`;
-  const res = await fetch(`${KALSHI_TRADE_BASE}/portfolio/orders/${orderId}`, {
+  const path = `/trade-api/v2/portfolio/events/orders/${orderId}`;
+  const res = await fetch(`${KALSHI_TRADE_BASE}/portfolio/events/orders/${orderId}`, {
     method: 'DELETE',
     headers: makeKalshiAuthHeaders('DELETE', path),
     signal: AbortSignal.timeout(10_000),
@@ -231,21 +314,15 @@ export async function cancelKalshiOrder(orderId: string): Promise<boolean> {
 
 /** Place a SELL order to close an existing position (auto-close on partial-fill failure). */
 export async function placeKalshiSellOrder(p: KalshiOrderParams): Promise<KalshiOrderResponse> {
-  if (p.priceCents < 1 || p.priceCents > 99) throw new Error(`Kalshi price out of range: ${p.priceCents}¢`);
-  if (p.count < 1) throw new Error(`Kalshi count must be >= 1, got ${p.count}`);
+  p = exactOrderParams(p);
+  const path = '/trade-api/v2/portfolio/events/orders';
+  const body = createV2Body(p, 'sell');
+  logger.info('[kalshi-orders] submitting exact order', {
+    ticker: p.ticker, action: 'sell', outcome: p.side, bookSide: body.side,
+    priceMicroCents: p.priceMicroCents, tickSizeMicroCents: p.tickSizeMicroCents, wirePrice: body.price,
+  });
 
-  const path = '/trade-api/v2/portfolio/orders';
-  const body = {
-    ticker: p.ticker,
-    client_order_id: p.clientOrderId,
-    action: 'sell',
-    side: p.side,
-    count: Math.floor(p.count),
-    type: 'limit',
-    ...(p.side === 'yes' ? { yes_price: Math.round(p.priceCents) } : { no_price: Math.round(p.priceCents) }),
-  };
-
-  const res = await fetch(`${KALSHI_TRADE_BASE}/portfolio/orders`, {
+  const res = await fetch(`${KALSHI_TRADE_BASE}/portfolio/events/orders`, {
     method: 'POST',
     headers: { ...makeKalshiAuthHeaders('POST', path), 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -264,11 +341,13 @@ export async function placeKalshiSellOrder(p: KalshiOrderParams): Promise<Kalshi
 
   const payload = asRecord(data);
   const order = asRecord(payload?.order) ?? payload;
+  const filledCount = parseKalshiCount(order?.immediate_fill_count ?? order?.fill_count_fp ?? order?.fill_count);
+  const remainingCount = parseKalshiCount(order?.remaining_count_fp ?? order?.remaining_count);
   return attachFillEvidence({
     orderId: nonEmptyString(order?.order_id) ?? '',
-    status: nonEmptyString(order?.status) ?? 'unknown',
-    filledCount: parseKalshiCount(order?.fill_count_fp ?? order?.taker_fill_count ?? order?.fill_count),
-    remainingCount: parseKalshiCount(order?.remaining_count_fp ?? order?.remaining_count),
+    status: nonEmptyString(order?.status) ?? v2Status(filledCount, remainingCount, p.count),
+    filledCount,
+    remainingCount,
     raw: data,
   }, { ticker: p.ticker, outcomeSide: p.side });
 }

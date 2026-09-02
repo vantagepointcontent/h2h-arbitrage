@@ -371,16 +371,32 @@ describe('evaluateBotTrade', () => {
   });
 
   it('labels venue-minimum pricing as evaluation-only without implying a five-share order', () => {
-    const ev = evaluateBotTrade(makeInput({
+    const input = makeInput({
       pmNoMinOrderSize: 5,
       kalshiYesDepth: 5,
       pmNoDepth: 5,
-    }), baseSettings());
+      pmNoExecutableQuote: quoteOneShareFromTopAsk({
+        price: 0.54,
+        depthUsd: 5,
+        tickSize: 0.01,
+        minimumOrderSize: 5,
+        depthTimestamp: new Date().toISOString(),
+      }),
+    });
+    const ev = evaluateBotTrade(input, baseSettings());
 
     expect(ev.shouldTrade).toBe(false);
     expect(ev.reason).toContain('evaluation quantity 5');
     expect(ev.reason).toContain('canonical executable quantity 1');
     expect(ev.reason).not.toContain('(requested 5)');
+    expect(ev.reason).not.toContain('executable quote is unavailable');
+    expect(input.pmNoExecutableQuote).toMatchObject({
+      status: 'executable',
+      requestedQuantityMicros: 1_000_000,
+      vwapPriceMicroCents: 54_000_000,
+      minimumOrderQuantityMicros: 5_000_000,
+    });
+    expect(buildExecutionRequest(input)).toBeNull();
   });
 
   it('renders an authoritative empty selected book explicitly instead of coercing it to numeric zero liquidity', () => {
@@ -458,7 +474,7 @@ describe('evaluateBotTrade', () => {
     expect(ev.reason).not.toContain('Kalshi $0.00');
   });
 
-  it('keeps a tapered sub-cent Kalshi quote visible but non-executable at the cent-only adapter boundary', () => {
+  it('accepts a tapered Kalshi mill-tick quote without changing the executable price', () => {
     const subCentQuote = quoteOneShareFromTopAsk({
       price: 0.055,
       depthUsd: 0.055,
@@ -472,9 +488,45 @@ describe('evaluateBotTrade', () => {
       kalshiYesExecutableQuote: subCentQuote,
     });
 
-    const ev = evaluateBotTrade(input, baseSettings());
+    const ev = evaluateBotTrade(input, baseSettings({ minDepthUsd: 0.05 }));
+    expect(ev.shouldTrade, ev.reason).toBe(true);
+    expect(ev.reason).not.toContain('cent-only execution adapter');
+    expect(buildExecutionRequest(input)?.kalshiOrder).toMatchObject({
+      ticker: 'KXTEST-A',
+      outcome: 'yes',
+      contracts: 1,
+      price: 0.055,
+      tickSize: 0.001,
+      priceMicroCents: 5_500_000,
+      tickSizeMicroCents: 100_000,
+    });
+  });
+
+  it.each([
+    ['missing', 0],
+    ['malformed', 100_000.5],
+    ['unsupported', 1_000],
+  ])('fails closed with an actionable reason for %s Kalshi tick metadata', (kind, tickSizeMicroCents) => {
+    const quote = walkExecutableBook({
+      side: 'buy',
+      levels: [{ priceMicroCents: 5_500_000, quantityMicros: 1_000_000 }],
+      requestedQuantityMicros: 1_000_000,
+      tickSizeMicroCents,
+      minimumOrderQuantityMicros: 1_000_000,
+      depthTimestamp: new Date().toISOString(),
+    });
+    const input = makeInput({
+      kalshiYesAsk: 0.055,
+      kalshiYesDepth: 0.055,
+      kalshiYesExecutableQuote: quote,
+    });
+
+    const ev = evaluateBotTrade(input, baseSettings({ minDepthUsd: 0.05 }));
     expect(ev.shouldTrade).toBe(false);
-    expect(ev.reason).toContain('unsupported by the cent-only execution adapter');
+    const expected = kind === 'unsupported'
+      ? 'Kalshi YES tick size $0.00001000 is unsupported'
+      : `Kalshi YES tick size metadata is ${kind}`;
+    expect(ev.reason).toContain(expected);
     expect(buildExecutionRequest(input)).toBeNull();
   });
 
@@ -677,6 +729,43 @@ describe('buildExecutionRequest', () => {
     expect(economics.eligible).toBe(false);
     expect(economics.expectedProfit).toBeLessThan(0);
     expect(economics.reason).toContain('not positive');
+  });
+
+  it('reconciles displayed and evaluation ROI from the same exact mill-tick legs and fees', () => {
+    const kalshiQuote = walkExecutableBook({
+      side: 'buy', levels: [{ priceMicroCents: 42_500_000, quantityMicros: 1_000_000 }],
+      requestedQuantityMicros: 1_000_000, tickSizeMicroCents: 100_000,
+      minimumOrderQuantityMicros: 1_000_000, depthTimestamp: new Date().toISOString(),
+    });
+    const pmQuote = walkExecutableBook({
+      side: 'buy', levels: [{ priceMicroCents: 55_000_000, quantityMicros: 1_000_000 }],
+      requestedQuantityMicros: 1_000_000, tickSizeMicroCents: 1_000_000,
+      minimumOrderQuantityMicros: 1_000_000, depthTimestamp: new Date().toISOString(),
+    });
+    const displayedRoiPct = 2.564102564102564;
+    const input = makeInput({
+      kalshiYesAsk: 0.425, kalshiYesDepth: 0.425, kalshiYesExecutableQuote: kalshiQuote,
+      pmNoAsk: 0.55, pmNoDepth: 0.55, pmNoExecutableQuote: pmQuote,
+      roiPct: displayedRoiPct, expectedProfit: 0.025,
+    });
+    const request = buildExecutionRequest(input)!;
+    const economics = revalidateBotTradeEconomics(input, baseSettings({ minRoiPct: 2 }), request, {
+      kalshi: {
+        feeType: 'quadratic', feeMultiplierPpm: 0, source: 'kalshi-series:test',
+        observedAt: new Date().toISOString(), version: 'quadratic:0',
+      },
+      polymarket: {
+        tokenId: TEST_PM_NO_TOKEN_ID, feeRateBps: 0, feesEnabled: false,
+        feeSchedule: { rate: 0, exponent: 1, takerOnly: true, rebateRate: 0 },
+        orderBaseFeeBps: 0, orderSource: 'clob:test', orderVersion: 'token-order-base-fee:0',
+        source: 'gamma:test', observedAt: new Date().toISOString(), version: 'gamma-fee-schedule:0',
+      },
+      pmTheta: 0,
+    });
+
+    expect(economics.expectedProfit).toBe(0.025);
+    expect(economics.roiPct).toBeCloseTo(displayedRoiPct, 10);
+    expect(economics.eligible).toBe(true);
   });
 });
 
@@ -1028,6 +1117,29 @@ describe('maybeExecuteBotTrade safety', () => {
 
     expect(result).toMatchObject({ executed: false });
     expect(result.reason).toContain('persisted scan identity does not match');
+    expect(executeArb).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['deleted', 'Matched market exact outcome mapping is stale/unverified: approved coupling v1:kalshi:KXTEST-A|polymarket:0xcondition coupling is deleted'],
+    ['revised', 'Matched market exact outcome mapping is stale/unverified: approved coupling v1:kalshi:KXTEST-A|polymarket:0xcondition coupling revision mismatch: approved 1, current 2'],
+  ])('re-resolves the persisted mapping at the final placement boundary and stops on a %s coupling', async (_state, reason) => {
+    const executeArb = vi.fn();
+    vi.doMock('./auto-execute', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('./auto-execute')>()),
+      executeArb,
+    }));
+    const mapping = await import('./matched-market-mapping');
+    vi.mocked(mapping.resolveOrDeriveMatchedMarketMapping).mockResolvedValueOnce({
+      state: 'invalid' as const,
+      matchedMarketId: 'pair-1',
+      reason,
+    });
+    const { maybeExecuteBotTrade } = await import('./bot-trader');
+
+    const result = await maybeExecuteBotTrade(makeInput());
+
+    expect(result).toMatchObject({ executed: false, reason });
     expect(executeArb).not.toHaveBeenCalled();
   });
 
