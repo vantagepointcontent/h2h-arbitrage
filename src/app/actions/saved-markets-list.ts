@@ -9,7 +9,8 @@ export interface SavedMarketsListRefreshResponse {
   markets: unknown[] | null;
   revision: string | null;
   observedAt: string | null;
-  source: 'persisted-saved-markets' | null;
+  source: 'persisted-saved-markets' | 'saved-markets-json-mirror' | null;
+  degradedReason: 'canonical_sqlite_busy' | null;
   message: string | null;
   correlationId: string | null;
 }
@@ -29,7 +30,7 @@ function failureMessage(status: number): string {
 
 function failure(status: number, correlationId: string | null = null): SavedMarketsListRefreshResponse {
   return {
-    ok: false, status, markets: null, revision: null, observedAt: null, source: null,
+    ok: false, status, markets: null, revision: null, observedAt: null, source: null, degradedReason: null,
     message: failureMessage(status), correlationId,
   };
 }
@@ -53,14 +54,21 @@ export async function refreshSavedMarketsList(): Promise<SavedMarketsListRefresh
     if (!payload || !Array.isArray(payload.markets) || typeof payload.revision !== 'string') {
       return failure(502, correlationId);
     }
+    const degradedReason = payload.degradedReason === 'canonical_sqlite_busy'
+      ? payload.degradedReason : null;
+    const source = payload.source === 'persisted-saved-markets' || payload.source === 'saved-markets-json-mirror'
+      ? payload.source : null;
     return {
       ok: true,
       status: response.status,
       markets: payload.markets,
       revision: payload.revision,
       observedAt: typeof payload.observedAt === 'string' ? payload.observedAt : null,
-      source: payload.source === 'persisted-saved-markets' ? payload.source : null,
-      message: null,
+      source,
+      degradedReason,
+      message: degradedReason === 'canonical_sqlite_busy'
+        ? 'Canonical Saved Markets are temporarily unavailable because the database is busy. Showing the latest validated persisted mirror.'
+        : null,
       correlationId,
     };
   } catch {

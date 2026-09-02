@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import {
   buildScanLinkPayload,
   buildSavedMarketsListFailureState,
+  buildSavedMarketsListSuccessState,
   createQuickPricesRequestOwner,
   createSavedMarketsListRequestOwner,
   createSavedMarketHydrationOwner,
@@ -91,6 +92,16 @@ function createSavedMarketViewHarness() {
 }
 
 describe('saved-market quick-price request ownership', () => {
+  it('marks a mirrored Saved Markets list as degraded while keeping every row visible', () => {
+    expect(buildSavedMarketsListSuccessState(473, {
+      source: 'saved-markets-json-mirror',
+      message: 'Canonical Saved Markets are temporarily unavailable because the database is busy. Showing the latest validated persisted mirror.',
+    })).toEqual({
+      status: 'degraded',
+      message: 'Canonical Saved Markets are temporarily unavailable because the database is busy. Showing the latest validated persisted mirror.',
+    });
+  });
+
   it('keeps retained rows with an actionable degraded refresh message', () => {
     expect(buildSavedMarketsListFailureState(true, null)).toEqual({
       status: 'degraded',

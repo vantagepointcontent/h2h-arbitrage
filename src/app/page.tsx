@@ -106,6 +106,7 @@ import {
   createQuickPricesRequestOwner, createSavedMarketsListRequestOwner, createSavedMarketHydrationOwner, restoreSavedMarketPopNavigation,
   mergeQuickPricesResult, mergeSavedMarketMatchRefresh, markSavedMarketMatchRefreshing,
   selectSavedMarketPriceCache, normalizeSavedMarketsList, mergeSavedMarketHydration, buildSavedMarketsListFailureState,
+  buildSavedMarketsListSuccessState,
   venuePriceFreshnessFromScan,
 } from "@/app/lib/page-shared";
 import type {
@@ -838,9 +839,9 @@ export default function Home() {
         });
         savedMarketsRef.current = merged;
         setSavedMarkets(merged);
+        const successState = buildSavedMarketsListSuccessState(merged.length, response);
         setSavedMarketsListRefresh({
-          status: merged.length === 0 ? 'empty' : 'success',
-          message: null,
+          ...successState,
           observedAt: response.observedAt,
           source: response.source,
           revision: response.revision,

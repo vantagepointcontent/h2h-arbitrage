@@ -75,6 +75,146 @@ describe('POST /api/saved-markets/list-refresh', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it('keeps validated mirrored rows visible and marks them degraded during SQLite contention', async () => {
+    mocks.getSavedMarkets.mockRejectedValueOnce(Object.assign(new Error('SQLITE_BUSY: database is locked'), {
+      code: 'SQLITE_BUSY',
+    }));
+    mocks.readFile.mockImplementation(async (file: string) => String(file).endsWith('saved-markets.json')
+      ? JSON.stringify([{
+          id: 'market-mirrored', eventTitle: 'Mirrored market',
+          kalshiUrl: 'https://kalshi.com/markets/mirrored',
+          polymarketUrl: 'https://polymarket.com/event/mirrored',
+          createdAt: '2026-08-01T00:00:00.000Z',
+        }])
+      : '{}');
+
+    const response = await POST(new NextRequest('http://localhost/api/saved-markets/list-refresh', {
+      method: 'POST', headers: { 'x-h2h-token': 'list-secret' },
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      source: 'saved-markets-json-mirror',
+      degradedReason: 'canonical_sqlite_busy',
+      markets: [{ id: 'market-mirrored' }],
+    });
+  });
+
+  it('uses the populated backup mirror when the primary mirror is unexpectedly empty', async () => {
+    mocks.getSavedMarkets.mockRejectedValueOnce(Object.assign(new Error('database is locked'), {
+      code: 'SQLITE_BUSY',
+    }));
+    mocks.readFile.mockImplementation(async (file: string) => {
+      if (String(file).endsWith('saved-markets.json')) return '[]';
+      if (String(file).endsWith('saved-markets.json.bak')) return JSON.stringify([{
+        id: 'market-from-backup', eventTitle: 'Backup market',
+        kalshiUrl: 'https://kalshi.com/markets/backup',
+        polymarketUrl: 'https://polymarket.com/event/backup',
+        createdAt: '2026-08-01T00:00:00.000Z',
+      }]);
+      return '{}';
+    });
+
+    const response = await POST(new NextRequest('http://localhost/api/saved-markets/list-refresh', {
+      method: 'POST', headers: { 'x-h2h-token': 'list-secret' },
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      source: 'saved-markets-json-mirror',
+      degradedReason: 'canonical_sqlite_busy',
+      markets: [{ id: 'market-from-backup' }],
+    });
+  });
+
+  it('rejects duplicate primary mirror ids and uses the unique backup mirror', async () => {
+    mocks.getSavedMarkets.mockRejectedValueOnce(Object.assign(new Error('database is locked'), {
+      code: 'SQLITE_BUSY',
+    }));
+    const duplicate = {
+      id: 'duplicate', eventTitle: 'Duplicate',
+      kalshiUrl: 'https://kalshi.com/markets/duplicate',
+      polymarketUrl: 'https://polymarket.com/event/duplicate',
+      createdAt: '2026-08-01T00:00:00.000Z',
+    };
+    mocks.readFile.mockImplementation(async (file: string) => {
+      if (String(file).endsWith('saved-markets.json')) return JSON.stringify([duplicate, duplicate]);
+      if (String(file).endsWith('saved-markets.json.bak')) return JSON.stringify([{ ...duplicate, id: 'unique-backup' }]);
+      return '{}';
+    });
+
+    const response = await POST(new NextRequest('http://localhost/api/saved-markets/list-refresh', {
+      method: 'POST', headers: { 'x-h2h-token': 'list-secret' },
+    }));
+
+    await expect(response.json()).resolves.toMatchObject({
+      source: 'saved-markets-json-mirror',
+      markets: [{ id: 'unique-backup' }],
+    });
+  });
+
+  it('fails closed when neither mirror has complete canonical row identity', async () => {
+    mocks.getSavedMarkets.mockRejectedValueOnce(Object.assign(new Error('database is locked'), {
+      code: 'SQLITE_BUSY',
+    }));
+    mocks.readFile.mockImplementation(async (file: string) => {
+      if (String(file).endsWith('saved-markets.json')) return JSON.stringify([{
+        id: 'unsafe-primary', eventTitle: 'Unsafe primary',
+        kalshiUrl: 'javascript:alert(1)',
+        polymarketUrl: 'https://polymarket.com/event/unsafe',
+        createdAt: '2026-08-01T00:00:00.000Z',
+      }]);
+      if (String(file).endsWith('saved-markets.json.bak')) return JSON.stringify([{
+        id: 'incomplete-backup',
+        kalshiUrl: 'https://kalshi.com/markets/incomplete',
+        polymarketUrl: 'https://polymarket.com/event/incomplete',
+      }]);
+      return '{}';
+    });
+
+    const response = await POST(new NextRequest('http://localhost/api/saved-markets/list-refresh', {
+      method: 'POST', headers: { 'x-h2h-token': 'list-secret' },
+    }));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.not.toHaveProperty('markets');
+  });
+
+  it('does not use the mirror for a code-less non-canonical lock message', async () => {
+    mocks.getSavedMarkets.mockRejectedValueOnce(new Error('database is locked'));
+
+    const response = await POST(new NextRequest('http://localhost/api/saved-markets/list-refresh', {
+      method: 'POST', headers: { 'x-h2h-token': 'list-secret' },
+    }));
+
+    expect(response.status).toBe(503);
+    expect(mocks.readFile).not.toHaveBeenCalled();
+  });
+
+  it('rejects a mirror row with a non-boolean archived marker', async () => {
+    mocks.getSavedMarkets.mockRejectedValueOnce(Object.assign(new Error('database is locked'), {
+      code: 'SQLITE_BUSY',
+    }));
+    const malformedArchived = {
+      id: 'malformed-archived', eventTitle: 'Malformed archived row',
+      kalshiUrl: 'https://kalshi.com/markets/malformed',
+      polymarketUrl: 'https://polymarket.com/event/malformed',
+      createdAt: '2026-08-01T00:00:00.000Z', archived: 'false',
+    };
+    mocks.readFile.mockImplementation(async (file: string) => {
+      if (String(file).endsWith('saved-markets.json')) return JSON.stringify([malformedArchived]);
+      if (String(file).endsWith('saved-markets.json.bak')) return '[]';
+      return '{}';
+    });
+
+    const response = await POST(new NextRequest('http://localhost/api/saved-markets/list-refresh', {
+      method: 'POST', headers: { 'x-h2h-token': 'list-secret' },
+    }));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.not.toHaveProperty('markets');
+  });
+
   it('fails closed instead of returning an APY-only current projection', async () => {
     mocks.getSavedMarkets.mockResolvedValueOnce([{
       id: 'market-1', eventTitle: 'Market 1', kalshiUrl: 'k', polymarketUrl: 'p',

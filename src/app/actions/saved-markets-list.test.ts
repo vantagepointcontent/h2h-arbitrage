@@ -39,6 +39,22 @@ describe('refreshSavedMarketsList server action', () => {
     expect(JSON.stringify(result)).not.toContain('server-only-list-token');
   });
 
+  it('returns mirrored rows with an explicit degraded reason instead of reporting an empty list', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      markets: [{ id: 'market-1', eventTitle: 'Market 1' }],
+      revision: 'rev-mirror', observedAt: '2026-09-02T11:35:06.000Z',
+      source: 'saved-markets-json-mirror', degradedReason: 'canonical_sqlite_busy',
+    }), { status: 200, headers: { 'content-type': 'application/json' } })));
+
+    await expect(refreshSavedMarketsList()).resolves.toMatchObject({
+      ok: true,
+      markets: [{ id: 'market-1' }],
+      source: 'saved-markets-json-mirror',
+      degradedReason: 'canonical_sqlite_busy',
+      message: 'Canonical Saved Markets are temporarily unavailable because the database is busy. Showing the latest validated persisted mirror.',
+    });
+  });
+
   it('rejects a missing browser session before the internal service hop', async () => {
     sessionMocks.value = null;
     const fetchMock = vi.fn();

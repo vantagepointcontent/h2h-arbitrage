@@ -150,6 +150,24 @@ export function buildSavedMarketsListFailureState(
   };
 }
 
+/** Keep a validated mirror visible while making canonical SQLite contention explicit. */
+export function buildSavedMarketsListSuccessState(
+  marketCount: number,
+  response: {
+    source: 'persisted-saved-markets' | 'saved-markets-json-mirror' | null;
+    message: string | null;
+  },
+): { status: 'success' | 'empty' | 'degraded'; message: string | null } {
+  if (response.source === 'saved-markets-json-mirror') {
+    return {
+      status: 'degraded',
+      message: response.message
+        ?? 'Canonical Saved Markets are temporarily unavailable. Showing the latest validated persisted mirror.',
+    };
+  }
+  return { status: marketCount === 0 ? 'empty' : 'success', message: null };
+}
+
 /** Validate the server-action boundary and collapse duplicate IDs to the latest row. */
 export function normalizeSavedMarketsList(value: unknown): SavedMarket[] | null {
   if (!Array.isArray(value)) return null;

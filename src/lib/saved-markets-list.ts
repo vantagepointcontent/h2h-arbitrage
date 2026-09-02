@@ -8,6 +8,52 @@ import {
 } from './persistence';
 import { getCanonicalCurrentMarketMetrics, type SavedMarket as SavedMarketView } from '@/app/lib/page-shared';
 import { buildSavedMarketLifecycle } from './saved-market-lifecycle';
+import { parseSavedMarketCreate, parseSavedMarketId } from './saved-market-request';
+
+const SAVED_MARKETS_MIRROR = process.env.H2H_SAVED_MARKETS_FILE
+  || path.join(process.cwd(), 'data', 'saved-markets.json');
+
+function isSqliteBusy(error: unknown): boolean {
+  const code = error && typeof error === 'object' && 'code' in error
+    ? String(error.code) : '';
+  return code.startsWith('SQLITE_BUSY');
+}
+
+function isValidMirroredMarket(value: unknown): value is SavedMarket {
+  if (!value || typeof value !== 'object') return false;
+  const market = value as Record<string, unknown>;
+  const id = parseSavedMarketId(market.id);
+  const core = parseSavedMarketCreate(market);
+  const createdAt = typeof market.createdAt === 'string' ? Date.parse(market.createdAt) : Number.NaN;
+  return id === market.id
+    && !('error' in core)
+    && core.kalshiUrl === market.kalshiUrl
+    && core.polymarketUrl === market.polymarketUrl
+    && typeof market.eventTitle === 'string'
+    && market.eventTitle.trim().length > 0
+    && market.eventTitle.length <= 500
+    && Number.isFinite(createdAt)
+    && (market.archived === undefined || market.archived === false);
+}
+
+async function readValidatedSavedMarketsMirror(): Promise<SavedMarket[]> {
+  let lastError: unknown = new Error('Saved Markets mirror is unavailable');
+  for (const file of [SAVED_MARKETS_MIRROR, `${SAVED_MARKETS_MIRROR}.bak`]) {
+    try {
+      const parsed: unknown = JSON.parse(await fs.readFile(file, 'utf8'));
+      if (!Array.isArray(parsed) || parsed.length === 0 || !parsed.every(isValidMirroredMarket)) {
+        throw new Error('Saved Markets mirror is empty or malformed');
+      }
+      if (new Set(parsed.map((market) => market.id)).size !== parsed.length) {
+        throw new Error('Saved Markets mirror contains duplicate ids');
+      }
+      return parsed;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
 
 export async function readSavedMarketSchedulerState(): Promise<Record<string, unknown>> {
   try {
@@ -121,13 +167,25 @@ export function buildBasicSavedMarketList(
 }
 
 export async function getCanonicalSavedMarketsBasicSnapshot() {
-  await reconcileSavedMarketMatchSummaries();
-  const [savedMarkets, schedulerState] = await Promise.all([getSavedMarkets(), readSavedMarketSchedulerState()]);
+  let savedMarkets: SavedMarket[];
+  let source: 'persisted-saved-markets' | 'saved-markets-json-mirror' = 'persisted-saved-markets';
+  let degradedReason: 'canonical_sqlite_busy' | null = null;
+  try {
+    await reconcileSavedMarketMatchSummaries();
+    savedMarkets = await getSavedMarkets();
+  } catch (error) {
+    if (!isSqliteBusy(error)) throw error;
+    savedMarkets = await readValidatedSavedMarketsMirror();
+    source = 'saved-markets-json-mirror';
+    degradedReason = 'canonical_sqlite_busy';
+  }
+  const schedulerState = await readSavedMarketSchedulerState();
   const markets = buildBasicSavedMarketList(savedMarkets, schedulerState);
   return {
     markets,
     revision: createHash('sha1').update(JSON.stringify(markets)).digest('hex'),
     observedAt: new Date().toISOString(),
-    source: 'persisted-saved-markets' as const,
+    source,
+    degradedReason,
   };
 }

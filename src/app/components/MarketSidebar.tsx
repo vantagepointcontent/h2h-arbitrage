@@ -95,7 +95,7 @@ export interface SavedMarketsListRefreshState {
   status: 'idle' | 'loading' | 'success' | 'empty' | 'degraded' | 'error';
   message: string | null;
   observedAt: string | null;
-  source: 'persisted-saved-markets' | null;
+  source: 'persisted-saved-markets' | 'saved-markets-json-mirror' | null;
   revision: string | null;
 }
 
