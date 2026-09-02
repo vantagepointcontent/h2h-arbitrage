@@ -45,6 +45,8 @@ export interface ExecutableBookQuote {
   /** Venue constraints bound to the observed ladder and checked at runtime boundaries. */
   tickSizeMicroCents: number;
   minimumOrderQuantityMicros: number;
+  /** Canonical depth/VWAP observation; venue submission minimum is gated separately. */
+  quotePurpose?: 'canonical_pricing';
   /** Optional producer provenance retained across scan persistence. */
   sourceStatus?: 'fresh' | 'source_unavailable' | 'stale';
   sourceAttemptedAt?: string;
@@ -217,12 +219,21 @@ export function quoteOneShareFromTopAsk(request: TopAskQuoteRequest): Executable
     levels: quantityMicros > 0 ? [{ priceMicroCents, quantityMicros }] : [],
     requestedQuantityMicros,
     tickSizeMicroCents,
-    minimumOrderQuantityMicros,
+    // This quote answers a pricing/depth question, not whether the venue will
+    // accept the eventual order. Preserve the authoritative venue minimum on
+    // the returned quote, but walk the canonical quantity independently so a
+    // five-share submission minimum cannot erase a valid one-share VWAP.
+    minimumOrderQuantityMicros: Math.min(minimumOrderQuantityMicros, requestedQuantityMicros),
     depthTimestamp: request.depthTimestamp,
   });
+  const pricedResult = {
+    ...result,
+    minimumOrderQuantityMicros,
+    quotePurpose: 'canonical_pricing' as const,
+  };
   return request.unavailableReason
     ? {
-      ...result,
+      ...pricedResult,
       status: 'unavailable',
       reason: request.unavailableReason,
       filledQuantityMicros: 0,
@@ -231,7 +242,7 @@ export function quoteOneShareFromTopAsk(request: TopAskQuoteRequest): Executable
       limitPriceMicroCents: null,
       fills: [],
     }
-    : result;
+    : pricedResult;
 }
 
 /** Validate an executable quote crossing an untrusted API/runtime boundary. */
@@ -246,7 +257,8 @@ export function isExecutableQuoteConsistent(
       || candidate.filledQuantityMicros !== expectedQuantityMicros
       || !Number.isSafeInteger(candidate.tickSizeMicroCents) || candidate.tickSizeMicroCents <= 0
       || !Number.isSafeInteger(candidate.minimumOrderQuantityMicros) || candidate.minimumOrderQuantityMicros <= 0
-      || expectedQuantityMicros < candidate.minimumOrderQuantityMicros
+      || (expectedQuantityMicros < candidate.minimumOrderQuantityMicros
+        && candidate.quotePurpose !== 'canonical_pricing')
       || !candidate.depthTimestamp || !Number.isFinite(Date.parse(candidate.depthTimestamp))
       || !Array.isArray(candidate.fills) || candidate.fills.length === 0) return false;
 

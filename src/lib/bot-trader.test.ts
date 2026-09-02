@@ -371,16 +371,32 @@ describe('evaluateBotTrade', () => {
   });
 
   it('labels venue-minimum pricing as evaluation-only without implying a five-share order', () => {
-    const ev = evaluateBotTrade(makeInput({
+    const input = makeInput({
       pmNoMinOrderSize: 5,
       kalshiYesDepth: 5,
       pmNoDepth: 5,
-    }), baseSettings());
+      pmNoExecutableQuote: quoteOneShareFromTopAsk({
+        price: 0.54,
+        depthUsd: 5,
+        tickSize: 0.01,
+        minimumOrderSize: 5,
+        depthTimestamp: new Date().toISOString(),
+      }),
+    });
+    const ev = evaluateBotTrade(input, baseSettings());
 
     expect(ev.shouldTrade).toBe(false);
     expect(ev.reason).toContain('evaluation quantity 5');
     expect(ev.reason).toContain('canonical executable quantity 1');
     expect(ev.reason).not.toContain('(requested 5)');
+    expect(ev.reason).not.toContain('executable quote is unavailable');
+    expect(input.pmNoExecutableQuote).toMatchObject({
+      status: 'executable',
+      requestedQuantityMicros: 1_000_000,
+      vwapPriceMicroCents: 54_000_000,
+      minimumOrderQuantityMicros: 5_000_000,
+    });
+    expect(buildExecutionRequest(input)).toBeNull();
   });
 
   it('renders an authoritative empty selected book explicitly instead of coercing it to numeric zero liquidity', () => {
