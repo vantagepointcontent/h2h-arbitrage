@@ -3197,7 +3197,9 @@ export async function migrateExecutionsSchema(
   // Migration order matters: CREATE TABLE IF NOT EXISTS never alters an existing table.
   for (const ddl of [
     `ALTER TABLE executions ADD COLUMN steps TEXT`,
-    `ALTER TABLE executions ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'`,
+    // A schema migration cannot prove who initiated pre-contract rows. Keep
+    // those records explicit instead of silently attributing them to Victor.
+    `ALTER TABLE executions ADD COLUMN source TEXT NOT NULL DEFAULT 'unknown'`,
     `ALTER TABLE executions ADD COLUMN selection_method TEXT`,
     `ALTER TABLE executions ADD COLUMN bot_entry_evidence TEXT`,
     `ALTER TABLE executions ADD COLUMN proposition_relationship TEXT`,
@@ -3234,6 +3236,8 @@ async function ensureExecutionsTable(): Promise<void> {
       result           TEXT,
       estimated_profit REAL    NOT NULL DEFAULT 0,
       steps            TEXT,
+      source           TEXT    NOT NULL DEFAULT 'unknown'
+        CHECK (source IN ('manual', 'bot', 'unknown')),
       bot_entry_evidence TEXT,
       proposition_relationship TEXT,
       source_scan_id INTEGER,
@@ -3265,7 +3269,7 @@ export interface ExecutionRecord {
   result?: unknown;
   estimatedProfit: number;
   steps?: unknown;
-  source?: 'manual' | 'bot';
+  source?: 'manual' | 'bot' | 'unknown';
   selectionMethod?: 'roi' | 'apy' | 'hybrid' | null;
   botEntryEvidence?: import('./bot-entry-recovery').BotEntryEvidenceV1 | null;
   propositionRelationship?: import('./proposition-identity').PropositionRelationship | null;
@@ -3275,6 +3279,9 @@ export interface ExecutionRecord {
 }
 
 export async function persistExecution(e: ExecutionRecord): Promise<number> {
+  if (e.source !== 'manual' && e.source !== 'bot' && e.source !== 'unknown') {
+    throw new Error('Execution source must be declared as manual, bot, or unknown');
+  }
   if (e.source === 'bot' && e.success) {
     const evidenceErrors = botEntryEvidenceErrors(e.botEntryEvidence, {
       arbId: e.arbId,
@@ -3307,7 +3314,7 @@ export async function persistExecution(e: ExecutionRecord): Promise<number> {
       e.result != null ? JSON.stringify(e.result) : null,
       e.estimatedProfit ?? 0,
       e.steps != null ? JSON.stringify(e.steps) : null,
-      e.source ?? 'manual',
+      e.source,
       e.source === 'bot' ? (e.selectionMethod ?? null) : null,
       e.botEntryEvidence != null ? JSON.stringify(e.botEntryEvidence) : null,
       e.propositionRelationship != null ? JSON.stringify(e.propositionRelationship) : null,
@@ -3319,26 +3326,133 @@ export async function persistExecution(e: ExecutionRecord): Promise<number> {
   return Number((res.rows as any[])[0]?.id ?? 0);
 }
 
-export async function getExecutions(
-  limit = 200,
-  source?: 'manual' | 'bot',
-  options: { selectionMethod?: 'roi' | 'apy' | 'hybrid' | 'legacy'; sortMethod?: 'asc' | 'desc' } = {},
-): Promise<ExecutionRecord[]> {
+export interface ExecutionQuery {
+  limit?: number;
+  offset?: number;
+  source?: 'manual' | 'bot' | 'unknown';
+  view?: 'real' | 'dry' | 'pending';
+  selectionMethod?: 'roi' | 'apy' | 'hybrid' | 'legacy';
+  sortMethod?: 'asc' | 'desc';
+}
+
+export interface ExecutionQuerySummary {
+  realCount: number;
+  pendingCount: number;
+  totalNetPnlMicros: number | null;
+  unhedgedCount: number;
+  unhedgedExposure: number;
+}
+
+export interface ExecutionQueryResult {
+  executions: ExecutionRecord[];
+  total: number;
+  sourceCounts: { all: number; manual: number; bot: number; unknown: number };
+  summary: ExecutionQuerySummary;
+  nextOffset: number | null;
+}
+
+function executionCanonicalNetPnlMicros(execution: ExecutionRecord): number | null {
+  const envelope = parseCalculationEnvelope(execution.calculationEnvelope, `execution ${execution.id ?? 'unknown'}`);
+  if (envelope.scope !== 'execution' || envelope.status !== 'executable') return null;
+  if (envelope.legs.length !== 2 || envelope.legs.some((leg) => leg.action !== 'buy')) return null;
+  return envelope.totals.netPnlMicros;
+}
+
+function executionTradeStatus(execution: ExecutionRecord): 'filled' | 'pending' | 'cancelled' | 'failed' | 'unavailable' {
+  if (!execution.success) return 'failed';
+  if (execution.dryRun) return 'filled';
+  if (executionCanonicalNetPnlMicros(execution) == null) return 'unavailable';
+  const result = execution.result as {
+    kalshiResult?: { status?: string };
+    polymarketResult?: { status?: string };
+  } | null | undefined;
+  const statuses = [result?.kalshiResult?.status, result?.polymarketResult?.status];
+  if (statuses.includes('pending')) return 'pending';
+  if (statuses.includes('cancelled')) return 'cancelled';
+  return 'filled';
+}
+
+function matchesExecutionView(execution: ExecutionRecord, view?: ExecutionQuery['view']): boolean {
+  if (view === 'pending') return executionTradeStatus(execution) === 'pending';
+  if (view === 'real') return !execution.dryRun && execution.success && executionCanonicalNetPnlMicros(execution) != null;
+  if (view === 'dry') return execution.dryRun;
+  return true;
+}
+
+function summarizeExecutions(executions: ExecutionRecord[]): ExecutionQuerySummary {
+  const realPnls = executions
+    .filter((execution) => !execution.dryRun && execution.success)
+    .map(executionCanonicalNetPnlMicros)
+    .filter((pnl): pnl is number => pnl != null);
+  const unhedged = executions.filter((execution) => {
+    const result = execution.result as { unhedged?: unknown } | null | undefined;
+    return Boolean(result?.unhedged);
+  });
+  return {
+    realCount: realPnls.length,
+    pendingCount: executions.filter((execution) => executionTradeStatus(execution) === 'pending').length,
+    totalNetPnlMicros: realPnls.length > 0 ? realPnls.reduce((sum, pnl) => sum + pnl, 0) : null,
+    unhedgedCount: unhedged.length,
+    unhedgedExposure: unhedged.reduce((sum, execution) => {
+      const exposure = (execution.result as { netExposure?: unknown } | null | undefined)?.netExposure;
+      return sum + (typeof exposure === 'number' && Number.isFinite(exposure) ? exposure : 0);
+    }, 0),
+  };
+}
+
+function executionMethodClauses(selectionMethod?: ExecutionQuery['selectionMethod']): {
+  clauses: string[];
+  args: Array<string | number>;
+} {
+  if (selectionMethod === 'legacy') return { clauses: ['selection_method IS NULL'], args: [] };
+  if (selectionMethod) return { clauses: ['selection_method = ?'], args: [selectionMethod] };
+  return { clauses: [], args: [] };
+}
+
+/** Query and count the complete filtered execution set before pagination. */
+export async function queryExecutions(options: ExecutionQuery = {}): Promise<ExecutionQueryResult> {
   await ensureExecutionsTable();
   const c = getClient();
-  const clauses: string[] = [];
-  const args: Array<string | number> = [];
-  if (source) { clauses.push('source = ?'); args.push(source); }
-  if (options.selectionMethod === 'legacy') clauses.push('selection_method IS NULL');
-  else if (options.selectionMethod) { clauses.push('selection_method = ?'); args.push(options.selectionMethod); }
-  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const limit = Math.min(1000, Math.max(1, options.limit ?? 200));
+  const offset = Math.max(0, options.offset ?? 0);
+  const base = executionMethodClauses(options.selectionMethod);
+  const baseWhere = base.clauses.length ? `WHERE ${base.clauses.join(' AND ')}` : '';
   const order = options.sortMethod
-    ? `CASE WHEN selection_method IS NULL THEN 1 ELSE 0 END, selection_method ${options.sortMethod === 'asc' ? 'ASC' : 'DESC'}, timestamp DESC`
-    : 'timestamp DESC';
-  const sql = `SELECT * FROM executions ${where} ORDER BY ${order} LIMIT ?`;
-  args.push(Math.min(10_000, Math.max(1, limit)));
-  const res = await c.execute({ sql, args });
-  return (res.rows as any[]).map((r) => rowToExecutionRecord(r));
+    ? `CASE WHEN selection_method IS NULL THEN 1 ELSE 0 END, selection_method ${options.sortMethod === 'asc' ? 'ASC' : 'DESC'}, timestamp DESC, id DESC`
+    : 'timestamp DESC, id DESC';
+  // View predicates depend on validated calculation and result envelopes, so
+  // classify the complete method-filtered population before every count,
+  // aggregate, source selection, and page boundary.
+  const result = await c.execute({ sql: `SELECT * FROM executions ${baseWhere} ORDER BY ${order}`, args: base.args });
+  const viewExecutions = (result.rows as any[])
+    .map((row) => rowToExecutionRecord(row))
+    .filter((execution) => matchesExecutionView(execution, options.view));
+  const sourceCounts = { all: 0, manual: 0, bot: 0, unknown: 0 };
+  for (const execution of viewExecutions) {
+    const source = execution.source ?? 'unknown';
+    sourceCounts[source] += 1;
+    sourceCounts.all += 1;
+  }
+  const filteredExecutions = options.source
+    ? viewExecutions.filter((execution) => execution.source === options.source)
+    : viewExecutions;
+  const total = filteredExecutions.length;
+  const executions = filteredExecutions.slice(offset, offset + limit);
+  return {
+    executions,
+    total,
+    sourceCounts,
+    summary: summarizeExecutions(filteredExecutions),
+    nextOffset: offset + executions.length < total ? offset + executions.length : null,
+  };
+}
+
+export async function getExecutions(
+  limit = 200,
+  source?: 'manual' | 'bot' | 'unknown',
+  options: { selectionMethod?: 'roi' | 'apy' | 'hybrid' | 'legacy'; sortMethod?: 'asc' | 'desc' } = {},
+): Promise<ExecutionRecord[]> {
+  return (await queryExecutions({ limit, source, ...options })).executions;
 }
 
 /** Read only the immutable calculation envelopes needed to enrich position APIs. */
@@ -3371,7 +3485,7 @@ function rowToExecutionRecord(r: any): ExecutionRecord {
     result: r.result ? JSON.parse(String(r.result)) : null,
     estimatedProfit: Number(r.estimated_profit ?? 0),
     steps: r.steps ? JSON.parse(String(r.steps)) : null,
-    source: (r.source ?? 'manual') as 'manual' | 'bot',
+    source: r.source === 'manual' || r.source === 'bot' ? r.source : 'unknown',
     selectionMethod: r.selection_method != null ? String(r.selection_method) as 'roi' | 'apy' | 'hybrid' : null,
     botEntryEvidence: r.bot_entry_evidence ? JSON.parse(String(r.bot_entry_evidence)) : null,
     propositionRelationship: r.proposition_relationship ? JSON.parse(String(r.proposition_relationship)) : null,

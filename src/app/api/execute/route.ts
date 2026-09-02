@@ -180,7 +180,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           );
         }
         const authoritativeBook = pmTokenId
-          ? await fetchClobBook(pmTokenId, { bypassCache: true })
+          ? await fetchClobBook(pmTokenId, {
+              bypassCache: true,
+              context: { consumer: 'execute-route', reason: 'pre-placement-revalidation' },
+            })
           : null;
         const constraint = validateOneShareBookOrder(
           authoritativeBook,
@@ -245,6 +248,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         polymarketOrder: effective.polymarketOrder,
         result,
         estimatedProfit: effective.estimatedProfit,
+        source: 'manual',
         steps: result.steps,
         calculationEnvelope: effective.calculationEnvelope
           ? { ...effective.calculationEnvelope, scope: 'execution' }

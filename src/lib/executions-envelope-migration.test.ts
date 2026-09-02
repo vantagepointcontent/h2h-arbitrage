@@ -49,6 +49,7 @@ describe('existing executions calculation-envelope migration', () => {
       totals: { totalFeesMicros: null, netPnlMicros: null },
     });
     expect(first.rows[0].estimated_profit).toBe(12.34);
+    expect(first.rows[0].source).toBe('unknown');
 
     await migrateExecutionsSchema(client);
     const second = await client.execute('SELECT * FROM executions WHERE arb_id = \'legacy-arb\'');
@@ -61,6 +62,7 @@ describe('existing executions calculation-envelope migration', () => {
       'paper_position_deleted_at',
       'paper_position_deletion_reason',
       'paper_position_deletion_source_revision',
+      'source',
     ]));
     expect((await client.execute('PRAGMA integrity_check')).rows[0].integrity_check).toBe('ok');
     expect((await client.execute('PRAGMA foreign_key_check')).rows).toHaveLength(0);

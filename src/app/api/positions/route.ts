@@ -622,6 +622,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           // The legacy column is NOT NULL. Persist a compatibility zero only in
           // that column; consumers must authorize P&L from calculationEnvelope.
           estimatedProfit: canonicalNetPnl ?? 0,
+          source: 'manual',
           calculationEnvelope: { ...calculationEnvelope, scope: 'execution' },
         }).catch(e => logger.warn('[positions] persistExecution failed', { error: String(e) }));
       } catch {

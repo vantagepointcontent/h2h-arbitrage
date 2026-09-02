@@ -10,7 +10,7 @@
  * FEAT: Expandable rows with step-by-step execution timeline (UI-11).
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import {
   Loader2,
@@ -62,7 +62,7 @@ interface ExecutionRecord {
   } | null;
   estimatedProfit: number;
   calculationEnvelope?: unknown;
-  source?: 'manual' | 'bot';
+  source: 'manual' | 'bot' | 'unknown';
   selectionMethod?: 'roi' | 'apy' | 'hybrid' | null;
 }
 
@@ -82,6 +82,22 @@ interface ClosedPositionRecord {
   feesPaid: number | null;
   executionMode?: 'live' | 'paper';
 }
+
+interface ExecutionSummary {
+  realCount: number;
+  pendingCount: number;
+  totalNetPnlMicros: number | null;
+  unhedgedCount: number;
+  unhedgedExposure: number;
+}
+
+const EMPTY_EXECUTION_SUMMARY: ExecutionSummary = {
+  realCount: 0,
+  pendingCount: 0,
+  totalNetPnlMicros: null,
+  unhedgedCount: 0,
+  unhedgedExposure: 0,
+};
 
 const fmtUsd = (n: number) => `$${n.toFixed(2)}`;
 const fmtOptionalUsd = (n: number | null) => n == null ? 'Unavailable' : fmtUsd(n);
@@ -134,7 +150,11 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function MethodBadge({ trade }: { trade: Pick<ExecutionRecord, 'source' | 'selectionMethod'> }) {
-  const label = trade.source !== 'bot' ? 'Manual' : trade.selectionMethod ? trade.selectionMethod.toUpperCase() : 'Legacy/Unknown';
+  const label = trade.source === 'manual'
+    ? 'Manual'
+    : trade.source === 'unknown'
+      ? 'Unknown source'
+      : trade.selectionMethod ? trade.selectionMethod.toUpperCase() : 'Bot · Legacy method';
   return <span className="whitespace-nowrap rounded bg-[#8A9BA8]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#8A9BA8]">{label}</span>;
 }
 
@@ -327,6 +347,13 @@ export default function TradesPanel() {
   const [filter, setFilter] = useState<'all' | 'real' | 'dry' | 'pending'>('all');
   const [methodFilter, setMethodFilter] = useState<'all' | 'roi' | 'apy' | 'hybrid' | 'legacy'>('all');
   const [methodSort, setMethodSort] = useState<'none' | 'asc' | 'desc'>('none');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'manual' | 'bot' | 'unknown'>('all');
+  const [sourceCounts, setSourceCounts] = useState({ all: 0, manual: 0, bot: 0, unknown: 0 });
+  const [summary, setSummary] = useState<ExecutionSummary>(EMPTY_EXECUTION_SUMMARY);
+  const [totalTrades, setTotalTrades] = useState(0);
+  const [nextOffset, setNextOffset] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadGeneration = useRef(0);
   const [cancelling, setCancelling] = useState<number | null>(null);
   const [subTab, setSubTab] = useState<'positions' | 'history'>('positions');
 
@@ -337,24 +364,94 @@ export default function TradesPanel() {
   const [loadingTimelines, setLoadingTimelines] = useState<Set<number>>(new Set());
 
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     setLoading(true);
+    setNextOffset(null);
+    setLoadingMore(false);
     setError(null);
     try {
+      const sourceQuery = sourceFilter === 'all' ? '' : `&source=${sourceFilter}`;
+      const viewQuery = filter === 'all' ? '' : `&view=${filter}`;
       const [executionRes, closedRes] = await Promise.all([
-        fetch(`/api/executions?limit=500${methodFilter === 'all' ? '' : `&method=${methodFilter}`}${methodSort === 'none' ? '' : `&sortMethod=${methodSort}`}`, { cache: 'no-store' }),
+        fetch(`/api/executions?limit=500&offset=0${sourceQuery}${viewQuery}${methodFilter === 'all' ? '' : `&method=${methodFilter}`}${methodSort === 'none' ? '' : `&sortMethod=${methodSort}`}`, { cache: 'no-store' }),
         fetch('/api/closed-positions?limit=500', { cache: 'no-store' }),
       ]);
       const [executionData, closedData] = await Promise.all([executionRes.json(), closedRes.json()]);
       if (!executionData.success) throw new Error(executionData.error || 'Failed to load trades');
       if (!closedData.success) throw new Error(closedData.error || 'Failed to load closed positions');
+      if (generation !== loadGeneration.current) return;
       setTrades(executionData.executions || []);
+      setSourceCounts(executionData.sourceCounts || { all: 0, manual: 0, bot: 0, unknown: 0 });
+      setSummary(executionData.summary || EMPTY_EXECUTION_SUMMARY);
+      setTotalTrades(executionData.total ?? executionData.executions?.length ?? 0);
+      setNextOffset(executionData.nextOffset ?? null);
       setClosedPositions(closedData.positions || []);
     } catch (e: any) {
-      setError(e.message);
+      if (generation === loadGeneration.current) setError(e.message);
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current) setLoading(false);
     }
-  }, [methodFilter, methodSort]);
+  }, [filter, methodFilter, methodSort, sourceFilter]);
+
+  const selectSource = useCallback((source: 'all' | 'manual' | 'bot' | 'unknown') => {
+    if (source === sourceFilter) return;
+    // Invalidate the previous view synchronously at the interaction boundary;
+    // its response must never cross-classify rows after this tab changes.
+    loadGeneration.current += 1;
+    setNextOffset(null);
+    setLoadingMore(false);
+    setSourceFilter(source);
+  }, [sourceFilter]);
+
+  const selectView = useCallback((view: 'all' | 'real' | 'dry' | 'pending') => {
+    if (view === filter) return;
+    loadGeneration.current += 1;
+    setNextOffset(null);
+    setLoadingMore(false);
+    setFilter(view);
+  }, [filter]);
+
+  const selectMethod = useCallback((method: 'all' | 'roi' | 'apy' | 'hybrid' | 'legacy') => {
+    if (method === methodFilter) return;
+    loadGeneration.current += 1;
+    setNextOffset(null);
+    setLoadingMore(false);
+    setMethodFilter(method);
+  }, [methodFilter]);
+
+  const toggleMethodSort = useCallback(() => {
+    loadGeneration.current += 1;
+    setNextOffset(null);
+    setLoadingMore(false);
+    setMethodSort((value) => value === 'asc' ? 'desc' : 'asc');
+  }, []);
+
+  const loadMore = useCallback(async () => {
+    if (nextOffset == null || loadingMore) return;
+    const generation = loadGeneration.current;
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const sourceQuery = sourceFilter === 'all' ? '' : `&source=${sourceFilter}`;
+      const viewQuery = filter === 'all' ? '' : `&view=${filter}`;
+      const res = await fetch(`/api/executions?limit=500&offset=${nextOffset}${sourceQuery}${viewQuery}${methodFilter === 'all' ? '' : `&method=${methodFilter}`}${methodSort === 'none' ? '' : `&sortMethod=${methodSort}`}`, { cache: 'no-store' });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to load more trades');
+      if (generation !== loadGeneration.current) return;
+      setTrades((current) => {
+        const known = new Set(current.map((trade) => trade.id));
+        return [...current, ...(data.executions || []).filter((trade: ExecutionRecord) => !known.has(trade.id))];
+      });
+      setSourceCounts(data.sourceCounts || sourceCounts);
+      setSummary(data.summary || summary);
+      setTotalTrades(data.total ?? totalTrades);
+      setNextOffset(data.nextOffset ?? null);
+    } catch (e: unknown) {
+      if (generation === loadGeneration.current) setError(e instanceof Error ? e.message : 'Failed to load more trades');
+    } finally {
+      if (generation === loadGeneration.current) setLoadingMore(false);
+    }
+  }, [filter, loadingMore, methodFilter, methodSort, nextOffset, sourceCounts, sourceFilter, summary, totalTrades]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
@@ -438,23 +535,7 @@ export default function TradesPanel() {
     }
   };
 
-  const visible = trades.filter((t) => {
-    if (filter === 'all') return true;
-    if (filter === 'pending') return tradeStatus(t) === 'pending';
-    if (filter === 'real') return !t.dryRun && canonicalNetPnlMicros(t) != null;
-    if (filter === 'dry') return t.dryRun;
-    return true;
-  });
-
-  const realTrades = trades.filter((t) => !t.dryRun && t.success && canonicalNetPnlMicros(t) != null);
-  const totalNetPnlMicros = realTrades.length > 0
-    ? realTrades.reduce((sum, trade) => sum + canonicalNetPnlMicros(trade)!, 0)
-    : null;
-  const pendingCount = trades.filter((t) => tradeStatus(t) === 'pending').length;
-  const unhedgedCount = trades.filter((t) => t.result?.unhedged).length;
-  const unhedgedExposure = trades
-    .filter((t) => t.result?.unhedged)
-    .reduce((s, t) => s + (t.result?.netExposure ?? 0), 0);
+  const { realCount, pendingCount, totalNetPnlMicros, unhedgedCount, unhedgedExposure } = summary;
 
   return (
     <div className="p-4 sm:p-6">
@@ -488,7 +569,7 @@ export default function TradesPanel() {
                 {(['all', 'real', 'dry', 'pending'] as const).map((f) => (
                   <button
                     key={f}
-                    onClick={() => setFilter(f)}
+                    onClick={() => selectView(f)}
                     className={`px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
                       filter === f ? 'bg-[#5DBE81] text-black' : 'text-[#8A9BA8] hover:text-[#FFFFFF]'
                     }`}
@@ -500,12 +581,12 @@ export default function TradesPanel() {
                   </button>
                 ))}
               </div>
-              <select aria-label="Filter trades by selection method" value={methodFilter} onChange={(event) => setMethodFilter(event.target.value as typeof methodFilter)} className="min-h-8 rounded-lg border border-[#232E3C] bg-[#0E1621] px-2 text-xs text-[#8A9BA8]">
+              <select aria-label="Filter trades by selection method" value={methodFilter} onChange={(event) => selectMethod(event.target.value as typeof methodFilter)} className="min-h-8 rounded-lg border border-[#232E3C] bg-[#0E1621] px-2 text-xs text-[#8A9BA8]">
                 <option value="all">All methods</option><option value="roi">ROI</option><option value="apy">APY</option><option value="hybrid">Hybrid</option><option value="legacy">Legacy/Unknown</option>
               </select>
-              <button type="button" onClick={() => setMethodSort((value) => value === 'asc' ? 'desc' : 'asc')} className="min-h-8 rounded-lg border border-[#232E3C] px-2 text-xs text-[#8A9BA8]" title="Sort by immutable selection method">Method {methodSort === 'asc' ? '↑' : methodSort === 'desc' ? '↓' : '↕'}</button>
+              <button type="button" onClick={toggleMethodSort} className="min-h-8 rounded-lg border border-[#232E3C] px-2 text-xs text-[#8A9BA8]" title="Sort by immutable selection method">Method {methodSort === 'asc' ? '↑' : methodSort === 'desc' ? '↓' : '↕'}</button>
               <button
-                onClick={load}
+                onClick={() => void load()}
                 className="p-1.5 rounded-lg border border-[#232E3C] text-[#8A9BA8] hover:text-[#FFFFFF] transition-colors"
                 title="Refresh"
               >
@@ -522,7 +603,26 @@ export default function TradesPanel() {
       {/* Trade History sub-tab */}
       {subTab === 'history' && (
         <>
-          <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-x-auto mb-4">
+          <div className="mb-4 flex flex-wrap items-center gap-1 rounded-lg border border-[#182533] bg-[#0E1621] p-1" aria-label="Trade source views">
+            {([
+              ['all', 'All trades'],
+              ['manual', 'Manual trades'],
+              ['bot', 'BotTrader trades'],
+              ['unknown', 'Unknown source'],
+            ] as const).map(([source, label]) => (
+              <button
+                key={source}
+                type="button"
+                onClick={() => selectSource(source)}
+                className={`min-h-8 rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                  sourceFilter === source ? 'bg-[#5DBE81] text-black' : 'text-[#8A9BA8] hover:text-[#FFFFFF]'
+                }`}
+              >
+                {label} <span className="ml-1 tabular-nums">{sourceCounts[source]}</span>
+              </button>
+            ))}
+          </div>
+          {sourceFilter === 'all' && <div className="rounded-xl border border-[#182533] bg-[#17212B] overflow-x-auto mb-4">
             <div className="px-4 py-3 border-b border-[#182533] flex items-center justify-between">
               <div><div className="text-sm font-semibold text-[#FFFFFF]">Closed positions</div><div className="text-[10px] text-[#8A9BA8]">Realized P&amp;L after entry and exit fees</div></div>
               <span className="text-xs text-[#8A9BA8]">{closedPositions.length}</span>
@@ -545,17 +645,17 @@ export default function TradesPanel() {
                 </tr>)}</tbody>
               </table>
             )}
-          </div>
+          </div>}
 
           {/* Summary */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
               <div className="text-[10px] uppercase text-[#8A9BA8]">Total trades</div>
-              <div className="text-lg font-bold text-[#FFFFFF]">{trades.length}</div>
+              <div className="text-lg font-bold text-[#FFFFFF]">{totalTrades}</div>
             </div>
             <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
               <div className="text-[10px] uppercase text-[#8A9BA8]">Real (verified)</div>
-              <div className="text-lg font-bold text-[#5DBE81]">{realTrades.length}</div>
+              <div className="text-lg font-bold text-[#5DBE81]">{realCount}</div>
             </div>
             <div className="rounded-lg border border-[#182533] bg-[#17212B] p-3">
               <div className="text-[10px] uppercase text-[#8A9BA8]">Pending</div>
@@ -588,7 +688,7 @@ export default function TradesPanel() {
             <div className="flex items-center gap-2 text-sm text-[#8A9BA8] py-8 justify-center">
               <Loader2 className="w-4 h-4 animate-spin" /> Loading trades…
             </div>
-          ) : visible.length === 0 ? (
+          ) : trades.length === 0 ? (
             <div className="text-sm text-[#8A9BA8] py-8 text-center">
               No trades recorded yet. Executions (dry-run or real) will appear here.
             </div>
@@ -613,7 +713,7 @@ export default function TradesPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#182533]">
-                  {visible.map((t) => {
+                  {trades.map((t) => {
                     const status = tradeStatus(t);
                     const isUnhedged = Boolean(t.result?.unhedged);
                     const expanded = expandedIds.has(t.id);
@@ -768,6 +868,13 @@ export default function TradesPanel() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+          {nextOffset != null && !loading && (
+            <div className="mt-3 flex justify-center">
+              <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className="min-h-9 rounded-lg border border-[#232E3C] px-4 text-xs font-medium text-[#8A9BA8] hover:text-[#FFFFFF] disabled:opacity-50">
+                {loadingMore ? 'Loading more…' : `Load more (${trades.length} of ${totalTrades})`}
+              </button>
             </div>
           )}
         </>
