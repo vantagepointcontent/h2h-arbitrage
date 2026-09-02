@@ -1,0 +1,36 @@
+{
+  "verifiedAt": "2026-09-02T08:51:13.139Z",
+  "conditionId": "0x0dfc102a438e3554200e2197a328a13b130f5a361f1e21d991caa641a2a9e9d5",
+  "tokenId": "56819873893884977258858218393516932561340483144921551749004812696074089665219",
+  "orderSide": "BUY",
+  "outcomeSide": "yes",
+  "providerHttpStatus": 200,
+  "rawAskLevelCount": 30,
+  "bestAsk": 0.075,
+  "availableShares": 1162.06,
+  "observedAt": "2026-09-02T08:51:05.184Z",
+  "freshnessMs": 7955,
+  "minimumOrderSize": 5,
+  "tickSize": 0.001,
+  "quote": {
+    "status": "executable",
+    "reason": null,
+    "requestedQuantityMicros": 1000000,
+    "filledQuantityMicros": 1000000,
+    "totalCostMicroCents": 7500000,
+    "vwapPriceMicroCents": 7500000,
+    "limitPriceMicroCents": 7500000,
+    "fills": [
+      {
+        "priceCents": 7.5,
+        "priceMicroCents": 7500000,
+        "quantityMicros": 1000000
+      }
+    ],
+    "depthTimestamp": "2026-09-02T08:51:05.184Z",
+    "tickSizeMicroCents": 100000,
+    "minimumOrderQuantityMicros": 5000000,
+    "quotePurpose": "canonical_pricing"
+  },
+  "minimumGate": "Polymarket YES minimum order 5 exceeds canonical executable quantity 1"
+}

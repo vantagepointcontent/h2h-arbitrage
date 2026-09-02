@@ -638,6 +638,14 @@ describe('durable BotTrader scan consumer', () => {
       placementCount: 0,
     });
     expect(result.reason).toContain('canonical executable quantity 1');
+    expect(result.reason).not.toContain('executable quote is unavailable');
+    expect(venueMinimumCandidate.pmNoExecutableQuote).toMatchObject({
+      status: 'executable',
+      requestedQuantityMicros: 1_000_000,
+      filledQuantityMicros: 1_000_000,
+      minimumOrderQuantityMicros: 5_000_000,
+      quotePurpose: 'canonical_pricing',
+    });
     expect(h.deps.execute).not.toHaveBeenCalled();
     expect(h.opportunityDecisions).toContainEqual(expect.objectContaining({
       state: 'rejected',
