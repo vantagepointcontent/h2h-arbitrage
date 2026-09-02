@@ -8,8 +8,11 @@ export async function GET(
 ) {
   try {
     const { id: rawId } = await params;
+    if (!/^[1-9]\d*$/.test(rawId)) {
+      return NextResponse.json({ error: 'Invalid scan id' }, { status: 400 });
+    }
     const id = Number(rawId);
-    if (!Number.isSafeInteger(id) || id <= 0) {
+    if (!Number.isSafeInteger(id)) {
       return NextResponse.json({ error: 'Invalid scan id' }, { status: 400 });
     }
     const detail = await getScanHistoryDetail(id);
